@@ -2,6 +2,12 @@
 
 AI coding agent skills for audio development workflows.
 
+## Installation
+
+```bash
+npx skills add shortwavlabs/agent-skills
+```
+
 ## Skills
 
 ### plugdata-patch
