@@ -94,7 +94,7 @@ skills/vcv-rack-plugin/
 
 ### juce-plugin
 
-Build JUCE audio plugins (VST3, AU, AAX, LV2, Standalone) in C++ with CMake. Covers the full development workflow from project scaffolding to multi-format builds — AudioProcessor lifecycle, parameter management with APVTS, DSP module chains, custom editor GUIs, state serialization, real-time audio safety, and cross-platform CI/CD.
+Build JUCE audio plugins (VST3, AU, AAX, LV2, Standalone) in C++ with CMake. Covers the full development workflow from project scaffolding to multi-format builds — AudioProcessor lifecycle, parameter management with APVTS, DSP module chains, custom editor GUIs, WebView UIs with web technologies (React, Vue, Svelte), state serialization, real-time audio safety, and cross-platform CI/CD.
 
 **Triggers on:** JUCE, audio plugins, VST plugins, AU plugins, audio effects, synthesizers, MIDI processors, AudioProcessor, AudioProcessorEditor, Projucer, `juce_add_plugin`, PluginProcessor.cpp, PluginEditor.cpp.
 
@@ -108,6 +108,7 @@ skills/juce-plugin/
     ├── parameter-management.md APVTS patterns: parameter layout, attachments, state, groups
     ├── dsp-patterns.md         DSP cookbook: ProcessorChain, filters, oscillators, convolution, delay
     ├── ui-patterns.md          Editor patterns: layout, custom widgets, LookAndFeel, meters
+    ├── webview-ui.md           WebView UIs (JUCE 8): React/Vue frontends, JS parameter bindings, hot reloading
     ├── audio-thread-safety.md  Real-time safety: processBlock rules, lock-free patterns, debugging
     └── cmake-reference.md      Full CMake API: juce_add_plugin, SDK paths, CI/CD, platform specifics
 ```
@@ -120,6 +121,7 @@ skills/juce-plugin/
 | **Parameter management** | APVTS: ParameterLayout, SliderAttachment, raw pointers, ParameterReferences struct |
 | **DSP module** | ProcessorChain, IIR/FIR/SVF filters, Oscillator, WaveShaper, Convolution, DelayLine, LadderFilter |
 | **Editor/GUI** | Component layout (FlexBox, Grid), custom widgets, LookAndFeel, meters, binary data |
+| **WebView UIs (JUCE 8)** | WebBrowserComponent, React/Vue frontends, JS parameter bindings, resource providers, hot reloading |
 | **State serialization** | XML state save/load, non-parameter state via ValueTree children |
 | **Audio thread safety** | No-allocation rules, lock-free patterns, denormal prevention, debugging |
 | **Synths** | Synthesiser/SynthesiserVoice/SynthesiserSound framework, polyphonic MIDI |
