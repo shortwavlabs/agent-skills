@@ -85,3 +85,45 @@ skills/vcv-rack-plugin/
 - [VCV Community — Development](https://community.vcvrack.com/c/development/8) — forum discussions
 - [vc-plugins-cli](https://github.com/stephanepericat/vc-plugins-cli) — project scaffolding tool
 - [rack-plugin-toolchain](https://github.com/stephanepericat/rack-plugin-toolchain) — cross-compilation build system
+
+### juce-plugin
+
+Build JUCE audio plugins (VST3, AU, AAX, LV2, Standalone) in C++ with CMake. Covers the full development workflow from project scaffolding to multi-format builds — AudioProcessor lifecycle, parameter management with APVTS, DSP module chains, custom editor GUIs, state serialization, real-time audio safety, and cross-platform CI/CD.
+
+**Triggers on:** JUCE, audio plugins, VST plugins, AU plugins, audio effects, synthesizers, MIDI processors, AudioProcessor, AudioProcessorEditor, Projucer, `juce_add_plugin`, PluginProcessor.cpp, PluginEditor.cpp.
+
+#### Structure
+
+```
+skills/juce-plugin/
+├── SKILL.md                    Main skill instructions & plugin development workflow
+└── references/
+    ├── plugin-lifecycle.md     AudioProcessor contract: overrides, bus configs, Synthesiser framework
+    ├── parameter-management.md APVTS patterns: parameter layout, attachments, state, groups
+    ├── dsp-patterns.md         DSP cookbook: ProcessorChain, filters, oscillators, convolution, delay
+    ├── ui-patterns.md          Editor patterns: layout, custom widgets, LookAndFeel, meters
+    ├── audio-thread-safety.md  Real-time safety: processBlock rules, lock-free patterns, debugging
+    └── cmake-reference.md      Full CMake API: juce_add_plugin, SDK paths, CI/CD, platform specifics
+```
+
+#### What it covers
+
+| Area | Details |
+|------|---------|
+| **Plugin development** | AudioProcessor/AudioProcessorEditor pattern, processBlock(), CMake project setup |
+| **Parameter management** | APVTS: ParameterLayout, SliderAttachment, raw pointers, ParameterReferences struct |
+| **DSP module** | ProcessorChain, IIR/FIR/SVF filters, Oscillator, WaveShaper, Convolution, DelayLine, LadderFilter |
+| **Editor/GUI** | Component layout (FlexBox, Grid), custom widgets, LookAndFeel, meters, binary data |
+| **State serialization** | XML state save/load, non-parameter state via ValueTree children |
+| **Audio thread safety** | No-allocation rules, lock-free patterns, denormal prevention, debugging |
+| **Synths** | Synthesiser/SynthesiserVoice/SynthesiserSound framework, polyphonic MIDI |
+| **Build system** | CMake: juce_add_plugin, SDK paths, binary data, cross-platform, GitHub Actions CI/CD |
+| **Plugin formats** | VST3, AU, AUv3, AAX, LV2, Standalone — format-specific categories and properties |
+
+#### Source documentation
+
+- [JUCE Framework](https://juce.com/) — C++ audio plugin framework by Raw Material Software
+- [JUCE CMake API](https://github.com/juce-framework/JUCE/blob/master/docs/CMake%20API.md) — build system reference
+- [JUCE Examples](https://github.com/juce-framework/JUCE/tree/master/examples) — official plugin and DSP examples
+- [JUCE Development Forum](https://forum.juce.com/c/development/21) — community Q&A and best practices
+- [Pamplejuce](https://github.com/sudara/pamplejuce) — community CMake template for production plugins
