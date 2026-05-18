@@ -139,3 +139,36 @@ skills/juce-plugin/
 - [JUCE Development Forum](https://forum.juce.com/c/development/21) — community Q&A and best practices
 - [JUCE Tutorials](https://juce.com/learn/tutorials/) — official tutorials on plugins, DSP, synth, MIDI, GUI, and more
 - [Pamplejuce](https://github.com/sudara/pamplejuce) — community CMake template for production plugins
+
+### dsp
+
+Digital signal processing algorithms and techniques for real-time audio in C/C++. Covers filter design, audio effects, sound synthesis, spectral analysis, and DSP utilities — derived from the musicdsp.org community archive of practitioner-tested algorithms spanning two decades.
+
+**Triggers on:** audio DSP, digital filters, biquad/Moog/SVF filter code, delay/reverb/compressor/distortion effects, oscillator/wavetable/noise synthesis, FFT/envelope detection, fast math approximations, denormal prevention, interpolation, dithering, any real-time audio processing task.
+
+#### Structure
+
+```
+skills/dsp/
+├── SKILL.md                    Main skill instructions & implementation principles
+└── references/
+    ├── filters.md              Filter design: biquad/RBJ, Moog ladder, SVF, FIR, crossover, DC block
+    ├── effects.md              Effects: delay, reverb, dynamics, modulation, distortion, stereo
+    ├── synthesis.md            Synthesis: oscillators, bandlimited waveforms, FM/PM, noise, envelopes
+    ├── analysis.md             Analysis: FFT, DFT, Goertzel, envelope following, beat detection, LPC
+    └── utilities.md            Utilities: fast math, interpolation, clipping, denormals, dithering, MIDI
+```
+
+#### What it covers
+
+| Area | Details |
+|------|---------|
+| **Filter design** | RBJ/biquad cookbook (LP, HP, BP, notch, peaking, shelf), state variable (Dattorro, Chamberlin, double-sampled), Moog ladder (basic, nonlinear, RC-style), windowed-sinc FIR, Linkwitz-Riley crossover, DC blocker, formant filter, tilt EQ, parameter smoothing, all-pass |
+| **Audio effects** | Static/feedback delay with cubic interpolation, reverb techniques (Schroeder to FDN), RMS compressor, lookahead limiter, 6-stage phaser, waveshapers (Bram de Jong, soft saturation, variable-hardness, gloubi-boulga, polynomial), decimator/bit-crusher, stereo width/rotation/enhancement, dynamic convolution, fold-back distortion |
+| **Sound synthesis** | SVF/recurrence/Taylor/wavetable oscillators, bandlimited synthesis (sinc-train, additive mip-mapping, DSF BLIT, Tomisawa PWM), FM vs PM, noise (Gaussian Box-Muller, XOR-shift, pink auto-correlated), exponential/quadratic envelopes, Chebyshev waveshaping, MinBLEP generation, AM formantic synthesis, granular time-stretching, chaotic LFOs (Rossler/Lorenz) |
+| **Spectral analysis** | DFT partial analysis, FFT overview, Walsh-Hadamard transform, Goertzel single-frequency detection, envelope detection (attack/release, RMS, peak), beat detection pipeline, LPC/Levinson-Durbin, binary-tree lookahead limiting, bit-reversed counting |
+| **DSP utilities** | Fast exp/log/sin/sqrt approximations, IEEE 754 bit manipulation (abs/neg/sign/power/root), interpolation (linear, cubic, Hermite, spline), branchless clipping, denormal prevention (3 methods), triangular-PDF dithering with noise shaping, MIDI/frequency conversion, exponential parameter mapping, cycle-accurate benchmarking, lock-free FIFO |
+
+#### Source documentation
+
+- [musicdsp.org Archive](https://www.musicdsp.org/) — community-contributed DSP algorithms and code (2001-2012)
