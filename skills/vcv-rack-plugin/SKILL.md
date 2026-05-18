@@ -501,3 +501,4 @@ Load these when you need deeper detail on a specific topic:
 - `references/component-library.md` — Full catalog of 60+ built-in UI components (knobs, ports, switches, etc.)
 - `references/ci-cd.md` — GitHub Actions workflow for multi-platform builds
 - `references/rack-sdk-api.md` — Key SDK API reference (engine, dsp, app, widget namespaces)
+- `references/testing.md` — DSP unit testing: test framework, mock strategies, coverage, performance benchmarks

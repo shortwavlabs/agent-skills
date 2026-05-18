@@ -66,6 +66,7 @@ skills/vcv-rack-plugin/
     ├── dsp-patterns.md         DSP cookbook: oscillators, filters, envelopes, triggers
     ├── panel-design.md         SVG panel creation, component placement, dark theme
     ├── component-library.md    60+ built-in UI components (knobs, ports, switches)
+    ├── testing.md              DSP unit testing: frameworks, mock strategies, coverage, benchmarks
     ├── ci-cd.md                GitHub Actions workflow for multi-platform builds
     └── rack-sdk-api.md         Key SDK API reference (engine, dsp, app, widget)
 ```
@@ -78,6 +79,7 @@ skills/vcv-rack-plugin/
 | **DSP patterns** | VCO, VCF, VCA, ADSR, delay, LFO, S&H, clock divider, mixer — with voltage conventions |
 | **Panel design** | SVG specs (mm units, 128.5mm height), Inkscape workflow, component placeholder system |
 | **Components** | 60+ built-in knobs, ports, switches, buttons, sliders, screws, lights |
+| **Testing** | Custom test framework, Rack API mocking strategies, DSP test patterns, coverage, benchmarks |
 | **Polyphony** | 16-channel support, per-voice engines, getPolyVoltage(), setChannels() |
 | **Serialization** | JSON state persistence, dataToJson/dataFromJson, patch storage |
 | **Build system** | Makefile + plugin.mk, Rack SDK, cross-compilation toolchain, Docker builds |
@@ -106,8 +108,8 @@ skills/juce-plugin/
 └── references/
     ├── plugin-lifecycle.md     AudioProcessor contract: overrides, bus configs, Synthesiser framework
     ├── parameter-management.md APVTS patterns: parameter layout, attachments, state, groups
-    ├── dsp-patterns.md         DSP cookbook: ProcessorChain, filters, oscillators, convolution, delay
-    ├── ui-patterns.md          Editor patterns: layout, custom widgets, LookAndFeel, meters
+    ├── dsp-patterns.md         DSP cookbook: ProcessorChain, filters, oscillators, wavetable synthesis, delay, distortion
+    ├── ui-patterns.md          Editor patterns: layout, custom widgets, LookAndFeel, meters, FFT spectrum analyser
     ├── webview-ui.md           WebView UIs (JUCE 8): React/Vue frontends, JS parameter bindings, hot reloading
     ├── audio-thread-safety.md  Real-time safety: processBlock rules, lock-free patterns, debugging
     └── cmake-reference.md      Full CMake API: juce_add_plugin, SDK paths, CI/CD, platform specifics
@@ -119,12 +121,13 @@ skills/juce-plugin/
 |------|---------|
 | **Plugin development** | AudioProcessor/AudioProcessorEditor pattern, processBlock(), CMake project setup |
 | **Parameter management** | APVTS: ParameterLayout, SliderAttachment, raw pointers, ParameterReferences struct |
-| **DSP module** | ProcessorChain, IIR/FIR/SVF filters, Oscillator, WaveShaper, Convolution, DelayLine, LadderFilter |
-| **Editor/GUI** | Component layout (FlexBox, Grid), custom widgets, LookAndFeel, meters, binary data |
+| **DSP module** | ProcessorChain, IIR/FIR/SVF filters, Oscillator, WaveShaper, Convolution, DelayLine, LadderFilter, wavetable synthesis, LFO at control rate, two-level chain architecture |
+| **Editor/GUI** | Component layout (FlexBox, Grid), custom widgets, LookAndFeel, meters, FFT spectrum analyser, binary data |
 | **WebView UIs (JUCE 8)** | WebBrowserComponent, React/Vue frontends, JS parameter bindings, resource providers, hot reloading |
 | **State serialization** | XML state save/load, non-parameter state via ValueTree children |
 | **Audio thread safety** | No-allocation rules, lock-free patterns, denormal prevention, debugging |
-| **Synths** | Synthesiser/SynthesiserVoice/SynthesiserSound framework, polyphonic MIDI |
+| **Synths** | Synthesiser/SynthesiserVoice/SynthesiserSound framework, polyphonic MIDI, gain ramping |
+| **AudioProcessorGraph** | Processor chaining, graph nodes, dynamic rebuild, node bypass |
 | **Build system** | CMake: juce_add_plugin, SDK paths, binary data, cross-platform, GitHub Actions CI/CD |
 | **Plugin formats** | VST3, AU, AUv3, AAX, LV2, Standalone — format-specific categories and properties |
 
