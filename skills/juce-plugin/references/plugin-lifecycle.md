@@ -255,6 +255,113 @@ auto sidechain = getBusBuffer (buffer, true, 1);
 auto mainOutput = getBusBuffer (buffer, false, 0);
 ```
 
+## AudioProcessorGraph (Chaining Processors)
+
+`AudioProcessorGraph` lets you wire multiple `AudioProcessor` instances together as a directed graph — useful for channel strips, modular effects, or plugin hosting.
+
+### ProcessorBase (reduces boilerplate for graph nodes)
+
+```cpp
+class ProcessorBase : public juce::AudioProcessor
+{
+public:
+    ProcessorBase()
+        : AudioProcessor (BusesProperties()
+            .withInput  ("Input",  juce::AudioChannelSet::stereo())
+            .withOutput ("Output", juce::AudioChannelSet::stereo())) {}
+
+    void prepareToPlay (double, int) override {}
+    void releaseResources() override {}
+    void processBlock (juce::AudioSampleBuffer&, juce::MidiBuffer&) override {}
+
+    juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+    bool hasEditor() const override { return false; }
+    const juce::String getName() const override { return {}; }
+    bool acceptsMidi() const override { return false; }
+    bool producesMidi() const override { return false; }
+    double getTailLengthSeconds() const override { return 0; }
+    int getNumPrograms() override { return 0; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram (int) override {}
+    const juce::String getProgramName (int) override { return {}; }
+    void changeProgramName (int, const juce::String&) override {}
+    void getStateInformation (juce::MemoryBlock&) override {}
+    void setStateInformation (const void*, int) override {}
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ProcessorBase)
+};
+```
+
+### Graph Setup
+
+```cpp
+std::unique_ptr<juce::AudioProcessorGraph> mainProcessor;
+juce::AudioProcessorGraph::Node::Ptr audioInputNode, audioOutputNode;
+juce::AudioProcessorGraph::Node::Ptr midiInputNode, midiOutputNode;
+
+void initialiseGraph()
+{
+    mainProcessor->clear();
+
+    audioInputNode  = mainProcessor->addNode (std::make_unique<juce::AudioGraphIOProcessor>
+        (juce::AudioGraphIOProcessor::audioInputNode));
+    audioOutputNode = mainProcessor->addNode (std::make_unique<juce::AudioGraphIOProcessor>
+        (juce::AudioGraphIOProcessor::audioOutputNode));
+    midiInputNode   = mainProcessor->addNode (std::make_unique<juce::AudioGraphIOProcessor>
+        (juce::AudioGraphIOProcessor::midiInputNode));
+    midiOutputNode  = mainProcessor->addNode (std::make_unique<juce::AudioGraphIOProcessor>
+        (juce::AudioGraphIOProcessor::midiOutputNode));
+}
+```
+
+### Connecting Nodes
+
+```cpp
+// Audio connections use channel indices
+for (int channel = 0; channel < 2; ++channel)
+    mainProcessor->addConnection ({
+        { audioInputNode->nodeID, channel },
+        { audioOutputNode->nodeID, channel }
+    });
+
+// MIDI uses a special channel index
+mainProcessor->addConnection ({
+    { midiInputNode->nodeID, juce::AudioProcessorGraph::midiChannelIndex },
+    { midiOutputNode->nodeID, juce::AudioProcessorGraph::midiChannelIndex }
+});
+```
+
+### Delegating processBlock to the Graph
+
+```cpp
+void prepareToPlay (double sampleRate, int samplesPerBlock) override
+{
+    mainProcessor->setPlayConfigDetails (
+        getMainBusNumInputChannels(), getMainBusNumOutputChannels(),
+        sampleRate, samplesPerBlock);
+    mainProcessor->prepareToPlay (sampleRate, samplesPerBlock);
+    initialiseGraph();
+}
+
+void processBlock (juce::AudioSampleBuffer& buffer, juce::MidiBuffer& midi) override
+{
+    // Clear excess output channels
+    for (int i = getTotalNumInputChannels(); i < getTotalNumOutputChannels(); ++i)
+        buffer.clear (i, 0, buffer.getNumSamples());
+
+    updateGraph();  // rebuild if parameters changed
+    mainProcessor->processBlock (buffer, midi);
+}
+```
+
+### Node Bypass
+
+```cpp
+node->setBypassed (true);   // node still exists but is skipped
+```
+
+Bypassing is more efficient than removing/re-adding nodes for temporary bypass.
+
 ## Double Precision
 
 ```cpp

@@ -244,6 +244,33 @@ std::make_unique<juce::AudioParameterFloat>(
     0.5f)
 ```
 
+## Gain Ramping (Avoiding Zipper Noise)
+
+Applying parameter values directly in `processBlock` causes zipper noise — audible clicks when values change between blocks. Always smooth parameter changes:
+
+```cpp
+// In processor header:
+float previousGain = 0.0f;
+
+// In prepareToPlay (not constructor — param value may change before audio starts):
+previousGain = *gainParam;
+
+// In processBlock:
+auto currentGain = gainParam->load();
+
+if (juce::approximatelyEqual (currentGain, previousGain))
+{
+    buffer.applyGain (currentGain);
+}
+else
+{
+    buffer.applyGainRamp (0, buffer.getNumSamples(), previousGain, currentGain);
+    previousGain = currentGain;
+}
+```
+
+The `dsp::Gain` processor handles this automatically with `setRampDurationSeconds()`, but for manual gain application, `applyGainRamp()` is the standard approach.
+
 ## Responding to Parameter Changes
 
 To react when a parameter changes (e.g., recalculating coefficients):

@@ -134,4 +134,5 @@ skills/juce-plugin/
 - [JUCE CMake API](https://github.com/juce-framework/JUCE/blob/master/docs/CMake%20API.md) — build system reference
 - [JUCE Examples](https://github.com/juce-framework/JUCE/tree/master/examples) — official plugin and DSP examples
 - [JUCE Development Forum](https://forum.juce.com/c/development/21) — community Q&A and best practices
+- [JUCE Tutorials](https://juce.com/learn/tutorials/) — official tutorials on plugins, DSP, synth, MIDI, GUI, and more
 - [Pamplejuce](https://github.com/sudara/pamplejuce) — community CMake template for production plugins

@@ -249,6 +249,114 @@ juce::Font customFont (juce::FontOptions {
 });
 ```
 
+## FFT Spectrum Analyser
+
+Real-time frequency display using a lock-free FIFO pattern. The audio thread fills a FIFO; when full, it copies to an FFT buffer and sets a flag. The message thread picks it up via a timer.
+
+```cpp
+class SpectrumAnalyser : public juce::Component,
+                         private juce::Timer
+{
+public:
+    SpectrumAnalyser()
+        : forwardFFT (fftOrder),
+          window (fftSize, juce::dsp::WindowingFunction<float>::hann)
+    {
+        startTimerHz (30);
+    }
+
+    // Called from audio thread — lock-free
+    void pushSample (float sample) noexcept
+    {
+        if (fifoIndex == fftSize)
+        {
+            if (! nextFFTBlockReady)
+            {
+                std::fill (fftData.begin(), fftData.end(), 0.0f);
+                std::copy (fifo.begin(), fifo.end(), fftData.begin());
+                nextFFTBlockReady = true;
+            }
+            fifoIndex = 0;
+        }
+        fifo[(size_t) fifoIndex++] = sample;
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        g.fillAll (juce::Colours::black);
+        g.setColour (juce::Colours::green);
+        auto bounds = getLocalBounds().toFloat();
+        auto width = bounds.getWidth();
+        auto height = bounds.getHeight();
+
+        for (int i = 1; i < scopeSize; ++i)
+        {
+            g.drawLine ({
+                juce::jmap ((float) (i - 1), 0.0f, (float) scopeSize, 0.0f, width),
+                juce::jmap (scopeData[i - 1], 0.0f, 1.0f, height, 0.0f),
+                juce::jmap ((float) i, 0.0f, (float) scopeSize, 0.0f, width),
+                juce::jmap (scopeData[i], 0.0f, 1.0f, height, 0.0f)
+            });
+        }
+    }
+
+private:
+    void timerCallback() override
+    {
+        if (nextFFTBlockReady)
+        {
+            // Apply window before FFT
+            window.multiplyWithWindowingTable (fftData.data(), fftSize);
+            forwardFFT.performFrequencyOnlyForwardTransform (fftData.data());
+
+            // Convert to dB, map to [0, 1]
+            for (int i = 0; i < scopeSize; ++i)
+            {
+                auto skewedX = 1.0f - std::exp (std::log (1.0f - (float) i / scopeSize) * 0.2f);
+                auto fftIndex = juce::jlimit (0, fftSize / 2, (int) (skewedX * fftSize / 2));
+                auto level = juce::jmap (
+                    juce::jlimit (-100.0f, 0.0f,
+                        juce::Decibels::gainToDecibels (fftData[fftIndex])
+                        - juce::Decibels::gainToDecibels ((float) fftSize)),
+                    -100.0f, 0.0f, 0.0f, 1.0f);
+                scopeData[i] = level;
+            }
+            nextFFTBlockReady = false;
+            repaint();
+        }
+    }
+
+    static constexpr auto fftOrder = 10;       // 2^10 = 1024
+    static constexpr auto fftSize = 1 << fftOrder;
+    static constexpr auto scopeSize = 512;
+
+    juce::dsp::FFT forwardFFT;
+    juce::dsp::WindowingFunction<float> window;
+
+    std::array<float, fftSize> fifo;
+    std::array<float, fftSize * 2> fftData;    // double-sized for FFT
+    std::array<float, scopeSize> scopeData;
+    int fifoIndex = 0;
+    bool nextFFTBlockReady = false;
+};
+```
+
+Key points:
+- `fftData` is `fftSize * 2` elements but only the first `fftSize` are filled from the FIFO. The FFT operates in-place on the full array.
+- Apply windowing (`multiplyWithWindowingTable`) **before** the FFT. Hann window is the default for spectrum analysis.
+- Normalize by subtracting `gainToDecibels(fftSize)` — raw FFT magnitudes scale with FFT size.
+- Only `fftSize / 2` bins are meaningful (Nyquist limit).
+- The `skewedX` formula maps linear pixel positions to logarithmic frequency indices.
+
+### Windowing Functions
+
+| Window | Best For |
+|--------|----------|
+| Rectangular | Highest frequency resolution, lowest dynamic range |
+| Hamming | Narrow-band analysis |
+| **Hann** | **Balanced — recommended default** |
+| Blackman | Highest dynamic range, lowest resolution |
+
 ## Paint Best Practices
 
 ```cpp

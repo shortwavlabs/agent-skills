@@ -417,8 +417,8 @@ Read these as needed based on what you're implementing:
 
 - **`references/plugin-lifecycle.md`** — Complete AudioProcessor contract: all overrides, bus configurations, double precision, Synthesiser framework for synths
 - **`references/parameter-management.md`** — APVTS patterns: parameter layout, attachments, raw pointers, non-parameter state, parameter groups
-- **`references/dsp-patterns.md`** — DSP cookbook: ProcessorChain, filters, oscillators, waveshapers, convolution reverb, delay lines, per-sample vs block processing
-- **`references/ui-patterns.md`** — Editor patterns: component layout, custom widgets, LookAndFeel, meters, responsive resize, binary data for assets
+- **`references/dsp-patterns.md`** — DSP cookbook: ProcessorChain, filters, oscillators, waveshapers, convolution reverb, delay lines, wavetable synthesis, LFO at control rate, two-level chain architecture, per-sample vs block processing
+- **`references/ui-patterns.md`** — Editor patterns: component layout, custom widgets, LookAndFeel, meters, FFT spectrum analyser, responsive resize, binary data for assets
 - **`references/webview-ui.md`** — WebView UIs (JUCE 8): WebBrowserComponent, resource providers, native functions, JS parameter bindings, React integration, hot reloading
 - **`references/audio-thread-safety.md`** — Real-time safety rules: what you can/cannot do in processBlock, lock-free patterns, atomics, debugging audio glitches
 - **`references/cmake-reference.md`** — Full CMake API: all juce_add_plugin properties, SDK paths, binary data, CI/CD, platform specifics

@@ -295,3 +295,222 @@ juce::dsp::LinkwitzRileyFilter<float> crossover;
 // Low output = lowpass, High output = highpass
 // Sum of low + high = original signal (phase-coherent)
 ```
+
+## Wavetable Synthesis
+
+Pre-computing one cycle of a waveform into a table, then reading back with linear interpolation. This trades memory for CPU — significantly faster than calling `std::sin()` per sample, especially with many voices.
+
+```cpp
+class WavetableOscillator
+{
+public:
+    WavetableOscillator (const juce::AudioSampleBuffer& wavetable)
+        : wavetable (wavetable), tableSize ((int) wavetable.getNumSamples() - 1)
+    {
+        jassert (wavetable.getNumChannels() == 1);
+    }
+
+    void prepare (double sampleRate)
+    {
+        tableDelta = frequency * (float) tableSize / (float) sampleRate;
+    }
+
+    void setFrequency (float freq, double sampleRate)
+    {
+        frequency = freq;
+        tableDelta = freq * (float) tableSize / (float) sampleRate;
+    }
+
+    float getNextSample() noexcept
+    {
+        auto index0 = (unsigned int) currentIndex;
+        auto index1 = index0 + 1;  // safe: table has wrap guard
+        auto frac = currentIndex - (float) index0;
+
+        auto* table = wavetable.getReadPointer (0);
+        auto value0 = table[index0];
+        auto value1 = table[index1];
+        auto currentSample = value0 + frac * (value1 - value0);
+
+        currentIndex += tableDelta;
+        while (currentIndex >= (float) tableSize)
+            currentIndex -= (float) tableSize;
+
+        return currentSample;
+    }
+
+private:
+    const juce::AudioSampleBuffer& wavetable;
+    int tableSize;
+    float currentIndex = 0.0f, tableDelta = 0.0f, frequency = 440.0f;
+};
+```
+
+Key: `tableSize` is `getNumSamples() - 1` because the last sample is a wrap guard — a copy of the first sample. This eliminates a conditional branch in `getNextSample()` since `index1 = index0 + 1` is always valid.
+
+### Generating Harmonic Wavetables
+
+```cpp
+juce::AudioSampleBuffer generateWavetable (int tableSize)
+{
+    juce::AudioSampleBuffer table (1, tableSize + 1);  // +1 for wrap guard
+    auto* samples = table.getWritePointer (0);
+
+    int harmonics[] = { 1, 3, 5, 7, 9, 13, 15 };
+    float harmonicWeights[] = { 0.5f, 0.1f, 0.05f, 0.09f, 0.005f, 0.002f, 0.001f };
+
+    for (auto harmonic = 0; harmonic < numElementsInArray (harmonics); ++harmonic)
+    {
+        auto angleDelta = MathConstants<double>::twoPi / (double) (tableSize - 1)
+                          * harmonics[harmonic];
+        auto currentAngle = 0.0;
+
+        for (unsigned int i = 0; i < tableSize; ++i)
+        {
+            auto sample = std::sin (currentAngle);
+            samples[i] += (float) sample * harmonicWeights[harmonic];
+            currentAngle += angleDelta;
+        }
+    }
+
+    samples[tableSize] = samples[0];  // wrap guard
+    return table;
+}
+```
+
+Note: adding high harmonics causes aliasing if they exceed Nyquist. For production, use band-limited wavetables (multiple tables per octave, crossfade between them).
+
+## LFO at Control Rate
+
+LFOs are control-rate, not audio-rate. They should NOT be in the ProcessorChain — run them separately and apply their output to parameters at a reduced update rate:
+
+```cpp
+static constexpr size_t lfoUpdateRate = 100;  // update every 100 samples
+size_t lfoUpdateCounter = lfoUpdateRate;
+juce::dsp::Oscillator<float> lfo;
+
+// In prepare — run at reduced rate:
+lfo.prepare ({ spec.sampleRate / lfoUpdateRate, spec.maximumBlockSize, spec.numChannels });
+
+// In processBlock — manual block splitting:
+for (size_t pos = 0; pos < (size_t) numSamples;)
+{
+    auto max = juce::jmin ((size_t) numSamples - pos, lfoUpdateCounter);
+    auto block = audioBlock.getSubBlock (pos, max);
+    juce::dsp::ProcessContextReplacing<float> context (block);
+    processorChain.process (context);
+    pos += max;
+    lfoUpdateCounter -= max;
+
+    if (lfoUpdateCounter == 0)
+    {
+        lfoUpdateCounter = lfoUpdateRate;
+        auto lfoOut = lfo.processSample (0.0f);
+        auto cutoffFreq = juce::jmap (lfoOut, -1.0f, 1.0f, 100.0f, 2000.0f);
+        processorChain.get<filterIndex>().setCutoffFrequencyHz (cutoffFreq);
+    }
+}
+```
+
+## Two-Level Chain Architecture (Per-Voice + Engine FX)
+
+For synths, each voice has its own ProcessorChain for oscillators/filters/gain. Shared effects like reverb go on the engine level:
+
+```cpp
+// Per-voice chain (inside SynthesiserVoice)
+enum { oscIndex, filterIndex, gainIndex };
+juce::dsp::ProcessorChain<juce::dsp::Oscillator<float>,
+                          juce::dsp::StateVariableTPTFilter<float>,
+                          juce::dsp::Gain<float>> voiceChain;
+
+// Engine-level chain (inside Synthesiser subclass)
+enum { reverbIndex };
+juce::dsp::ProcessorChain<juce::dsp::Reverb> fxChain;
+
+// Override renderNextSubBlock to apply engine FX after all voices render:
+void renderNextSubBlock (AudioBuffer<float>& output, int startSample, int numSamples) override
+{
+    Synthesiser::renderNextSubBlock (output, startSample, numSamples);  // render all voices
+    auto block = juce::dsp::AudioBlock<float> (output)
+                    .getSubBlock ((size_t) startSample, (size_t) numSamples);
+    juce::dsp::ProcessContextReplacing<float> context (block);
+    fxChain.process (context);  // apply shared FX
+}
+```
+
+## Delay with Feedback and Saturation
+
+The `tanh` soft-clip on the feedback path prevents runaway feedback — a standard DSP technique for natural-sounding delays:
+
+```cpp
+for (int s = 0; s < numSamples; ++s)
+{
+    auto delayedSample = delayLine.popSample (channel);
+    auto inputSample = buffer.getSample (channel, s);
+
+    // Soft-clip the feedback to prevent runaway
+    auto dlineInput = std::tanh (inputSample + feedback * delayedSample);
+    delayLine.pushSample (channel, dlineInput);
+
+    auto output = inputSample + wetLevel * delayedSample;
+    buffer.setSample (channel, s, output);
+}
+```
+
+### Filtered feedback (darker repeats — more realistic)
+
+```cpp
+// Filter the delayed sample before feeding back
+auto filteredDelayed = feedbackFilter.processSample (channel, delayedSample);
+auto dlineInput = std::tanh (inputSample + feedback * filteredDelayed);
+```
+
+Use `IIR::Coefficients::makeFirstOrderLowPass` for natural decay (high frequencies die first), or `makeFirstOrderHighPass` for lo-fi bright repeats.
+
+## Distortion Signal Chain
+
+The standard distortion chain: filter → pre-gain → waveshaper → post-gain:
+
+```cpp
+enum { filterIndex, preGainIndex, waveshaperIndex, postGainIndex };
+
+juce::dsp::ProcessorChain<
+    juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>,
+                                    juce::dsp::IIR::Coefficients<float>>,
+    juce::dsp::Gain<float>,
+    juce::dsp::WaveShaper<float>,
+    juce::dsp::Gain<float>
+> distortionChain;
+
+// Setup:
+auto& preGain = distortionChain.get<preGainIndex>();
+preGain.setGainDecibels (30.0f);  // drive into saturation
+
+auto& waveshaper = distortionChain.get<waveshaperIndex>();
+waveshaper.functionToUse = [] (float x) { return std::tanh (x); };
+
+auto& postGain = distortionChain.get<postGainIndex>();
+postGain.setGainDecibels (-20.0f);  // trim after saturation
+
+// High-pass before distortion prevents muddy low-frequency buildup
+auto& filter = distortionChain.get<filterIndex>();
+*filter.state = *juce::dsp::IIR::Coefficients<float>::makeFirstOrderHighPass (sampleRate, 200.0f);
+```
+
+## HeapBlock for Temporary Buffers
+
+Pre-allocated temporary buffers for multi-voice rendering:
+
+```cpp
+juce::HeapBlock<char> heapBlock;
+juce::dsp::AudioBlock<float> tempBlock;
+
+// In prepare:
+tempBlock = juce::dsp::AudioBlock<float> (heapBlock, spec.numChannels, spec.maximumBlockSize);
+
+// In process — use tempBlock as scratch, then add to output:
+auto output = tempBlock.getSubBlock (0, (size_t) numSamples);
+output.clear();
+// ... render voices into output ...
+juce::dsp::AudioBlock<float> (buffer).getSubBlock (0, (size_t) numSamples).add (tempBlock);
+```
