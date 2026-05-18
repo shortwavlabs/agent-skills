@@ -216,3 +216,43 @@ skills/vult-dsp/
 - [Vult Examples](https://github.com/vult-dsp/vult/tree/master/examples) — filters, oscillators, envelopes, effects, utilities
 - [Vult Compiler (GitHub)](https://github.com/vult-dsp/vult) — compiler source and releases
 - [VCV Rack Playground](https://github.com/vult-dsp/RackPlayground) — Vult + VCV Rack template
+
+### faust-dsp
+
+Write DSP algorithms in Faust — a functional, block-diagram programming language that compiles to optimized C/C++, WebAssembly, LLVM IR, Rust, and more. Covers the full Faust workflow from signal processing design to cross-platform deployment: VST/AU plugins, standalone JACK apps, PureData/Max externals, SuperCollider, Csound, WebAudio, iOS/Android, Bela, Teensy, ESP32, and JUCE integration. The skill covers Faust's five composition operators, standard libraries (30+ libraries with 500+ functions), UI primitives, MIDI/polyphony, and the complete compilation pipeline.
+
+**Triggers on:** Faust, faust code, `.dsp` files, functional audio programming, block-diagram DSP, faust2xx scripts, compiling DSP to audio plugins, cross-platform audio from a single source, signal processing block diagrams, any real-time audio DSP task that could be expressed functionally.
+
+#### Structure
+
+```
+skills/faust-dsp/
+├── SKILL.md                    Main skill instructions & Faust development workflow
+└── references/
+    ├── dsp-patterns.md         DSP cookbook: oscillators, filters, delays, dynamics, modulation, distortion, reverb, synthesis, envelopes, analysis
+    ├── libraries.md            Standard library reference: 30+ libraries (basics, maths, oscillators, filters, delays, reverbs, envelopes, compressors, etc.)
+    └── compilation.md          Compiler options, faust2xx scripts, architecture files, plugin targets, code generation modes
+```
+
+#### What it covers
+
+| Area | Details |
+|------|---------|
+| **Language syntax** | Five composition operators (parallel, sequential, split, merge, recursive), iterations (par/seq/sum/prod), pattern matching, lexical environments (`with`, `environment`, `letrec`), foreign functions |
+| **Primitives** | Numbers, identity (`_`), cut (`!`), delay (`@`, `'`), tables (rdtable, rwtable), waveform, soundfile, route, select2/3, math.h equivalents |
+| **Standard libraries** | 30+ libraries via stdfaust.lib: oscillators, filters, delays, reverbs, envelopes, compressors, noises, signals, analyzers, physical models, DX7, wavetable, ambisonics, and more |
+| **DSP patterns** | Oscillators (sine, saw, square, wavetable), filters (one-pole, resonant, SVF, Moog, parametric EQ, Butterworth), delay/echo/comb, dynamics (compressor, limiter, gate), modulation (chorus, flanger, phaser, tremolo, vibrato), distortion (soft/hard clip, bitcrusher), reverb (Zita, Freeverb, Schroeder), synthesis (additive, FM, Karplus-Strong, subtractive, physical modeling), envelopes (AR, ADSR) |
+| **User interface** | UI primitives (hslider, vslider, nentry, button, checkbox, groups, bargraphs), metadata for styling, parameter smoothing with `si.smoo` |
+| **MIDI & polyphony** | MIDI CC/note/velocity/pitchwheel mapping, polyphonic voice allocation, `freq`/`gain`/`gate` standard params, shared `effect` line, sustain pedal |
+| **Compilation** | `faust` CLI options, code generation modes (scalar, vector, OpenMP, scheduler), precision (single/double/quad/fixed-point) |
+| **Targets** | VST2, AU, LV2, JACK, ALSA, CoreAudio, PureData, Max/MSP, SuperCollider, Csound, WebAudio/WASM, iOS, Android, Bela, Teensy, ESP32, Raspberry Pi, JUCE, Unity, Cmajor, JSFX, RNBO |
+| **faust2xx scripts** | 30+ one-step compilation scripts: faust2faustvst, faust2au, faust2jaqt, faust2puredata, faust2supercollider, faust2android, faust2ios, faust2bela, faust2api, etc. |
+| **Architecture files** | Audio driver + GUI bridges: ALSA, JACK, CoreAudio, VST, AU, LV2, WebAudio, Android, iOS, Bela; embedding via libfaust LLVM JIT |
+
+#### Source documentation
+
+- [Faust Documentation](https://faustdoc.grame.fr/) — official manual, syntax reference, compiler guide, tutorials
+- [Faust Libraries](https://faustlibraries.grame.fr/) — complete library function reference (30+ libraries)
+- [Faust GitHub](https://github.com/grame-cncm/faust) — compiler source, examples, architecture files
+- [Faust Examples](https://faustdoc.grame.fr/examples/) — categorized examples (ambisonics, reverb, physical modeling, etc.)
+- [Faust Wiki](https://github.com/grame-cncm/faust/wiki) — tutorials, platform-specific guides, workshops
