@@ -172,3 +172,47 @@ skills/dsp/
 #### Source documentation
 
 - [musicdsp.org Archive](https://www.musicdsp.org/) — community-contributed DSP algorithms and code (2001-2012)
+
+### vult-dsp
+
+Write DSP algorithms in the Vult language — a transcompiled language designed for high-performance audio signal processing. Vult compiles to plain C/C++ (or JavaScript/Lua) and excels at writing audio effects, synthesizers, and real-time DSP for VCV Rack plugins, Teensy/Arduino microcontrollers, PureData externals, and WebAudio. The language's unique `mem` variable and implicit function context system eliminates the boilerplate of manual state management in DSP code.
+
+**Triggers on:** Vult, vultc, Vult DSP code generation, audio DSP for VCV Rack with Vult, embedded audio on Teensy/Arduino with Vult, fixed-point audio DSP, transcompiling DSP to C/C++, Vult filters/oscillators/envelopes/effects, `.vult` files.
+
+#### Structure
+
+```
+skills/vult-dsp/
+├── SKILL.md                    Main skill instructions & DSP development workflow
+└── references/
+    ├── language-reference.md   Complete syntax: types, mem variables, function context, tags, arrays
+    ├── dsp-patterns.md         DSP cookbook: biquad, ladder, SVF filters, oscillators, ADSR, LFO, delay, saturation
+    └── code-generation.md      Compilation, C/C++ output, integration patterns, fixed-point, polyphony
+```
+
+#### What it covers
+
+| Area | Details |
+|------|---------|
+| **Language syntax** | Static typing with inference, `int`/`real`/`bool`/`unit`, explicit casting, `val`/`mem` variables |
+| **Function context** | Implicit state via `mem`, named contexts for stereo/oversampling, `and` for shared state |
+| **Filters** | Biquad (Direct Form 2), Audio EQ Cookbook lowpass, SVF (LP/HP/BP/notch), diode ladder (Euler/Heun) |
+| **Oscillators** | Phase accumulator, saw, square, triangle, BLIT-based bandlimited |
+| **Envelopes** | ADSR state machine with gate triggering, shape-selectable LFO with reset |
+| **Effects** | Simple delay, feedback delay, soft saturation, decimator/bitcrusher |
+| **Tags** | `@[init]` custom init, `@[table]` lookup tables, `@[wave]` WAV file embedding |
+| **Oversampling** | 2x/4x patterns using named contexts, frequency scaling |
+| **Pitch/frequency** | CV↔pitch↔frequency conversion, rate calculation with table optimizations |
+| **Compilation** | `vultc` CLI: `-ccode`, `-jscode`, `-luacode`, `-real fixed`, `-template pd/teensy` |
+| **Code generation** | C/C++ naming conventions, context types, return value access, runtime files |
+| **Integration** | VCV Rack (RackPlayground), JUCE/audio plugins, Teensy Audio, Arduino, PureData, WebAudio |
+| **Fixed-point** | q16.16 format, range/scaling strategies, mixed float/fixed, `fix16` type |
+| **Polyphony** | Context struct arrays, voice sharing optimizations |
+
+#### Source documentation
+
+- [Vult Language Reference](https://github.com/vult-dsp/vult/wiki/Language-Reference) — official syntax guide
+- [Vult Tutorials](https://vult-dsp.github.io/vult/tutorials/) — basics through advanced DSP
+- [Vult Examples](https://github.com/vult-dsp/vult/tree/master/examples) — filters, oscillators, envelopes, effects, utilities
+- [Vult Compiler (GitHub)](https://github.com/vult-dsp/vult) — compiler source and releases
+- [VCV Rack Playground](https://github.com/vult-dsp/RackPlayground) — Vult + VCV Rack template
