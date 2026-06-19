@@ -173,6 +173,40 @@ skills/dsp/
 
 - [musicdsp.org Archive](https://www.musicdsp.org/) — community-contributed DSP algorithms and code (2001-2012)
 
+### dsp-engineer
+
+Think DSP-inspired signal-processing engineering guide for C++ implementations. Covers concept-first DSP workflows: Signal/Wave/Spectrum modeling, spectra, spectrograms, harmonics, aliasing, noise, autocorrelation, DCT/DFT, convolution, LTI systems, modulation, sampling, interpolation, and C++ translations of Think DSP's Python/NumPy examples.
+
+**Triggers on:** Think DSP, translating DSP examples from Python/NumPy to C++, signal analysis, spectral decomposition, FFT/DFT/DCT explanations, spectrograms, autocorrelation pitch estimation, convolution theorem, impulse responses, sampling theorem, aliasing, modulation, educational DSP prototypes.
+
+#### Structure
+
+```
+skills/dsp-engineer/
+├── SKILL.md                         Main skill workflow and reference routing
+├── references/
+│   ├── thinkdsp-concepts.md         Chapter-by-chapter concept map from Think DSP
+│   ├── cpp-patterns.md              C++ translations of core Think DSP examples
+│   └── engineering-checks.md        Validation, scaling, aliasing, and production checks
+└── assets/
+    └── thinkdsp.hpp                 Self-contained educational C++ DSP header
+```
+
+#### What it covers
+
+| Area | Details |
+|------|---------|
+| **DSP mental model** | Signal/Wave/Spectrum/Spectrogram object model, unit-first workflow, sample rate and bin spacing discipline |
+| **Spectral analysis** | DFT/IDFT conventions, one-sided real spectra, harmonic structure, phase, DC handling, spectrogram resolution |
+| **C++ translations** | Sine/cosine synthesis, triangle/square/sawtooth waves, chirps, windows, direct DFT, DCT-IV, convolution, filters, noise, autocorrelation, AM, sampling |
+| **Signal phenomena** | Leakage, aliasing, Nyquist/folding frequency, Gabor limit, pink/Brownian noise slopes, spectral differentiation/integration |
+| **Systems view** | Convolution theorem, LTI systems, impulse responses, transfer functions, linear versus circular convolution |
+| **Engineering validation** | Round-trip tests, amplitude scaling checks, alias fold tests, pitch-lag tests, FFT replacement guidance, real-time safety notes |
+
+#### Source documentation
+
+- Think DSP by Allen B. Downey, Green Tea Press — CC BY-NC-SA 4.0
+
 ### vult-dsp
 
 Write DSP algorithms in the Vult language — a transcompiled language designed for high-performance audio signal processing. Vult compiles to plain C/C++ (or JavaScript/Lua) and excels at writing audio effects, synthesizers, and real-time DSP for VCV Rack plugins, Teensy/Arduino microcontrollers, PureData externals, and WebAudio. The language's unique `mem` variable and implicit function context system eliminates the boilerplate of manual state management in DSP code.

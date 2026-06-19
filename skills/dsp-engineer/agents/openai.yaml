@@ -1,0 +1,4 @@
+interface:
+  display_name: "DSP Engineer"
+  short_description: "Think DSP concepts with C++ recipes"
+  default_prompt: "Use $dsp-engineer to design and explain a C++ spectral analysis workflow."
