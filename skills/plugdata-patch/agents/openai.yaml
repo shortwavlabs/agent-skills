@@ -1,0 +1,4 @@
+interface:
+  display_name: "plugdata Patch"
+  short_description: "Pure Data and plugdata patches"
+  default_prompt: "Use $plugdata-patch to create a Pure Data audio effect patch."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Guitar DSP"
+  short_description: "Guitar amp, pedal, and plugin DSP"
+  default_prompt: "Use $guitar-dsp to design, debug, and validate a realtime-safe guitar amp or pedal plugin."

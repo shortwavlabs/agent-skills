@@ -112,7 +112,8 @@ skills/juce-plugin/
     ├── ui-patterns.md          Editor patterns: layout, custom widgets, LookAndFeel, meters, FFT spectrum analyser
     ├── webview-ui.md           WebView UIs (JUCE 8): React/Vue frontends, JS parameter bindings, hot reloading
     ├── audio-thread-safety.md  Real-time safety: processBlock rules, lock-free patterns, debugging
-    └── cmake-reference.md      Full CMake API: juce_add_plugin, SDK paths, CI/CD, platform specifics
+    ├── cmake-reference.md      Full CMake API: juce_add_plugin, SDK paths, CI/CD, platform specifics
+    └── production-plugin-practices.md  Product plugin practices: validation, assets, state restore
 ```
 
 #### What it covers
@@ -130,6 +131,7 @@ skills/juce-plugin/
 | **AudioProcessorGraph** | Processor chaining, graph nodes, dynamic rebuild, node bypass |
 | **Build system** | CMake: juce_add_plugin, SDK paths, binary data, cross-platform, GitHub Actions CI/CD |
 | **Plugin formats** | VST3, AU, AUv3, AAX, LV2, Standalone — format-specific categories and properties |
+| **Production practices** | Separate plugin/test/measurement builds, asset/model loading, state restore, host validation, release gates |
 
 #### Source documentation
 
@@ -139,6 +141,46 @@ skills/juce-plugin/
 - [JUCE Development Forum](https://forum.juce.com/c/development/21) — community Q&A and best practices
 - [JUCE Tutorials](https://juce.com/learn/tutorials/) — official tutorials on plugins, DSP, synth, MIDI, GUI, and more
 - [Pamplejuce](https://github.com/sudara/pamplejuce) — community CMake template for production plugins
+
+### guitar-dsp
+
+Design, implement, debug, train, and validate guitar amp/effects DSP systems. Covers realtime guitar plugin architecture, C++/JUCE DSP block modeling, RTNeural/neural amp modeling, capture and export workflows, cabinet IRs, pedal chains, tone stacks, validation, and release checks.
+
+**Triggers on:** guitar amp modelers, pedal emulations, neural audio model training/export, RTNeural loaders, cabinet simulators, tone stacks, C++/JUCE guitar DSP blocks, measurement harnesses, guitar plugin latency/CPU/aliasing/tone quality, neural modeling math, ESR/ASR/loss theory.
+
+#### Structure
+
+```
+skills/guitar-dsp/
+├── SKILL.md                         Main workflow and reference routing
+├── scripts/
+│   ├── compare_audio_metrics.py      WAV alignment, polarity, residual, ESR, correlation metrics
+│   ├── model_package_summary.py      RTNeural package/model summary and warnings
+│   └── receptive_field.py            Conv1D receptive-field calculator
+└── references/
+    ├── cpp-juce-dsp-modeling.md      C++/JUCE block modeling lessons for guitar effects
+    ├── example-prompts.md            Realistic prompts for testing and demonstrating skill use
+    ├── failure-diagnosis.md          Symptom-to-cause-to-check debugging matrix
+    ├── guitar-signal-chain.md       Guitar chain, gain staging, mono/stereo policy, block tests
+    ├── neural-modeling-workflow.md  Capture, alignment, training presets, export packages
+    ├── neural-modeling-math.md      Causal TCN math, metrics, losses, ASR, runtime theory
+    ├── rtneural-runtime.md          RTNeural loading, metadata, sample-rate and latency policy
+    ├── runtime-code-patterns.md      C++ runtime patterns for snapshots, handoff, smoothing
+    ├── task-playbooks.md             Common guitar DSP workflows
+    └── validation-and-release.md    Tests, benchmarks, plugin validation, DAW smoke gates
+```
+
+#### What it covers
+
+| Area | Details |
+|------|---------|
+| **Signal chain** | Input trim, gate, compressor, drives, neural amp, tone stack, EQ, cabinet, modulation, delay, reverb, utility output |
+| **C++/JUCE DSP modeling** | Parameter snapshots, smoothing, realtime-safe class shape, circuit-to-DSP translation, block tests, measurement fixtures |
+| **Neural modeling** | Dry/target capture contracts, latency alignment, WaveNet-family preset selection, RTNeural export packages |
+| **Math theory** | Causal finite-memory models, Conv1D receptive field, ESR/RMSE/correlation, checkpoint scoring, pre-emphasis/STFT losses, ASR, RTF |
+| **Runtime integration** | Embedded factory models, user-loaded package folders, per-channel model state, metadata warnings, sample-rate policy |
+| **Cabinet and effects** | IR loading, resampling, normalization policy, convolution latency, nonlinear pedal tests, automation safety |
+| **Diagnosis and validation** | Failure matrix, Python/native parity, native benchmarks, aliasing reports, DSP unit tests, measurement harnesses, auval/pluginval, DAW smoke |
 
 ### dsp
 

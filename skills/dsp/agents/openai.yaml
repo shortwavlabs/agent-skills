@@ -1,0 +1,4 @@
+interface:
+  display_name: "DSP"
+  short_description: "Real-time audio DSP algorithms"
+  default_prompt: "Use $dsp to implement a real-time audio DSP algorithm in C++."

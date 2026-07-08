@@ -1,0 +1,4 @@
+interface:
+  display_name: "Faust DSP"
+  short_description: "Faust audio DSP development"
+  default_prompt: "Use $faust-dsp to write and compile a Faust DSP effect."

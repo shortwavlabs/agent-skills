@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vult DSP"
+  short_description: "Vult language DSP development"
+  default_prompt: "Use $vult-dsp to implement a Vult DSP algorithm and generate C++."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "VCV Rack Plugin"
+  short_description: "VCV Rack module development"
+  default_prompt: "Use $vcv-rack-plugin to build a VCV Rack module in C++."

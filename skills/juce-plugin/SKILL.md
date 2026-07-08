@@ -422,6 +422,7 @@ Read these as needed based on what you're implementing:
 - **`references/webview-ui.md`** — WebView UIs (JUCE 8): WebBrowserComponent, resource providers, native functions, JS parameter bindings, React integration, hot reloading
 - **`references/audio-thread-safety.md`** — Real-time safety rules: what you can/cannot do in processBlock, lock-free patterns, atomics, debugging audio glitches
 - **`references/cmake-reference.md`** — Full CMake API: all juce_add_plugin properties, SDK paths, binary data, CI/CD, platform specifics
+- **`references/production-plugin-practices.md`** — Product-shaped plugin practices: CMake presets, test/measurement targets, asset/model loading, state restore, latency/tail updates, host validation, and release gates
 
 ## Common Patterns
 
