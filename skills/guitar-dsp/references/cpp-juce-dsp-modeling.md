@@ -65,6 +65,8 @@ Do not expose every component as a UI control. Hide calibration constants behind
 
 ## Nonlinear Pedal Modeling
 
+For deeper transfer-curve decisions, read `nonlinear-waveshaping.md`. For diode/fuzz circuits, read `diode-and-fuzz-circuits.md`. For aliasing and oversampling decisions, read `aliasing-oversampling.md`.
+
 A good guitar drive/fuzz block usually needs more than a waveshaper:
 
 ```text
@@ -122,6 +124,8 @@ Tone/EQ:
 - Rebuild coefficients at a bounded control interval or crossfade when coefficient jumps can click.
 - Validate response windows, not only finite output.
 
+For passive or interactive tone networks, read `tone-stack-modeling.md`.
+
 Cabinet:
 
 - Load, resample, normalize, and construct convolution engines outside the callback.
@@ -130,6 +134,8 @@ Cabinet:
 - Optimize no-IR and blend endpoint paths.
 - Preserve quiet captured IRs unless normalization is explicitly enabled.
 - Report latency and tail only when the active engine actually needs them.
+
+For speaker compression, resonance, breakup, and dynamic EQ beyond a static IR, read `speaker-cabinet-dynamics.md`.
 
 ## Modulation, Delay, And Reverb
 

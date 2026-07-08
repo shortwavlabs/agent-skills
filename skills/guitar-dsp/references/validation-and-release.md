@@ -49,7 +49,19 @@ For nonlinear guitar stages, add:
 - Harmonic growth with drive/sustain.
 - DC rejection after asymmetric clipping.
 - Alias residue checks or high-rate comparisons.
+- Coherent sine alias-probe reports for high-gain settings when aliasing is a release risk.
+- Oversampling on/off or factor comparisons when an oversampled path is introduced.
 - Output calibration across gain controls.
+- Transfer-curve reports for waveshapers and diode/tube stages.
+- Solver convergence checks for diode feedback stages.
+- Reduced-input cleanup checks for fuzz stages.
+
+For tone stacks, add:
+
+- Response curves at min/default/max and representative combinations.
+- Insertion-loss checks.
+- Automation/crossfade checks for switches and coefficient changes.
+- Passive network source/load assumptions when modeled.
 
 For cabinet stages, add:
 
@@ -58,6 +70,8 @@ For cabinet stages, add:
 - Non-matching IR sample rates are resampled or rejected deliberately.
 - Blend endpoints select the intended slot.
 - Repeated load/swap/clear while processing stays finite.
+- Dynamic cabinet layers disabled reproduce the static IR/filter path.
+- Speaker compression/resonance reports at low, medium, and high drive.
 
 For processor-level tests, include:
 
@@ -96,6 +110,7 @@ Build offline measurement tools for Repeatable Release data:
 - Full chain timing for common presets.
 - Stereo correlation for stereo post-FX.
 - Alias/DC checks for nonlinear blocks.
+- Harmonic/non-harmonic energy reports for nonlinear blocks.
 - Automation max-adjacent-delta checks for abrupt control changes.
 - IR swap stress timing.
 

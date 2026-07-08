@@ -144,9 +144,9 @@ skills/juce-plugin/
 
 ### guitar-dsp
 
-Design, implement, debug, train, and validate guitar amp/effects DSP systems. Covers realtime guitar plugin architecture, C++/JUCE DSP block modeling, RTNeural/neural amp modeling, capture and export workflows, cabinet IRs, pedal chains, tone stacks, validation, and release checks.
+Design, implement, debug, train, and validate guitar amp/effects DSP systems. Covers realtime guitar plugin architecture, C++/JUCE DSP block modeling, nonlinear waveshaping, aliasing/oversampling, tone stacks, diode/fuzz circuits, tube-stage approximations, speaker cabinet dynamics, RTNeural/neural amp modeling, capture and export workflows, cabinet IRs, pedal chains, validation, and release checks.
 
-**Triggers on:** guitar amp modelers, pedal emulations, neural audio model training/export, RTNeural loaders, cabinet simulators, tone stacks, C++/JUCE guitar DSP blocks, measurement harnesses, guitar plugin latency/CPU/aliasing/tone quality, neural modeling math, ESR/ASR/loss theory.
+**Triggers on:** guitar amp modelers, pedal emulations, neural audio model training/export, RTNeural loaders, cabinet simulators, tone stacks, diode clippers, fuzz circuits, tube stages, speaker dynamics, C++/JUCE guitar DSP blocks, measurement harnesses, guitar plugin latency/CPU/aliasing/tone quality, neural modeling math, ESR/ASR/loss theory.
 
 #### Structure
 
@@ -154,19 +154,26 @@ Design, implement, debug, train, and validate guitar amp/effects DSP systems. Co
 skills/guitar-dsp/
 ├── SKILL.md                         Main workflow and reference routing
 ├── scripts/
+│   ├── alias_probe_report.py         Harmonic/non-harmonic energy from sine renders
 │   ├── compare_audio_metrics.py      WAV alignment, polarity, residual, ESR, correlation metrics
 │   ├── model_package_summary.py      RTNeural package/model summary and warnings
 │   └── receptive_field.py            Conv1D receptive-field calculator
 └── references/
+    ├── aliasing-oversampling.md      Aliasing diagnosis, oversampling islands, ADAA, alias probes
     ├── cpp-juce-dsp-modeling.md      C++/JUCE block modeling lessons for guitar effects
+    ├── diode-and-fuzz-circuits.md    Diode clipping, feedback solvers, fuzz bias/loading behavior
     ├── example-prompts.md            Realistic prompts for testing and demonstrating skill use
     ├── failure-diagnosis.md          Symptom-to-cause-to-check debugging matrix
     ├── guitar-signal-chain.md       Guitar chain, gain staging, mono/stereo policy, block tests
+    ├── nonlinear-waveshaping.md      Transfer curves, dynamic shaping, gain staging, compensation
     ├── neural-modeling-workflow.md  Capture, alignment, training presets, export packages
     ├── neural-modeling-math.md      Causal TCN math, metrics, losses, ASR, runtime theory
     ├── rtneural-runtime.md          RTNeural loading, metadata, sample-rate and latency policy
     ├── runtime-code-patterns.md      C++ runtime patterns for snapshots, handoff, smoothing
+    ├── speaker-cabinet-dynamics.md  Speaker compression, resonance, breakup, dynamic cabinet behavior
     ├── task-playbooks.md             Common guitar DSP workflows
+    ├── tone-stack-modeling.md        Passive/active tone stacks, loading, smoothing, response tests
+    ├── triode-and-tube-stage-approximation.md  Tube-like curves, memory, sag, power-stage behavior
     └── validation-and-release.md    Tests, benchmarks, plugin validation, DAW smoke gates
 ```
 
@@ -180,6 +187,8 @@ skills/guitar-dsp/
 | **Math theory** | Causal finite-memory models, Conv1D receptive field, ESR/RMSE/correlation, checkpoint scoring, pre-emphasis/STFT losses, ASR, RTF |
 | **Runtime integration** | Embedded factory models, user-loaded package folders, per-channel model state, metadata warnings, sample-rate policy |
 | **Cabinet and effects** | IR loading, resampling, normalization policy, convolution latency, nonlinear pedal tests, automation safety |
+| **Nonlinear DSP** | Waveshaping families, diode/fuzz circuits, tube-stage approximation, aliasing analysis, local oversampling islands, ADAA tradeoffs |
+| **Tone and speaker modeling** | Passive/active tone stacks, insertion loss, speaker compression, resonance, breakup, dynamic cabinet behavior |
 | **Diagnosis and validation** | Failure matrix, Python/native parity, native benchmarks, aliasing reports, DSP unit tests, measurement harnesses, auval/pluginval, DAW smoke |
 
 ### dsp

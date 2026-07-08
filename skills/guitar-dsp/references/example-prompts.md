@@ -12,6 +12,9 @@
 
 - "Use $guitar-dsp to add a realtime-safe RTNeural model loader to this JUCE amp plugin."
 - "Use $guitar-dsp to design a C++ DSP block for a four-knob overdrive with bypass, smoothing, and tests."
+- "Use $guitar-dsp to design a passive tone stack model with insertion loss, smoothing, and response tests."
+- "Use $guitar-dsp to approximate a tube preamp stage with triode-like saturation and coupling-cap recovery."
+- "Use $guitar-dsp to add speaker cabinet dynamics on top of an existing IR loader."
 - "Use $guitar-dsp to add cabinet IR loading with safe swaps, sample-rate conversion, blend endpoints, and latency reporting."
 - "Use $guitar-dsp to refactor this pedal DSP so APVTS access stays outside the audio block."
 - "Use $guitar-dsp to design a measurement harness for drive transfer curves, alias spectra, and level compensation."

@@ -1,6 +1,6 @@
 ---
 name: guitar-dsp
-description: Design, implement, debug, train, and validate guitar amp/effects DSP systems, especially realtime C++/JUCE plugins, C++ DSP block modeling, RTNeural/neural amp models, cabinet IRs, pedal chains, capture/training/export workflows, neural modeling math theory, plugin validation, and DAW-safe release checks. Use when building guitar amp modelers, pedal emulations, neural audio model training/export, RTNeural loaders, cabinet simulators, tone stacks, guitar-focused realtime DSP, DSP measurement harnesses, or troubleshooting guitar plugin tone quality, latency, CPU, aliasing, metrics, losses, or host behavior.
+description: Design, implement, debug, train, and validate guitar amp/effects DSP systems, especially realtime C++/JUCE plugins, C++ DSP block modeling, nonlinear waveshaping, aliasing and oversampling strategy, tone stack modeling, diode/fuzz circuits, triode and tube stage approximation, speaker cabinet dynamics, RTNeural/neural amp models, cabinet IRs, pedal chains, capture/training/export workflows, neural modeling math theory, plugin validation, and DAW-safe release checks. Use when building guitar amp modelers, pedal emulations, neural audio model training/export, RTNeural loaders, cabinet simulators, tone stacks, guitar-focused realtime DSP, DSP measurement harnesses, or troubleshooting guitar plugin tone quality, latency, CPU, aliasing, oversampling, metrics, losses, or host behavior.
 ---
 
 # Guitar DSP
@@ -17,6 +17,8 @@ Use this skill for guitar-centric DSP work that spans tone, realtime safety, C++
 
 1. Classify the task:
    - Conventional DSP: pedals, tone stacks, EQ, cabinet, delay, reverb, tuner, metronome, looper.
+   - Nonlinear DSP: waveshaping, clipping, diode/fuzz circuits, tube-like stages, aliasing, DC, harmonic measurement, oversampling.
+   - Tone and cabinet modeling: tone stacks, presence/depth, cabinet IR, speaker dynamics, cabinet compression.
    - C++/JUCE DSP modeling: block class shape, parameter snapshots, smoothing, circuit-to-DSP translation, tests, measurement fixtures.
    - Neural modeling: capture, alignment, training preset selection, export package validation.
    - Runtime integration: RTNeural model loading, inference, sample-rate policy, model metadata, state restore.
@@ -33,6 +35,12 @@ Use this skill for guitar-centric DSP work that spans tone, realtime safety, C++
 | `references/failure-diagnosis.md` | Debugging audible or host failures: bad tone despite metrics, clicks, zipper noise, aliasing, gate chatter, stereo image shift, preset/model/IR restore bugs, or validation failures. |
 | `references/guitar-signal-chain.md` | Designing amp/effects order, mono/stereo routing, gain staging, cabinet IR, pedal/tone-stack behavior, or DSP block tests. |
 | `references/cpp-juce-dsp-modeling.md` | Implementing or reviewing C++/JUCE DSP blocks for gates, compressors, drives, fuzzes, tone/EQ, cabinet, modulation, delay, reverb, tuner/metronome, or post color. |
+| `references/nonlinear-waveshaping.md` | Designing or reviewing memoryless/dynamic waveshapers, transfer curves, asymmetry, output compensation, nonlinear control mapping, or harmonic-growth tests. |
+| `references/aliasing-oversampling.md` | Diagnosing aliasing, choosing local oversampling islands, using ADAA, measuring harmonic/non-harmonic energy, or handling nonlinear CPU/latency tradeoffs. |
+| `references/tone-stack-modeling.md` | Modeling amp tone stacks, pedal tone controls, passive loaded networks, active EQ macros, presence/depth controls, smoothing, and response tests. |
+| `references/diode-and-fuzz-circuits.md` | Modeling diode clippers, feedback clipping, op-amp diode solvers, fuzz circuits, bias/loading behavior, tone bypass, and fuzz-specific tests. |
+| `references/triode-and-tube-stage-approximation.md` | Approximating tube preamp/power stages, triode-like curves, grid/cathode/coupling memory, sag, presence/depth, and tube-stage tests. |
+| `references/speaker-cabinet-dynamics.md` | Adding dynamics beyond static IRs: speaker compression, resonance, excursion, breakup, dynamic EQ, impedance-style behavior, and cabinet dynamic tests. |
 | `references/neural-modeling-workflow.md` | Preparing dry/target captures, choosing WaveNet-family training presets, aligning latency, exporting RTNeural packages, or interpreting validation reports. |
 | `references/neural-modeling-math.md` | Need the math behind causal TCN amp modeling: receptive field, latency alignment, ESR/RMSE/correlation, checkpoint scoring, pre-emphasis/STFT losses, ASR, RTF, and architecture tradeoffs. |
 | `references/rtneural-runtime.md` | Loading embedded or user-selected RTNeural JSON, choosing dynamic vs static models, handling stereo state, metadata warnings, sample-rate mismatch, and plugin latency semantics. |
@@ -47,6 +55,7 @@ Use this skill for guitar-centric DSP work that spans tone, realtime safety, C++
 | `scripts/model_package_summary.py` | Inspect an RTNeural JSON or package folder for layers, Conv1D receptive field, metadata, validation/aliasing/benchmark sidecars, and warnings. |
 | `scripts/receptive_field.py` | Compute causal Conv1D receptive field and lookback samples from RTNeural/Keras-style JSON. |
 | `scripts/compare_audio_metrics.py` | Compare two WAV renders for alignment lag, polarity, RMSE, ESR, correlation, peak error, and DC offset. |
+| `scripts/alias_probe_report.py` | Estimate harmonic and non-harmonic energy from a coherent sine WAV render of a nonlinear stage. |
 
 ## Default Decisions
 

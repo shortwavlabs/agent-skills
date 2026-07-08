@@ -84,6 +84,7 @@ Tone-stack rules:
 - Update coefficients at a bounded control rate instead of rebuilding every sample unless the algorithm requires it.
 - Make neutral controls exact or near-exact passthrough.
 - Test automation across extremes, not only static settings.
+- For passive, lossy, or interactive stacks, read `tone-stack-modeling.md` before reducing the circuit to generic EQ.
 
 Useful starting frequency landmarks:
 
@@ -128,6 +129,7 @@ For nonlinear pedals:
 - Check aliasing with high-frequency tones and high-gain settings.
 - Use local oversampling or substeps only when measurement/listening justifies it.
 - Calibrate output level so gain changes feel intentional.
+- Read `nonlinear-waveshaping.md` for generic transfer curves and `diode-and-fuzz-circuits.md` for circuit-specific fuzz/diode behavior.
 
 For dynamics:
 

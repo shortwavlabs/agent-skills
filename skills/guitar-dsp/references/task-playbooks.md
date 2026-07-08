@@ -16,6 +16,12 @@
 Start with the playbook that matches the user's request, then load deeper references only when needed:
 
 - Conventional pedal/effect code: read `guitar-signal-chain.md` and `cpp-juce-dsp-modeling.md`.
+- Generic waveshaping work: read `nonlinear-waveshaping.md`.
+- Diode or fuzz work: read `diode-and-fuzz-circuits.md`.
+- Aliasing or oversampling work: read `aliasing-oversampling.md`.
+- Tone stack work: read `tone-stack-modeling.md`.
+- Tube-stage work: read `triode-and-tube-stage-approximation.md`.
+- Dynamic cabinet work: read `speaker-cabinet-dynamics.md`.
 - RTNeural runtime work: read `rtneural-runtime.md` and `runtime-code-patterns.md`.
 - Training/export work: read `neural-modeling-workflow.md` and `neural-modeling-math.md`.
 - Validation or release work: read `validation-and-release.md` and `failure-diagnosis.md`.
@@ -112,14 +118,22 @@ python skills/guitar-dsp/scripts/compare_audio_metrics.py dry.wav processed.wav 
 1. Identify every nonlinear stage in the enabled path.
 2. Confirm input gain into each nonlinear stage. A correct clipper can sound wrong if driven 12 dB hotter than intended.
 3. Render sines at 1 kHz, 5 kHz, 7 kHz, and 10 kHz at realistic drive settings.
-4. Compare host-rate processing against a local oversampled or reference render.
-5. Try cheap improvements before large architecture changes:
+4. Measure a coherent sine render when available:
+
+```bash
+python skills/guitar-dsp/scripts/alias_probe_report.py rendered-7khz.wav --fundamental 7000 --settle-samples 2048
+```
+
+5. Compare host-rate processing against a local oversampled or reference render.
+6. Try cheap improvements before large architecture changes:
    - pre-nonlinearity bandwidth limiting
    - post-nonlinearity recovery filtering
    - DC cleanup after asymmetric stages
    - better transfer curve or diode solver
    - small local oversampling island
-6. Keep full-chain oversampling as a last resort. It is often too expensive and can complicate latency and state.
+7. Keep full-chain oversampling as a last resort. It is often too expensive and can complicate latency and state.
+
+Read `aliasing-oversampling.md` before choosing an oversampling factor, and read `nonlinear-waveshaping.md` before changing a known-good transfer curve.
 
 ## Add Or Refine Cabinet IR Support
 
