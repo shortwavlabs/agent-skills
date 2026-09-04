@@ -1,0 +1,4 @@
+interface:
+  display_name: "Guitar Gear QA"
+  short_description: "Audit guitar-gear Blender scenes before final delivery"
+  default_prompt: "Use $guitar-gear-qa to inspect this guitar-gear Blender scene, classify visible or dimensional issues by severity, fix only high-confidence problems, and verify final-render readiness."

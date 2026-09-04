@@ -1,0 +1,4 @@
+interface:
+  display_name: "Guitar Product Render"
+  short_description: "Light and render polished commercial guitar product shots"
+  default_prompt: "Use $guitar-product-render to create a controlled studio camera and lighting setup, iterate with efficient previews, and produce a polished commercial render of this guitar-gear product."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Guitar Gear Modeling"
+  short_description: "Model dimensionally accurate pedals, amps, and hardware"
+  default_prompt: "Use $guitar-gear-modeling to build or revise this guitar-gear product with real dimensions, clean hard-surface construction, reusable hardware, and inspection-driven iteration."

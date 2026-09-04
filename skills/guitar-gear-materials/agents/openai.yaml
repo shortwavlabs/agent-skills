@@ -1,0 +1,4 @@
+interface:
+  display_name: "Guitar Gear Materials"
+  short_description: "Build realistic materials and graphics for guitar gear"
+  default_prompt: "Use $guitar-gear-materials to create physically plausible guitar-gear materials, correctly scaled surface detail, and clean labels or decals for this Blender product."
