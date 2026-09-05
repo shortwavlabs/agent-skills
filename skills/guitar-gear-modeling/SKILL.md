@@ -7,7 +7,7 @@ description: Model guitar pedals, amplifiers, cabinets, controls, and hardware i
 
 Use this skill for dimensionally grounded Blender modeling of guitar pedals, amplifiers, speaker cabinets, rack gear, footswitches, knobs, jacks, switches, handles, corners, vents, fasteners, and related product hardware.
 
-Read `references/construction-standards.md` before substantial modeling. Read `references/component-library.md` when creating repeated hardware. Use `templates/product-brief.md` when the request lacks a compact specification.
+Read [construction standards](references/construction-standards.md) for substantial modeling, panel constraints, slant geometry and support placement. Read [component construction](references/component-library.md) for knobs, jacks, toggles and repeated hardware. Read [Blender operations](references/blender-operations.md) when scripting, handling nested instances, saving standalone libraries or exporting. Use `templates/product-brief.md` when the request lacks a compact specification.
 
 ## When to use
 
@@ -34,9 +34,18 @@ If dimensions are incomplete, infer only low-risk secondary dimensions from visu
 2. Discover the Blender MCP operations available in the session instead of assuming tool names.
 3. Prefer small, reversible edits and non-destructive modifiers.
 4. After each major modeling phase, inspect at least one useful viewport/image result before continuing.
-5. Do not run large opaque Python programs when direct Blender/MCP operations are sufficient.
+5. Use direct Blender/MCP operations for small edits; use scoped, reproducible Python for repeated construction and batches. Keep helper dependencies explicit.
 6. When Python execution is the best route, make the script idempotent when practical and scope it to named objects/collections.
 7. Save or checkpoint before broad destructive operations when the available MCP supports it.
+
+## Refining an accepted asset
+
+- Carry forward the latest user feedback and explicitly accepted constraints. Do not reintroduce a rejected reference-based placement.
+- Inspect a fresh baseline, edit the smallest responsible source, and preserve requested prior versions. A material pass should not drift into geometry redesign.
+- Separate panel centering, content margins and shaft positions. Move bores, labels, notch and trim coherently when a layout changes.
+- Repair hardware in its mount frame: a toggle root must meet its pivot, a socket must have a round open throat, and retaining hardware must seat against the panel.
+- After a slant/depth change, recompute the usable cabinet top and check every head foot. A centered front view cannot prove support.
+- Verify structural invariants and relevant rendered views before accepting a revision; a previous QA pass is not proof against new feedback.
 
 ## Coordinate and unit conventions
 

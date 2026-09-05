@@ -7,13 +7,22 @@ description: Audit Blender guitar-gear scenes for dimensional, geometric, shadin
 
 Use this skill as the final audit for guitar pedal, amplifier, cabinet, and related Blender product scenes.
 
-Read `references/qa-checklist.md` for the full inspection matrix. `scripts/scene_audit.py` is an optional Blender-Python static audit for common scene issues.
+Read [the QA checklist](references/qa-checklist.md) for the inspection matrix, mounting tests, boundary diagnosis, preservation evidence and delivery gates. `scripts/scene_audit.py` is an optional direct-scene heuristic; it does not validate nested evaluated assemblies, physical clearances or visual quality.
 
 ## When to use
 
 Use before final render/delivery, after major modeling revisions, or when the user asks why a product render still looks wrong.
 
 This skill is inspection-first. Do not rebuild large parts of the scene simply because a different modeling approach would be cleaner.
+
+## Revision and evidence rules
+
+- Establish the latest request, accepted baseline and protected properties before editing. Treat new user feedback as a reason to recheck the relevant claim.
+- Fix source-level causes: shared hardware geometry, mount/bore registration, cloth normals or actual support placement. Do not hide a defect with framing, dark material or lighting.
+- Compare measurements with rendered evidence. Check both hero and useful detail distances, and inspect every requested final image before marking it passed.
+- Verify evaluated instances when the product uses collection instances; source counts and empty bounds are insufficient.
+- Record PASS, FAIL, NOT CHECKED or NOT APPLICABLE with evidence for relevant requirements. Preservation is not proof of realism, and a saved render is not proof it was inspected.
+- Confirm outputs come from the final saved revision; reopen requested master/library/export files and preserve prior versions where required.
 
 ## Severity model
 

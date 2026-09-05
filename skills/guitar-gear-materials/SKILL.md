@@ -7,7 +7,7 @@ description: Create and apply physically plausible Blender materials for guitar 
 
 Use this skill to create, tune, organize, and apply materials for guitar pedals, amplifiers, cabinets, and associated hardware.
 
-Read `references/material-recipes.md` for starting ranges and `references/graphics-and-decals.md` for logos, labels, scales, and faceplate art.
+Read [material recipes](references/material-recipes.md) for starting ranges, black-level diagnosis, physical grain projection, woven cloth and restrained aging. Read [graphics and decals](references/graphics-and-decals.md) for logos, centering, flush printing and glyph verification.
 
 ## When to use
 
@@ -41,6 +41,14 @@ Do not use this as the primary modeling or lighting workflow. Pair with `$guitar
 6. **Add graphics.** Choose UV/image, decal, geometry, or text based on permanence, relief, and viewing distance.
 7. **Inspect under product lighting.** A material is not approved from a flat shader ball alone; inspect it on the actual product under representative reflections.
 8. **Save reusable materials.** Use stable semantic names and avoid duplicate `.001` variants when the material is genuinely shared.
+
+## Refinement gates
+
+- Preserve accepted base materials, geometry and presentation; reuse existing variation layers before adding new ones. Isolate treatments that should not affect every shared metal/plastic part.
+- Audit physical grain density on equal-world-size surface patches. Identical node values and unit object scales are insufficient for anisotropic 3D mapping. Keep density distinct from wrap orientation.
+- Diagnose a stripe or seam through geometry, normals, coordinates and temporary lighting before altering the shader. A real beveled construction joint may remain dark.
+- Use manufacturing and handling cues appropriate to the requested age. Well-maintained vintage gear need not have grunge, bright edge wear, brown cloth or damaged trim.
+- Judge each meaningful change at native hero size and relevant detail distance. Full-resolution weave and small text can fail despite a clean preview.
 
 ## Naming convention
 

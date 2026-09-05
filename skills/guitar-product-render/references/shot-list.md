@@ -34,3 +34,23 @@ Across a product set:
 - Reuse lighting rigs unless a product's finish requires a deliberate variation.
 - Keep background tone and ground relationship consistent.
 - Match image margins and product scale for catalog grids.
+
+## Choose QA views by the claim being tested
+
+Do not reproduce a previous project's fixed number of shots. Add the smallest useful set for this brief, while delivering every view the user explicitly requests.
+
+| Change or suspected issue | Useful view |
+|---|---|
+| Panel layout, knob count and labels | Square-on full panel with all end margins visible |
+| Hardware seating, floating toggle or printed rules | Shallow oblique panel/power-section view |
+| Jack roundness, retaining-stack size and depth | Moderate jack detail beside a neighboring control, plus native hero crop |
+| Cabinet rake and head overhang | True side orthographic view including head feet and cabinet top |
+| Badge centering | Straight front view of the full grille opening |
+| Side-handle construction | Oblique view showing plate, cup depth, screws, covering and front edge |
+| Tolex physical consistency | Equal-world-size front/top/side/frame patches plus normal product detail |
+| Cloth hinge or side seam | Close-up at fixed camera under studio and broad diagnostic light |
+| Restrained age level | Matched hero and corner/piping/grip/material detail pairs |
+
+Use separate head-only, cabinet-only and assembled-stack scenes where they make isolation reproducible; do not hide arbitrary objects in a shared scene without restoring their state. Choose focal length together with camera distance and framing. Orthographic views measure shape/placement; perspective product views judge appearance. Neither replaces the other.
+
+For revision comparisons, preserve the previous camera transforms, lens, shifts, framing and aspect ratio. If a new QA camera has no prior equivalent, apply it to a temporary load of the previous source and render a matched baseline without resaving that source.

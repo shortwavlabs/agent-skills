@@ -7,7 +7,7 @@ description: Light, frame, preview, and render guitar pedals and amplifiers in B
 
 Use this skill for product-camera setup, studio lighting, Cycles rendering, framing, background treatment, and iterative render refinement of guitar pedals, amplifiers, cabinets, and related gear.
 
-Read `references/studio-recipes.md` for lighting patterns and `references/shot-list.md` when planning multiple deliverable views.
+Read [studio recipes](references/studio-recipes.md) for lighting patterns, fixed-rig diagnostics, two-distance testing, render freshness and comparison evidence. Read [the shot list](references/shot-list.md) to choose deliverable and QA views by the feature being tested.
 
 ## When to use
 
@@ -30,6 +30,14 @@ Do not use this as the primary modeling or material-authoring workflow. Pair wit
 - Change one major lighting variable at a time when diagnosing an image.
 - Retrieve and inspect preview renders after meaningful changes.
 - Do not launch a costly final render until a lower-cost preview has passed composition and material checks.
+
+## Accepted-scene refinement
+
+- Preserve accepted product cameras, lights, world, exposure and color management unless the current request calls for changes. Keep temporary diagnostic setups out of delivered lighting.
+- Use a matched baseline to isolate a revision. Match resolution and sampling as well as framing; a cleaner render can otherwise masquerade as better materials.
+- Preview composition cheaply, then check vulnerable details at final pixel scale before the full batch. Inspect the native hero crop as well as a separate macro.
+- Use a true side view for slant and support, a square-on panel for layout, and a shallow angle for mechanical seating.
+- Track final-source provenance and inspect each final output. Superseded renders and stale comparison sheets must be replaced after a source correction.
 
 ## Camera procedure
 
