@@ -9,6 +9,14 @@ Use this skill for dimensionally grounded Blender modeling of guitar pedals, amp
 
 Read [construction standards](references/construction-standards.md) for substantial modeling, panel constraints, slant geometry and support placement. Read [component construction](references/component-library.md) for knobs, jacks, toggles and repeated hardware. Read [Blender operations](references/blender-operations.md) when scripting, handling nested instances, saving standalone libraries or exporting. Use `templates/product-brief.md` when the request lacks a compact specification.
 
+## Refinement decision rules
+
+**Stop rule:** once the requested work is complete and all Blocker/High issues (delivery-preventing or visibly/dimensionally wrong results) are resolved, stop discretionary iteration when remaining changes lack reference support or a candidate does not materially improve the relevant hero/detail views. Retain the accepted baseline for that candidate, including already verified repairs. Do not undo useful fixes or mark unresolved requirements as passed merely to stop.
+
+**Accepted constraints:** keep a compact ledger of AUTHORITATIVE USER FACTS, LOCKED / ACCEPTED, PHOTO-INFERRED / UNCERTAIN, ALLOWED TO CHANGE THIS PASS, and PROTECTED FROM REGRESSION. Record source/evidence and superseded decisions; update it when the user changes direction. The modeling skill provides a [copyable ledger](templates/accepted-constraints.md) when working with the pack; the five categories above are sufficient when using this skill alone.
+
+**Candidate testing:** when one uncertain, allowed-to-change scalar or design parameter dominates a visible mismatch, render 2–3 isolated variants under identical conditions before committing. Include the baseline, vary only that parameter, compare relevant hero/detail views and reject regressions. This applies to dimensions, bevels, grain/weave contrast, logo scale or other focused choices; do not reopen accepted parameters or run a variant sweep when the correction is already clear.
+
 ## When to use
 
 Use when the user asks to create, revise, rebuild, dimension, or clean up physical guitar gear in Blender.

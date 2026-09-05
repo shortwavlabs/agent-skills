@@ -127,7 +127,7 @@ A line changing with lighting supports a reflection/shadow explanation but does 
 
 ## Physical texture scale and material age
 
-Equal node frequency and unit object scale do not establish equal grain size. Use identical physical footprints and comparable lighting on actual front/top/side/slanted surfaces. Distinguish density from direction and anisotropy; see the materials recipe's projection audit. Check after instancing and on bevel transitions, not only on flat test planes.
+Equal node frequency and unit object scale do not establish equal grain size. Use identical physical footprints and comparable lighting on actual front/top/side/slanted surfaces. Distinguish density from direction and anisotropy; see [material diagnostics](../../guitar-gear-materials/references/material-diagnostics.md) for the visual patch test and optional projection audit. Check after instancing and on bevel transitions, not only on flat test planes.
 
 For subtle aging, inspect both native hero size and useful detail size. Compare black balance between head and cabinet, fiber warmth, metal reflection bands, piping cream value, handle-cup darkness and speaker obscuration. Contact variation should follow plausible use and remain within the requested age level. Do not count random noise, brown coloration or generic edge brightening as realism.
 

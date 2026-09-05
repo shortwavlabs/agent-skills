@@ -76,7 +76,7 @@ Do not add random greebles. Every visible detail should have a plausible functio
 
 ## Reference measurements and user-directed layout
 
-Separate three kinds of evidence: confirmed dimensions, proportions inferred from photographs, and explicit user art direction. A later request to center a badge overrides an earlier photographic offset; do not reintroduce the rejected placement during a subsequent fidelity pass. Keep a small list of accepted constraints and changed requirements.
+Separate three kinds of evidence: confirmed dimensions, proportions inferred from photographs, and explicit user art direction. A later request to center a badge overrides an earlier photographic offset; do not reintroduce the rejected placement during a subsequent fidelity pass. Maintain the [accepted-constraints ledger](../templates/accepted-constraints.md), including changed requirements and their evidence.
 
 For an oblique panel photograph, rectify the panel plane using its four corners before comparing spacing. Measure washer/bushing centers on the panel, not projecting knob caps, toggle tips, lens highlights, or text baselines. Perspective correction cannot recover exact dimensions from an uncalibrated image. Register estimates to already accepted control datums and report uncertainty rather than claiming submillimeter accuracy.
 

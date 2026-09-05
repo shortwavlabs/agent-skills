@@ -9,6 +9,14 @@ Use this skill for product-camera setup, studio lighting, Cycles rendering, fram
 
 Read [studio recipes](references/studio-recipes.md) for lighting patterns, fixed-rig diagnostics, two-distance testing, render freshness and comparison evidence. Read [the shot list](references/shot-list.md) to choose deliverable and QA views by the feature being tested.
 
+## Refinement decision rules
+
+**Stop rule:** once the requested work is complete and all Blocker/High issues (delivery-preventing or visibly/dimensionally wrong results) are resolved, stop discretionary iteration when remaining changes lack reference support or a candidate does not materially improve the relevant hero/detail views. Retain the accepted baseline for that candidate, including already verified repairs. Do not undo useful fixes or mark unresolved requirements as passed merely to stop.
+
+**Accepted constraints:** keep a compact ledger of AUTHORITATIVE USER FACTS, LOCKED / ACCEPTED, PHOTO-INFERRED / UNCERTAIN, ALLOWED TO CHANGE THIS PASS, and PROTECTED FROM REGRESSION. Record source/evidence and superseded decisions; update it when the user changes direction. The modeling skill provides a [copyable ledger](../guitar-gear-modeling/templates/accepted-constraints.md) when working with the pack; the five categories above are sufficient when using this skill alone.
+
+**Candidate testing:** when one uncertain, allowed-to-change scalar or design parameter dominates a visible mismatch, render 2–3 isolated variants under identical conditions before committing. Include the baseline, vary only that parameter, compare relevant hero/detail views and reject regressions. This applies to dimensions, bevels, grain/weave contrast, logo scale or other focused choices; do not reopen accepted parameters or run a variant sweep when the correction is already clear.
+
 ## When to use
 
 Use when the user asks for a hero render, catalog image, ecommerce/product shot, studio setup, camera matching, lighting improvement, or final render settings.
