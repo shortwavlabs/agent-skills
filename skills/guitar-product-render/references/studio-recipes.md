@@ -65,7 +65,7 @@ Hardware needs shaped reflections, but uniformly bright white caps can look plas
 
 **Physical-scale test:** place orthographic cameras perpendicular to equal-size clear patches on actual wrapped surfaces. Use identical patch footprint, output pixels, and a light positioned relative to each local surface frame with equal size, distance and power. Avoid cropping a handle instead of the covering. Label the physical width, surface and revision. These images diagnose scale; they do not replace appearance checks under the final studio rig.
 
-**Two-distance test:** inspect the whole product at final delivery size plus a relevant detail view. For weave, add a medium-distance sample when needed to reveal interference. A macro may expose manufacturing cues but can hide the fact that the same signal creates noisy stripes in the hero. Use an unresized crop from the actual hero to assess tiny jack mouths or glyphs; a separate zoomed camera cannot prove delivery-scale readability.
+**Evaluation order:** native hero pixels → standard product view → detail → macro. Hero-scale plausibility has priority; impressive microgeometry can worsen the delivered image. Inspect an unresized crop of the final hero first, then the whole product and a relevant detail view. For weave, add a medium-distance sample when needed to reveal interference. A macro may expose manufacturing cues but can hide the fact that the same signal creates noisy stripes in the hero. Use an unresized crop from the actual hero to assess tiny jack mouths or glyphs; a separate zoomed camera cannot prove delivery-scale readability.
 
 ## Sampling and full-resolution surprises
 

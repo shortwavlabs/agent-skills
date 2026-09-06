@@ -54,3 +54,5 @@ Do not reproduce a previous project's fixed number of shots. Add the smallest us
 Use separate head-only, cabinet-only and assembled-stack scenes where they make isolation reproducible; do not hide arbitrary objects in a shared scene without restoring their state. Choose focal length together with camera distance and framing. Orthographic views measure shape/placement; perspective product views judge appearance. Neither replaces the other.
 
 For revision comparisons, preserve the previous camera transforms, lens, shifts, framing and aspect ratio. If a new QA camera has no prior equivalent, apply it to a temporary load of the previous source and render a matched baseline without resaving that source.
+
+For a hinged product, add a low side view for molding height and gap, a shallow pivot view for head seating, and a grazing print/rubber view only where those features are under review. Choose them by the claim, not as a mandatory pedal shot count. For saturated-color diagnosis, use [material diagnostics](../../guitar-gear-materials/references/material-diagnostics.md#saturated-coatings-and-isolated-material-candidates) before altering pigment or the accepted rig.

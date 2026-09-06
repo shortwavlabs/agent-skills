@@ -11,16 +11,14 @@ Read only the references needed for the task:
 
 - [Material recipes](references/material-recipes.md): basic response ranges for coatings, metal, plastic, rubber, lenses and other common materials.
 - [Amplifier surfaces](references/amplifier-surfaces.md): vinyl grain, cloth, vintage hardware, cups, sockets and piping when those surfaces are involved.
-- [Material diagnostics](references/material-diagnostics.md): unexpected black levels, sparkle or physical-scale mismatches. The visual patch test is primary; anisotropic math is an advanced optional fallback.
-- [Graphics and decals](references/graphics-and-decals.md): logos, centering, flush printing and glyph verification.
+- [Material diagnostics](references/material-diagnostics.md): unexpected black levels, saturated coatings, isolated material candidates, sparkle or physical-scale mismatches. The visual patch test is primary; anisotropic math is an advanced optional fallback.
+- [Graphics and decals](references/graphics-and-decals.md): source logos/arrows, registration, flush printing, molded relief and glyph verification.
 
 ## Refinement decision rules
 
-**Stop rule:** once the requested work is complete and all Blocker/High issues (delivery-preventing or visibly/dimensionally wrong results) are resolved, stop discretionary iteration when remaining changes lack reference support or a candidate does not materially improve the relevant hero/detail views. Retain the accepted baseline for that candidate, including already verified repairs. Do not undo useful fixes or mark unresolved requirements as passed merely to stop.
+Lock accepted systems and name the allowed changes before editing. For ambiguous visible defects, compare the baseline with restrained candidates under fixed conditions; keep the smallest change that improves reference match at delivery size. Stop when requested work is complete, delivery-preventing or visibly/dimensionally wrong issues are resolved, and protected systems pass regression checks; do not discard verified repairs or mark unfinished requirements passed to stop.
 
-**Accepted constraints:** keep a compact ledger of AUTHORITATIVE USER FACTS, LOCKED / ACCEPTED, PHOTO-INFERRED / UNCERTAIN, ALLOWED TO CHANGE THIS PASS, and PROTECTED FROM REGRESSION. Record source/evidence and superseded decisions; update it when the user changes direction. The modeling skill provides a [copyable ledger](../guitar-gear-modeling/templates/accepted-constraints.md) when working with the pack; the five categories above are sufficient when using this skill alone.
-
-**Candidate testing:** when one uncertain, allowed-to-change scalar or design parameter dominates a visible mismatch, render 2–3 isolated variants under identical conditions before committing. Include the baseline, vary only that parameter, compare relevant hero/detail views and reject regressions. Prefer the smallest variant set that can distinguish the decision; do not generate variants when the expected visual difference is below delivery-scale visibility. This applies to dimensions, bevels, grain/weave contrast, logo scale or other focused choices; do not reopen accepted parameters or run a variant sweep when the correction is already clear.
+Use the [refinement contract](../guitar-gear-modeling/templates/accepted-constraints.md) for source/target versions, evidence and stop conditions. The shared [candidate and diagnosis procedure](../guitar-gear-qa/references/qa-checklist.md#controlled-refinement-decisions) owns detailed comparison rules. If using this skill alone, record facts, accepted values, uncertain estimates, allowed changes and protected properties in the existing project brief.
 
 ## When to use
 

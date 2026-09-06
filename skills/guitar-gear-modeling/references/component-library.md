@@ -75,7 +75,7 @@ Collections used as hidden source libraries may not appear as ordinary scene mes
 
 Build the silhouette first: tapered body, restrained skirt, thin rim, top bevel and shaft-centered indicator. Fine grip ribs should read as molded grip, not a necklace of separate beads. Flat or gently crowned top surfaces and curved walls may need different smoothing treatment. Separate the indicator's paint/inset from exaggerated geometry.
 
-Judge diameter against panel height and neighboring gaps in a square-on panel image, then in the hero. Adjust the source while preserving accepted mounting centers and group spacing. Derive the required count and grouping from the brief; never hard-code the control count from another amplifier. Keep pointer orientation tied to the intended setting without rotating its surrounding printed scale.
+Judge diameter against panel height and neighboring gaps in a square-on panel image, then in the hero. Compare molding height, skirt height, insert diameter/thickness and exposed shaft/mount stack separately against low side and front references. A slightly tall knob can make the whole product look toy-like; top view alone cannot approve its height. Adjust the source while preserving accepted mounting centers and group spacing. Derive the required count and grouping from the brief; never hard-code the control count from another amplifier. Keep pointer orientation tied to the intended setting without rotating its surrounding printed scale.
 
 ## Toggle switches
 
@@ -114,3 +114,11 @@ If the exposed metal dominates the panel, compare a small number of isolated siz
 - **Corner cap:** model connected thin stamped flanges with rounded/scalloped profiles and a wrap that follows the actual corner. Sheet thickness, perimeter shape and outer radius are separate parameters. Rounded edges on a thick cube do not make a sheet-metal protector. Check mirrored instances, screw orientation and negative-scale shading.
 - **Pilot lamp:** a shallow tinted dome with a bezel and internal depth reads differently from a flat red button. Keep a possible emitter behind or within the lens rather than making every surface uniformly luminous. Smaller channel indicators should remain subordinate when the reference supports that hierarchy.
 - **Caster:** separate wheel/tire, axle, yoke and mounting plate only to the detail needed. Check floor contact and assembly height after instancing; do not add hidden mechanics to compensate for an unresolved silhouette or grounding defect.
+
+## Fastener heads and adjustment hardware
+
+Separate head diameter, head profile, exposed projection from the seating plane, drive recess and hidden shaft. Mesh thickness is not exposed projection. Use the photographed pan, countersunk or other profile; do not default to a flat disk. Where visible, a Phillips drive needs an actual four-wing recess with narrowing/sloped walls and restrained edge roll, not a painted or embossed plus. Check that the recess floor does not expose an underlying pin or unrelated metal.
+
+Preserve the mount axis when resizing only the head. Verify seating in a shallow view, left/right equality through shared geometry and dimensions, and distinct finish assignments. A black-oxide/phosphate steel fastener must not inherit a knob's plastic material merely because both are black. After Boolean/replacement operations, inspect face material indices as well as the material list.
+
+For ribbed adjustment knobs, compare diameter and exposed thickness separately. Fine ribs should form one molded grip rather than visibly separate beads. Keep the adjuster's stem and seating relationship fixed when changing its exterior profile; omit hidden threads unless required.

@@ -79,3 +79,17 @@ Avoid ultra-dense physical weave geometry unless the camera needs it.
 
 - [Amplifier surfaces](amplifier-surfaces.md): embossed vinyl, woven cloth, aged hardware, sockets, cups and piping.
 - [Material diagnostics](material-diagnostics.md): black-level/sparkle diagnosis, visual physical-scale testing and acceptance; optional analytic fallback for existing anisotropic graphs.
+
+## Material identity at product scale
+
+| Part/finish | Cues to preserve | Fake-looking failure |
+|---|---|---|
+| Coated cast metal | Dense opaque coating, restrained specularity, fine orange-peel normal and slight highlight breakup | Perfect glossy plastic or coarse procedural stucco |
+| Opaque molded knob/adjuster | Near-black pigment, subtle mold grain, weak roughness variation and restrained dielectric reflection | Brown/translucent plastic, piano lacquer, rubber or metal |
+| Thin metal knob insert | Very thin cap, controlled edge reflection, fine radial/concentric machining or anisotropy when supported | Thick chrome puck or deep visible scratches |
+| Plated nut/washer/bushing | Physical thickness, crisp edge bands, small roughness differences among pieces, environment-dependent reflections | One uniform silver-painted plastic finish |
+| Black-oxide/phosphate fastener | Dark steel response with subdued metal highlights and a readable recessed drive | Universal black plastic, featureless black disk or mirror chrome |
+| Molded rubber pad | High roughness, fine irregular non-directional normal, broad weak variation, restrained sheen | Perfectly smooth rectangle or noisy sandpaper |
+| LED lens/bezel | Shallow lens, separate retaining rim, tint and internal depth appropriate to on/off state | Uniform glowing orb used to hide incorrect lens geometry |
+
+Tune each physical finish separately; sharing should follow material identity, not color alone. Dark conversion coatings are not a universal bare-metal preset: match the photographed finish under useful reflections. Warm enclosure reflections on opaque black plastic are legitimate; do not tint the pigment brown to reproduce them. Coating and rubber microtexture should remain nearly invisible at hero size. See [graphics and decals](graphics-and-decals.md) for molded branding relief and print edges.

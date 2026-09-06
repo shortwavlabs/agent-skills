@@ -4,6 +4,7 @@ Use for an existing-asset refinement. Keep entries brief; copy into the project'
 
 ```text
 SOURCE VERSION / BASELINE:
+TARGET VERSION:
 PASS OBJECTIVE:
 
 AUTHORITATIVE USER FACTS
@@ -20,6 +21,31 @@ ALLOWED TO CHANGE THIS PASS
 
 PROTECTED FROM REGRESSION
 - Invariant — measurement or view that will verify it:
+
+REFERENCE PRIORITY
+- Reference → question it answers / variant / uncertainty:
+
+BASELINE RENDERS
+- Source, camera, settings, output and inspected feature:
+
+CANDIDATE STUDIES (only for unresolved visible choices)
+- A baseline / B restrained / C stronger; changed family and values:
+- Selected candidate and reference evidence, or retain baseline:
+
+NUMERIC VALIDATION
+- Protected invariant, expected value/tolerance, measured result:
+
+VISUAL QA
+- Native hero crop, product/detail views and reference comparison:
+
+FAIL CONDITIONS
+- Specific regression that rejects this pass:
+
+STOP RULE
+- Defect resolved, protected systems pass, required outputs complete:
+
+FINAL PASS/FAIL LEDGER
+- Criterion — PASS / FAIL / NOT CHECKED / NOT APPLICABLE — evidence:
 
 SUPERSEDED DECISIONS (only when needed)
 - Previous constraint → replacement — user direction/source:

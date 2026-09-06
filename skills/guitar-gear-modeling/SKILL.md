@@ -7,15 +7,13 @@ description: Model guitar pedals, amplifiers, cabinets, controls, and hardware i
 
 Use this skill for dimensionally grounded Blender modeling of guitar pedals, amplifiers, speaker cabinets, rack gear, footswitches, knobs, jacks, switches, handles, corners, vents, fasteners, and related product hardware.
 
-Read [construction standards](references/construction-standards.md) for substantial modeling, panel constraints, slant geometry and support placement. Read [component construction](references/component-library.md) for knobs, jacks, toggles and repeated hardware. Read [Blender operations](references/blender-operations.md) when scripting, handling nested instances, saving standalone libraries or exporting. Use `templates/product-brief.md` when the request lacks a compact specification.
+Read [construction standards](references/construction-standards.md) for reference hierarchy, corner diagnosis, mechanical gaps, panel constraints, slant geometry and support placement. Read [component construction](references/component-library.md) for knobs, jacks, toggles and repeated hardware. Read [Blender operations](references/blender-operations.md) when scripting, handling nested instances, saving standalone libraries or exporting. Use `templates/product-brief.md` when the request lacks a compact specification.
 
 ## Refinement decision rules
 
-**Stop rule:** once the requested work is complete and all Blocker/High issues (delivery-preventing or visibly/dimensionally wrong results) are resolved, stop discretionary iteration when remaining changes lack reference support or a candidate does not materially improve the relevant hero/detail views. Retain the accepted baseline for that candidate, including already verified repairs. Do not undo useful fixes or mark unresolved requirements as passed merely to stop.
+Lock accepted systems and name the allowed changes before editing. For ambiguous visible defects, compare the baseline with restrained candidates under fixed conditions; keep the smallest change that improves reference match at delivery size. Stop when requested work is complete, delivery-preventing or visibly/dimensionally wrong issues are resolved, and protected systems pass regression checks; do not discard verified repairs or mark unfinished requirements passed to stop.
 
-**Accepted constraints:** keep a compact ledger of AUTHORITATIVE USER FACTS, LOCKED / ACCEPTED, PHOTO-INFERRED / UNCERTAIN, ALLOWED TO CHANGE THIS PASS, and PROTECTED FROM REGRESSION. Record source/evidence and superseded decisions; update it when the user changes direction. The modeling skill provides a [copyable ledger](templates/accepted-constraints.md) when working with the pack; the five categories above are sufficient when using this skill alone.
-
-**Candidate testing:** when one uncertain, allowed-to-change scalar or design parameter dominates a visible mismatch, render 2–3 isolated variants under identical conditions before committing. Include the baseline, vary only that parameter, compare relevant hero/detail views and reject regressions. Prefer the smallest variant set that can distinguish the decision; do not generate variants when the expected visual difference is below delivery-scale visibility. This applies to dimensions, bevels, grain/weave contrast, logo scale or other focused choices; do not reopen accepted parameters or run a variant sweep when the correction is already clear.
+Use the [refinement contract](templates/accepted-constraints.md) for source/target versions, evidence and stop conditions. The shared [candidate and diagnosis procedure](../guitar-gear-qa/references/qa-checklist.md#controlled-refinement-decisions) owns detailed comparison rules. If using this skill alone, record facts, accepted values, uncertain estimates, allowed changes and protected properties in the existing project brief.
 
 ## When to use
 
@@ -65,7 +63,7 @@ If dimensions are incomplete, infer only low-risk secondary dimensions from visu
 
 ## Modeling procedure
 
-1. **Establish the envelope.** Create a simple blockout at the real overall dimensions. Verify width, depth, and height before adding detail.
+1. **Establish the envelope.** Create a simple blockout at the real overall dimensions. Verify width, depth, height, top slope, side wedge, moving-part rest angle and relative component scale before adding detail or polishing materials.
 2. **Split real assemblies.** Keep enclosure, base plate, knobs, switches, jacks, fasteners, handles, feet, grille, and other manufactured parts as separate semantic objects when they are separate physical parts.
 3. **Build primary forms.** Use simple meshes, bevels, mirror, array, solidify, and booleans before manual topology work.
 4. **Add openings non-destructively.** Use Boolean cutters for jack holes, footswitch holes, vents, speaker apertures, screw recesses, panel cutouts, and handle openings. Keep cutters organized until the design is stable.

@@ -72,13 +72,13 @@ A believable product usually includes:
 - Plausible panel thickness.
 - Enough clearance around knobs and switches to be operable.
 
-Do not add random greebles. Every visible detail should have a plausible function or manufacturing reason.
+For a replica, plausible function alone is insufficient evidence. Every visible dot, fastener, seam, port, vent or marking needs reference support; omit unsupported additions. If an observed feature is unresolved, record uncertainty and use the simplest supported form. Seek another reference when the ambiguity affects the deliverable; do not fill unknown areas with generic hardware.
 
 ## Reference measurements and user-directed layout
 
 Separate three kinds of evidence: confirmed dimensions, proportions inferred from photographs, and explicit user art direction. A later request to center a badge overrides an earlier photographic offset; do not reintroduce the rejected placement during a subsequent fidelity pass. Maintain the [accepted-constraints ledger](../templates/accepted-constraints.md), including changed requirements and their evidence.
 
-For an oblique panel photograph, rectify the panel plane using its four corners before comparing spacing. Measure washer/bushing centers on the panel, not projecting knob caps, toggle tips, lens highlights, or text baselines. Perspective correction cannot recover exact dimensions from an uncalibrated image. Register estimates to already accepted control datums and report uncertainty rather than claiming submillimeter accuracy.
+When an oblique panel photograph is the best available layout evidence, optionally rectify a copy of that plane using four identifiable coplanar corners before comparing spacing. Preserve the original and do not warp model renders to force agreement. Measure washer/bushing centers on the panel, not projecting knob caps, toggle tips, lens highlights, or text baselines. Perspective correction cannot recover exact dimensions from an uncalibrated image. Register estimates to already accepted control datums and report uncertainty rather than claiming submillimeter accuracy.
 
 Treat these as independent constraints:
 
@@ -128,3 +128,36 @@ Verify both a true side view and the assembled hero. Check caster wheel contact,
 Continuous vinyl covering can hide board joints; do not expose every internal panel seam as a black line through the wrap. Preserve genuine removable-panel boundaries. Inspect trim depth: piping must sit in its intended groove or edge, neither buried inside the frame nor floating ahead of it.
 
 Boolean and bevel order affects both outer rounding and opening edges. Inspect the evaluated result after cuts. Tiny nearby edges and overlap-clamping can suppress a large outer bevel; separate outer-shell rounding from hole-edge treatment when needed. There is no universally correct modifier order for every assembly. Apply only the necessary modifier on the intended object after a checkpoint, rather than globally flattening the stack.
+
+## Reference hierarchy by question
+
+Classify each reference by what it can establish; prefer measured dimensions for scale and multiple photographs for inferred proportions.
+
+| Reference | Strongest use | Limitation |
+|---|---|---|
+| Direct top/front/side | Footprint, control centers, symmetry, spacing, print registration | Check lens/perspective; one view cannot establish depth |
+| Low side/profile | Wedge/slope, vertical proportions, knob height, jack height, mechanical gaps | Projecting components can occlude their seating plane |
+| Three-quarter hero | Overall likeness, visual mass, silhouette, material identity | Foreshortening is not dimensional truth |
+| Grazing macro | Edge roll, highlight continuity, coating, embossing and seams | Magnification exaggerates microtexture and relief |
+| Hardware macro | Jack stack, fastener drive, plating, lens/bezel and molding | May show wear or a variant absent from the target |
+
+Cross-check variant, age and visible construction before combining references. Do not transfer a special edition's hardware or an aged specimen's damage to another target without evidence. Use profile and sectional checks before diagnosing a proportion problem as a shader problem.
+
+## Diagnose a rounded corner before editing
+
+“More rounded” can mean four independent corrections:
+
+| Observed defect | Inspect | Scoped repair |
+|---|---|---|
+| Plan silhouette too square | XY boundary and straight-run lengths | Change plan radius only when that footprint is unlocked |
+| Face transition too sharp | Edge-roll cross-section and highlight width | Adjust the relevant bevel/profile |
+| Vertical corner wall too flat | Wall sections through the corner | Repair that surface while retaining accepted boundaries |
+| Pinched/broken highlight | Local intersections, topology and normals | Repair the responsible surface or normals, not the global radius |
+
+If the footprint is accepted, preserve XY boundary coordinates, straight runs and overall dimensions. A local Z-surface or normal correction may solve a corner highlight without altering plan radius; verify that diagnosis rather than applying it to every corner. Keep control/pivot/shaft centers and the comparison rig fixed. Use the QA checklist's independent footprint test to catch silhouette drift. Increasing every bevel is not a substitute for identifying the defect.
+
+## Hinged assemblies and visible gaps
+
+Treat the hinge axis, pivot centers, rest angle, stationary lugs and working clearance as mechanical datums. Define which parts move and which stay fixed. A head-profile repair must not translate the hinge or shorten its pin accidentally.
+
+Compare apron depth, shadow line, stationary ledge and visible cavity against side references. Closing a genuine treadle gap to make the assembly look clean is as incorrect as enlarging it. Keep intentional contact separate from unintended penetration. After mechanical edits, use the QA checklist's sampled-motion check and restore the accepted rest pose.

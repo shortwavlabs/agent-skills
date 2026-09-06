@@ -148,3 +148,28 @@ Confirm final images correspond to the final saved revision, not an earlier cand
 `scripts/scene_audit.py` is a direct-scene heuristic, not an evaluated assembly or clearance validator. It enumerates `scene.objects`, so nested collection instances can hide the actual product from its mesh count and object warnings. Its dimensions are raw Blender object units despite the `dimensions_m` key; only interpret them as meters when the scene's unit convention supports that conversion. Augment it with a scoped evaluated-instance audit when necessary.
 
 Negative scale can be intentional mirroring, `.001` can be a valid distinct asset, and open edges can be deliberate visualization construction. Confirm the visible consequence before cleanup. For export-specific checks, inspect a reimported copy; do not turn a render-ready asset into a watertight printable solid without that requirement.
+
+## Controlled refinement decisions
+
+Once a system is correct, lock it. The smaller the remaining defect, the narrower the next pass should be. A final polish should usually look almost identical to the accepted version at first glance; the improvement appears under inspection. Finish the product without reinterpreting its industrial design.
+
+Use this diagnostic sequence for “looks wrong”:
+
+1. **Silhouette wrong?** Verify envelope, slope, wedge and corner boundary; fix geometry first.
+2. **Proportion wrong?** Compare direct/profile references, especially component height and seating. Do not measure height from a top photograph.
+3. **Highlight wrong?** Separate topology/intersections, normals and material/light response before editing; use the [corner decision table](../../guitar-gear-modeling/references/construction-standards.md#diagnose-a-rounded-corner-before-editing).
+4. **Material identity wrong?** Isolate roughness, specularity and micro-normal under the accepted rig. Check whether metal reads as silver plastic, opaque plastic as translucent brown, rubber as smooth paint, or a lens as a glowing orb.
+5. **Small hardware breaks realism?** Inspect its actual stack, drive, thickness, seating and finish rather than adding decoration.
+6. **Only visible in macro?** Recheck native hero pixels before changing anything. Preserve required close-up quality without damaging ordinary product views.
+
+For an ambiguous allowed change, use A = current baseline, B = restrained change, C = stronger change. Two candidates suffice when they resolve the question; skip studies when the correction is already clear or below delivery-scale visibility. Change one variable family, record values and distinguish jointly changed parameters from isolated causal tests. Examples include molding height, insert diameter, adjuster projection, lens size, emboss relief, label scale or fastener size. Freeze camera transform/lens, lighting/world, background, exposure/color management, resolution and sampling. Select the smallest change that materially improves reference match, not the most polished-looking candidate; retain the baseline if none does.
+
+Build readable side-by-side evidence as needed: prior/current, A/B/C, reference/current/candidate, and hero/detail pairs. Mark graphics baselines/arrow centers or hardware diameter/axis on separate copies. Do not warp model renders to fit a photograph. See [comparison-sheet guidance](../../guitar-product-render/references/studio-recipes.md#comparison-sheets-that-prove-the-change) for framing and freshness.
+
+Use the existing [refinement contract](../../guitar-gear-modeling/templates/accepted-constraints.md) in the project brief. Define fail conditions before editing: protected silhouette/centers change, unsupported details appear, pigment or rig drifts, hardware/functional print becomes dominant, moving parts intersect, or physical material distinctions weaken. Stop when the defect is resolved, required deliverables are complete and protected systems pass; do not continue improving unrelated systems. Keep unresolved requirements explicit rather than pre-filling PASS.
+
+## Independent footprint and motion checks
+
+For a local repair with a locked plan shape, supplement bounds with an independent top-view boundary comparison: projected silhouette overlap or nearest-boundary distance under identical orthographic projection and scale. Bounds alone cannot detect a changed radius or shortened straight run. Record the tolerance and raster pixel scale; evaluate disconnected/projecting parts separately. Compare boundary coordinates and straight runs, plus relevant vertex/normal/UV signatures, transforms and control/pivot coordinates. Allow only the intended surface/material changes.
+
+For moving assemblies, sample the rest pose and several positions across the expected travel. Record pose, tested object pairs, collision count or minimum separation, units and intentional seating/contact exceptions. Test stationary shell, ledges/lugs and other nearby obstructions; a rest-only render cannot establish travel clearance. Restore the rest pose afterward. Surface-intersection tests may miss complete containment, so add distance/containment checks where that failure is plausible. Discrete samples are not continuous mechanical certification.

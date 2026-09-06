@@ -69,3 +69,17 @@ Keep an applied badge thin enough to read as a badge rather than extruded letter
 Printed legends and divider rules should sit effectively flush. Tiny excess offsets can become dark detached rails in a grazing close-up. Prefer ink masks or almost-zero relief appropriate to the printing method; do not turn thin lines into physical panel seams. Preserve the physical panel's notch and surround independently from the artwork.
 
 Verify both the text string and its rendered glyphs. A correct digit 1 can still look like capital I in a selected font. Use a readable suitable face or a narrowly scoped alternate glyph when necessary, preserve alignment, and pack the actual font dependency. Do not invent illegible microtext, serial numbers or fine numeric graduations from an unclear photograph. Inspect label size beside the hardware and at final output resolution, not only enlarged in the text editor.
+
+## Functional print registration and source protection
+
+Treat registration independently from typography and material response. Check baseline, scale, weight, spacing, edge distance, adjacent artwork and the physical connector/control relationship. Symmetry and mathematical centering are not automatically faithful. Small function labels and arrows should stay subordinate to the main branding; enlarging or perfecting them can turn replication into redesign.
+
+Preserve correct supplied vector outlines, aspect ratio and accepted rotation/scale/placement. Do not replace a logo with text or redraw it from memory. Preserve custom arrow shapes rather than substituting Unicode/font arrows. Change scale, registration, spacing or edge quality only within the pass scope. Verify arrow direction against photographs and the latest explicit instruction; do not infer it solely from connector side or assumed signal flow.
+
+Use separate annotated reference/current/candidate images for baselines, arrow centers, panel edges and neighboring artwork. Keep raw images and preserve perspective. For a local atlas edit, compare pixels outside the allowed regions so unrelated legends, dots and logos cannot change silently.
+
+## Printed edges versus molded relief
+
+Screen/pad print remains surface ink: at macro scale allow tiny edge softness, mild source-derived density variation and small real irregularity. Preserve delivery-size legibility without antialias halos, arbitrary blur, invented wear or random distress. Do not make an otherwise flush graphic float above the coating to show it more clearly.
+
+For molded rubber branding, separate outline registration from relief height, edge roll, seating depth and contact plane. The logo should grow from the pad, not resemble an applied decal or detached letters. Reducing relief and softening its edge often helps more than greater extrusion. Preserve the accepted vector silhouette while adjusting only allowed depth/profile parameters; judge native hero pixels before the macro.
