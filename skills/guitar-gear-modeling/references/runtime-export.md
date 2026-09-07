@@ -60,6 +60,43 @@ Define angles in degrees about the loaded node's local axis. In this convention 
 
 For a toggle provide `ui_type = "toggle"`, `parameter_id = "ampMode"`, `state_count = 3`, local axis, `state_angles`, `rest_angle`, `state_labels` and a hit-target name. Angles must come from the actual switch travel, not a universal amp angle. Indicators use `ui_type = "indicator"` and a derived `state_id`, such as `power`; they are not extra host parameters. Two input nodes may deliberately reference one `inputMode` with distinct choice indices; one parameter binding serves both targets.
 
+Semantic interactive nodes and their hit targets must have unique, explicitly assigned names in the derivative before export. Blender auto-suffixes such as `.001` and realized duplicate instances are not stable semantic IDs. Inspect the raw exported node list too: fail on duplicate contract names, missing expected names or unexpected suffixed replacements before a loader can rename them. Do not rely on `getObjectByName()` returning an arbitrary first match. Static construction names outside the contract need not be renamed cosmetically.
+
+## Validation manifest example
+
+Keep an expected contract beside the GLB, independently maintained from the exported `userData`. This small example describes a one-knob/two-input device; extend it for the actual product, not a fixed amp control count. Positions are illustrative runtime-frame meters; replace them with evaluated camera data.
+
+```json
+{
+  "schema_version": 1,
+  "asset": "gear.glb",
+  "root": "GEAR_ROOT",
+  "parameters": {
+    "gain": { "type": "continuous" },
+    "inputMode": { "type": "choice", "choices": ["Regular", "High"] }
+  },
+  "nodes": [
+    { "name": "CTRL_GAIN", "parent": "GEAR_ROOT", "ui_type": "knob", "parameter_id": "gain", "rotation_axis": "Y", "rotation_sign": -1, "min_angle": -135, "max_angle": 135, "rest_angle": 0, "hit_target": "HIT_GAIN" },
+    { "name": "INPUT_REGULAR", "parent": "GEAR_ROOT", "ui_type": "input", "parameter_id": "inputMode", "choice_index": 0, "hit_target": "HIT_INPUT_REGULAR" },
+    { "name": "INPUT_HIGH", "parent": "GEAR_ROOT", "ui_type": "input", "parameter_id": "inputMode", "choice_index": 1, "hit_target": "HIT_INPUT_HIGH" }
+  ],
+  "hit_targets": [
+    { "name": "HIT_GAIN", "parent": "CTRL_GAIN" },
+    { "name": "HIT_INPUT_REGULAR", "parent": "INPUT_REGULAR" },
+    { "name": "HIT_INPUT_HIGH", "parent": "INPUT_HIGH" }
+  ],
+  "camera_presets_file": "runtime_camera_presets.json",
+  "camera_presets": {
+    "Front": { "position": [0, 0.2, 1], "target": [0, 0.2, 0], "up": [0, 1, 0], "vertical_fov_degrees": 35, "min_distance": 0.3, "max_distance": 2 },
+    "Controls": { "position": [0, 0.25, 0.45], "target": [0, 0.2, 0], "up": [0, 1, 0], "vertical_fov_degrees": 35, "min_distance": 0.25, "max_distance": 1 }
+  }
+}
+```
+
+The manifest is validation input, not another parameter store or a glTF-standard schema. Compare each expected node/parent and metadata field against parsed GLB nodes/extras, and compare the separate preset file against these expected presets. Validate unique names, exactly one root, finite camera vectors, valid FOV/distance ranges and every referenced hit target. Include static nodes only if their identity is part of the application contract. Do not generate expected values from the same possibly broken export and call that independent validation.
+
+`choice_index` is the exported zero-based APVTS choice index: Regular = 0, High = 1. On a jack hit, resolve its `parameter_id` and write `choice_index / (choiceCount - 1)` through that binding (for a one-choice parameter use 0). Reject noninteger/out-of-range indices. Node names identify geometry; never infer High/Regular behavior from spelling. When adding a toggle, include its expected `state_count`, `state_labels`, `state_angles`, axis and rest angle in the same manifest.
+
 Three.js reads extras through `object.userData`. Validate finite angles, valid axis/sign, state array lengths, unique node names and resolved target names at startup. Register by metadata against the processor's supported parameter IDs; do not silently create a host parameter for every mesh.
 
 ## Dedicated hit targets

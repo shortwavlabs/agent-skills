@@ -1,6 +1,6 @@
 # Guitar-gear materials for glTF and WebGL
 
-Use on the runtime derivative from [runtime export](../../guitar-gear-modeling/references/runtime-export.md). Keep accepted Blender materials in the master. Three.js does not evaluate arbitrary Blender procedural graphs, Object/Generated coordinates, volume networks or custom node groups.
+Use on the runtime derivative from [runtime export](../../guitar-gear-modeling/references/runtime-export.md). Keep accepted Blender materials in the master. glTF does not preserve arbitrary Blender procedural node networks or Blender-specific coordinate-driven shader logic; bake or translate the resulting appearance into supported glTF PBR inputs.
 
 ## Translation and baking
 

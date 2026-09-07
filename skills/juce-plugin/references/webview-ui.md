@@ -2,11 +2,25 @@
 
 Use WebBrowserComponent for an existing web frontend or a requested web-based plugin editor. Plain JS, React, Vue and Svelte use the same bridge. For Blender/GLB guitar-gear controls, read [Three.js runtime architecture](threejs-webview-ui.md); keep platform and bridge mechanics here.
 
-Examples target installed JUCE 9.0.1 APIs. Inspect the project's JUCE version, `juce_WebBrowserComponent.h`, WebControlRelays/WebControlParameterAttachments headers, frontend package and `docs/CMake API.md` before adapting them. JUCE 8 introduced modern integration; old snippets may have incompatible signatures and frontend paths.
+## Compatibility baseline
+
+All concrete API examples below target JUCE 9.0.1, not an unversioned promise. Inspect the pinned project's headers (`juce_WebBrowserComponent.h`, `juce_WebControlRelays.h`, `juce_ParameterAttachments.h/.cpp`), frontend package and `docs/CMake API.md` before adapting them. Keep version-sensitive platform assumptions here.
+
+| Area | For JUCE 9.0.1 | Recheck for another version/target |
+|---|---|---|
+| Build | CMake minimum 3.22; browser targets use `NEEDS_WEB_BROWSER` and Windows WebView2 targets use `NEEDS_WEBVIEW2` | CMake minimum, package discovery and module flags |
+| Windows | Explicit `Backend::webview2`; static-loader macro enables WebView2, but a browser runtime is still required | Runtime availability, loader packaging and options support |
+| WebView2 package | `JUCE_WEBVIEW2_PACKAGE_LOCATION` is the parent containing the `*Microsoft.Web.WebView2*` NuGet directory | Discovery layout, supported loader architectures |
+| macOS | Native backend uses system WebKit | Supported OS version, resource/CSP/WebGL behavior |
+| Linux | Backend uses WebKitGTK; this release uses WebKit2GTK 4.1 dependencies | Required development/runtime packages for the pinned release/distribution |
+| Frontend | `@juce-framework/webview`; bundled source under `modules/juce_gui_extra/native/typescript/webview-interop` | Matching frontend/backend protocol; older releases may use `native/javascript` |
+| Slider teardown | WebSliderParameterAttachment destructor removes its listener without ending an active gesture | Destructor and relay-listener behavior before reusing the guard below |
+
+These are source-verified compatibility facts, not claims that every platform was runtime-tested. JUCE 8 introduced modern integration; copy signatures from the pinned release, not historical tutorials.
 
 ## CMake and WebView2
 
-JUCE 9.0.1 requires CMake 3.22 or newer. In the existing target declaration enable `NEEDS_WEB_BROWSER TRUE` (including Linux WebKit linkage) and `NEEDS_WEBVIEW2 TRUE` for Windows. Replace a native-editor target's `JUCE_WEB_BROWSER=0` with `JUCE_WEB_BROWSER=1`; do not define both.
+Using the compatibility baseline above, in the existing target declaration enable `NEEDS_WEB_BROWSER TRUE` (including Linux WebKit linkage) and `NEEDS_WEBVIEW2 TRUE` for Windows. Replace a native-editor target's `JUCE_WEB_BROWSER=0` with `JUCE_WEB_BROWSER=1`; do not define both.
 
 ```cmake
 target_compile_definitions(MyPlugin PUBLIC JUCE_WEB_BROWSER=1)
@@ -19,9 +33,9 @@ target_link_libraries(MyPlugin PRIVATE juce::juce_gui_extra)
 
 Static loader linking enables `JUCE_USE_WIN_WEBVIEW2` in the installed module header. If choosing dynamic loader linking instead, enable `JUCE_USE_WIN_WEBVIEW2=1` and package the appropriate loader DLL. Neither loader includes the WebView2 browser runtime.
 
-JUCE CMake searches the NuGet package directory. For a nonstandard location set `JUCE_WEBVIEW2_PACKAGE_LOCATION` before adding JUCE; in 9.0.1 it names the parent containing the `*Microsoft.Web.WebView2*` package directory, not an arbitrary include path. Inspect the pinned CMake implementation if discovery fails. Detect the browser runtime and document its prerequisite or the product's supported installer path; test on a clean Windows system. Do not silently fall back to the legacy browser for WebGL.
+JUCE CMake searches the NuGet package directory. For a nonstandard location set `JUCE_WEBVIEW2_PACKAGE_LOCATION` before adding JUCE using the layout in the compatibility table. Inspect the pinned CMake implementation if discovery fails. Detect the browser runtime and document its prerequisite or the product's supported installer path; test on a clean Windows system. Do not silently fall back to the legacy browser for WebGL.
 
-Select `Options::Backend::webview2` on Windows and set `WinWebView2::withUserDataFolder()` to a writable product-specific directory outside the plugin bundle. Establish compatible folder/options behavior across instances/processes; avoid creating a permanent profile on every editor reopen. Use `areOptionsSupported()` to report unavailable options. macOS uses system WebKit; Linux requires the WebKitGTK dependencies for the installed JUCE version (9.0.1 uses WebKit2GTK 4.1). Validate each backend rather than assuming Chrome behavior transfers.
+Select `Options::Backend::webview2` on Windows and set `WinWebView2::withUserDataFolder()` to a writable product-specific directory outside the plugin bundle. Establish compatible folder/options behavior across instances/processes; avoid creating a permanent profile on every editor reopen. Use `areOptionsSupported()` to report unavailable options. Use the platform dependencies in the compatibility table and validate each backend rather than assuming Chrome behavior transfers.
 
 ## Relays and lifetime
 
@@ -96,9 +110,41 @@ Validate IDs before dereferencing parameters registered from metadata. Add route
 
 Other controls use the same order: declare `juce::WebToggleButtonRelay bypassRelay { "bypass" };` or `juce::WebComboBoxRelay filterRelay { "filterType" };`, register with `withOptionsFrom()`, then construct `WebToggleButtonParameterAttachment` or `WebComboBoxParameterAttachment` from the matching parameter and relay. A choice can also use WebSliderRelay for a shared normalized 3D binding, with explicit quantization; never reduce three states to a boolean.
 
+## Gesture cleanup on editor destruction
+
+This applies to any WebSliderRelay-backed web control, including flat sliders and discrete controls that use slider gestures. JS pointer/keyboard cancellation remains the primary cleanup path, but editor destruction can prevent JS unload from completing. The compatibility baseline requires an explicit native fallback.
+
+Use the small `WebGestureGuard` in [the runnable gesture check](../scripts/webview_gesture_check.cpp). It observes relay starts/ends without sending a second begin/end during normal interaction; destruction ends only an outstanding gesture. Declare members in this order:
+
+```cpp
+juce::WebSliderRelay gainRelay { "gain" };
+juce::WebBrowserComponent browser { makeOptions() };
+juce::WebSliderParameterAttachment gainAttachment;
+WebGestureGuard gainGestureGuard;
+```
+
+Construct the attachment with `(parameter, gainRelay)` and the guard with `(parameter, gainRelay)`. The guard dies before the attachment, browser and relay. Use the guard for each gesture-bearing parameter; do not separately register a second attachment. Toggle/combo attachments that send complete gestures do not need artificial drag state.
+
+The example uses relay listener hooks marked internal by JUCE; recheck them when upgrading. It assumes frontend begin/end events are balanced except for teardown; it does not make duplicate frontend starts safe. In particular, do not call its cleanup early while JS can still send an end event. Stop interaction/destroy the page as part of teardown, on the message thread.
+
+To run its headless native test inside an existing JUCE CMake project, add:
+
+```cmake
+juce_add_console_app(WebGestureCheck
+    PRODUCT_NAME "WebGestureCheck"
+    NEEDS_WEB_BROWSER TRUE
+    NEEDS_WEBVIEW2 TRUE)
+target_sources(WebGestureCheck PRIVATE path/to/webview_gesture_check.cpp)
+target_compile_features(WebGestureCheck PRIVATE cxx_std_17)
+target_compile_definitions(WebGestureCheck PRIVATE JUCE_WEB_BROWSER=1)
+target_link_libraries(WebGestureCheck PRIVATE juce::juce_audio_processors juce::juce_gui_extra)
+```
+
+Apply the same platform browser dependency flags as the product target. The check sends real relay events and counts host gesture notifications for normal completion, cancellation-equivalent completion, active teardown and idle teardown. It requires no browser window. Browser pointer/focus delivery and native editor lifetime still need the target-backend acceptance checks.
+
 ## Frontend package and state
 
-JUCE 9.0.1 includes `modules/juce_gui_extra/native/typescript/webview-interop` and the `@juce-framework/webview` package. Pin a compatible package in the frontend lockfile. Earlier versions used `native/javascript`; do not copy an obsolete `index.js` path or one file with unresolved imports.
+Use the frontend package/source path in the compatibility table and pin a compatible package in the frontend lockfile. Do not copy an obsolete `index.js` path or one file with unresolved imports.
 
 ```js
 import * as Juce from '@juce-framework/webview';
@@ -145,6 +191,17 @@ Serve `/` as the entry HTML; use an explicit route map and return `std::nullopt`
 Make dev-server loading an explicit build option, default OFF, independent of Debug/Release. Development can use Vite/esbuild in a normal browser with mocks or a native WebView at `http://127.0.0.1:5173/`. If that page needs native resources, `withResourceProvider(provider, origin)` takes one optional origin string, such as `http://127.0.0.1:5173`, not a StringArray. Keep the origin allowance out of production. Production navigates to `getResourceProviderRoot()`.
 
 Preserve a scoped CSP. GLB embedded images commonly decode through `blob:` URLs: permit `blob:` in `img-src` when required. Allow only schemes/sources actually used for images, local fetches and optional workers/decoders. Missing grille or face graphics with an otherwise loaded model warrants CSP/console/resource inspection before rebaking. Do not disable CSP globally.
+
+A conservative production policy for external bundled JS/CSS and GLB images is:
+
+```html
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+```
+
+Place it before page scripts/styles. This baseline assumes same-origin provider resources and no inline code, workers or decoder WASM. Test it inside each supported WebView: if a backend exposes assets at a distinct origin, add that exact resource origin to the relevant directive, not a wildcard. Add `data:` images or worker/WASM permissions only when the actual pipeline requires them. Development HMR permissions belong only in the development policy. Verify model load, embedded image decode, initial parameter sync and offline reopen with the final policy.
+
+The sample `bytes()` helper allocates/copies the entire resource on each request. A 20 MiB GLB means another 20 MiB copy before browser parsing/decoded images; BinaryData delivery is not free. Count requests and measure provider-copy time, load time and peak memory separately. Load a model once per viewer and prevent repeated effect/mount fetches. Reuse parsed assets within a live viewer where ownership permits; cache decompression/route work only when measured. Returning an owning Resource still requires owned bytes: returning a cached vector by value can copy again. Do not assume HTTP caching or cross-WebView sharing eliminates this cost.
 
 ## Streaming visual data
 

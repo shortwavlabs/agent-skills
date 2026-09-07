@@ -2,6 +2,36 @@
 
 Use for Blender-authored amps, pedals and rack gear rendered with Three.js in JUCE 9. This reference owns runtime/control architecture. [WebView integration](webview-ui.md) owns CMake, native APIs and offline serving; [runtime export](../../guitar-gear-modeling/references/runtime-export.md), [PBR translation](../../guitar-gear-materials/references/runtime-pbr.md), [camera translation](../../guitar-product-render/references/runtime-presentation.md) and [runtime QA](../../guitar-gear-qa/references/runtime-qa.md) own their respective asset stages.
 
+Do not overfit this architecture to amplifiers. Pedal footswitches, rack rotary selectors, alternative patch jacks, LED rings and meters use the same bindings and derived-state rules. Choose boolean, discrete or continuous semantics from the actual control contract; real independently routed patch ports must not be collapsed merely because alternative amp inputs use one choice.
+
+## Minimal project layout
+
+```text
+GuitarGearPlugin/
+├── CMakeLists.txt
+├── Source/
+│   ├── PluginProcessor.h/.cpp
+│   └── PluginEditor.h/.cpp
+├── blender/
+│   ├── gear_master.blend
+│   └── gear_juce.blend
+└── web/
+    ├── package.json
+    ├── package-lock.json
+    ├── index.html
+    ├── src/
+    │   ├── main.ts
+    │   ├── parameters/        # registry, mock/JUCE bindings
+    │   └── three/             # scene, controls, hits, invalidator
+    ├── assets/
+    │   ├── gear.glb
+    │   ├── runtime_manifest.json
+    │   └── runtime_camera_presets.json
+    └── dist/                  # generated HTML/JS/CSS/assets
+```
+
+Export the derivative to `web/assets`; the frontend build copies required runtime assets into `web/dist`. CMake depends on frontend sources, lockfile and input assets, builds `dist`, then embeds its outputs with `juce_add_binary_data`. The editor resource map serves those outputs; master/derivative Blender files stay out of BinaryData. The manifest may be validation-only. Reuse an existing equivalent layout rather than reorganizing a working project.
+
 ## Implementation sequence
 
 Follow this order, reusing accepted artifacts and existing implementations at each phase:
@@ -74,7 +104,7 @@ q(u) = qRest × axisAngle(localAxis, rotation_sign × (angle(u) − rest_angle))
 
 Convert degrees to radians once. Use quaternion copy/multiply from `qRest` each update, never `rotation += delta`. For switches choose the absolute entry in `state_angles` and subtract the recorded rest angle. Check 0 / 0.5 / 1 against printed markings, repeated values, axis direction and pivot stability. Do not rotate the panel scale with the knob.
 
-Prefer vertical drag: up increases, down decreases; Shift optionally reduces sensitivity. Map pointer coordinates using the canvas bounds. On a proxy hit, disable orbit before its handler starts, capture the pointer and begin one gesture. Moves set normalized values; pointerup ends it once. One idempotent cleanup path handles pointercancel, lost capture, window blur, page teardown and editor destruction, releases capture and restores orbit. Do not rely solely on JS unload: JUCE 9.0.1's WebSliderParameterAttachment destructor removes its listener but does not end an active gesture. Track relay gesture starts/ends natively and explicitly end an outstanding host gesture before attachment destruction, exactly once. Preserve existing click-cycle toggle UX when it works; bracket each cycle/select with one gesture. Double-click reset is optional and uses the actual parameter default.
+Prefer vertical drag: up increases, down decreases; Shift optionally reduces sensitivity. Map pointer coordinates using the canvas bounds. On a proxy hit, disable orbit before its handler starts, capture the pointer and begin one gesture. Moves set normalized values; pointerup ends it once. One idempotent cleanup path handles pointercancel, lost capture, window blur, page teardown and editor destruction, releases capture and restores orbit. Use the shared [native gesture cleanup pattern](webview-ui.md#gesture-cleanup-on-editor-destruction) so editor destruction closes an outstanding gesture even when JS unload does not run. Preserve existing click-cycle toggle UX when it works; bracket each cycle/select with one gesture. Double-click reset is optional and uses the actual parameter default.
 
 ## Physical controls: one logical choice
 
@@ -92,9 +122,17 @@ Snap finite normalized input with `Math.round(Math.min(1, Math.max(0, u)) * 2)`;
 
 Expose `enum class AmpMode { channel1 = 0, off = 1, channel2 = 2 };` and a DSP-facing `getAmpMode()` that safely converts the raw choice index. Cache its atomic parameter pointer during setup. Define Off audio behavior from the existing DSP contract; otherwise leave an explicit TODO. Never infer silence/bypass/modeled power-off from the artwork or add DSP switching during a UI-only task.
 
-For two alternative input jacks, use one `inputMode = Regular | High` choice. Clicking High writes High; clicking Regular/Low writes Regular. The DSP-facing mapping can be `highInput = (inputMode == High)`. These alternative physical sockets do not imply two audio buses or two independent booleans. Keep the existing plugin bus layout.
+For two alternative input jacks, use one `inputMode = Regular | High` choice with indices 0 and 1. Read each target's exported `choice_index` as defined in the [validation manifest](../../guitar-gear-modeling/references/runtime-export.md#validation-manifest-example); do not special-case its name. Clicking High writes High; clicking Regular/Low writes Regular. The DSP-facing mapping can be `highInput = (inputMode == High)`. These alternative physical sockets do not imply two audio buses or two independent booleans. Keep the existing plugin bus layout.
 
 Derive a plug's position/visibility from `inputMode`: attach it to the selected jack frame. A lightweight cable is optional visual state, never another parameter authority. Implement click-to-select before drag-and-drop cable interaction. A debug readout should expose the enum index/label and selected jack so tests can compare the physical representation to host state.
+
+## Accessible physical controls
+
+Canvas meshes alone do not provide accessible controls. Expose focusable DOM controls using the same ParameterBinding: native range inputs for knobs, a radio group/select for exclusive modes/jacks, and buttons for appropriate switches. A compact accessible control view or overlays may accompany the 3D view; avoid two competing focus targets for one control. Do not hide the accessible controls with `display: none` or `aria-hidden`.
+
+Give each control a meaningful label, current value/choice, units and disabled state where applicable. Show a visible focus indicator on the corresponding hardware or accessible control. Provide predictable Tab order, arrow-key adjustment/choice selection, Home/End where appropriate, and Enter/Space activation. Focused control keys must not also orbit the camera. Route keyboard edits through the same gesture/snap path, end an active edit on blur, and reflect host automation without stealing focus. Use text/semantics as well as lamp color to expose selected states; do not announce every automation frame as a live-region update.
+
+Acceptance includes keyboard-only access to every intended control, visible focus, no focus trap, screen-reader names/current values, and state/gesture parity with pointer operation on the actual WebView backend. Unsupported accessibility testing is NOT CHECKED, not a visual pass.
 
 ## Rendering, threading and lifetime
 
