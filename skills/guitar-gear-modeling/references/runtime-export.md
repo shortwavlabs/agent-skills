@@ -86,14 +86,14 @@ Keep an expected contract beside the GLB, independently maintained from the expo
     { "name": "HIT_INPUT_HIGH", "parent": "INPUT_HIGH" }
   ],
   "camera_presets_file": "runtime_camera_presets.json",
-  "camera_presets": {
+  "expected_camera_presets": {
     "Front": { "position": [0, 0.2, 1], "target": [0, 0.2, 0], "up": [0, 1, 0], "vertical_fov_degrees": 35, "min_distance": 0.3, "max_distance": 2 },
     "Controls": { "position": [0, 0.25, 0.45], "target": [0, 0.2, 0], "up": [0, 1, 0], "vertical_fov_degrees": 35, "min_distance": 0.25, "max_distance": 1 }
   }
 }
 ```
 
-The manifest is validation input, not another parameter store or a glTF-standard schema. Compare each expected node/parent and metadata field against parsed GLB nodes/extras, and compare the separate preset file against these expected presets. Validate unique names, exactly one root, finite camera vectors, valid FOV/distance ranges and every referenced hit target. Include static nodes only if their identity is part of the application contract. Do not generate expected values from the same possibly broken export and call that independent validation.
+The manifest is validation input, not another parameter store or a glTF-standard schema. Compare each expected node/parent and metadata field against parsed GLB nodes/extras, and compare the separate preset file against `expected_camera_presets`. `camera_presets_file` identifies the sole runtime camera source; `expected_camera_presets` is an independent expected-value snapshot used only by QA, never a second production source or runtime fallback. Validate unique names, exactly one root, finite camera vectors, valid FOV/distance ranges and every referenced hit target. Include static nodes only if their identity is part of the application contract. Do not generate expected values from the same possibly broken export and call that independent validation.
 
 `choice_index` is the exported zero-based APVTS choice index: Regular = 0, High = 1. On a jack hit, resolve its `parameter_id` and write `choice_index / (choiceCount - 1)` through that binding (for a one-choice parameter use 0). Reject noninteger/out-of-range indices. Node names identify geometry; never infer High/Regular behavior from spelling. When adding a toggle, include its expected `state_count`, `state_labels`, `state_angles`, axis and rest angle in the same manifest.
 

@@ -125,7 +125,7 @@ WebGestureGuard gainGestureGuard;
 
 Construct the attachment with `(parameter, gainRelay)` and the guard with `(parameter, gainRelay)`. The guard dies before the attachment, browser and relay. Use the guard for each gesture-bearing parameter; do not separately register a second attachment. Toggle/combo attachments that send complete gestures do not need artificial drag state.
 
-The example uses relay listener hooks marked internal by JUCE; recheck them when upgrading. It assumes frontend begin/end events are balanced except for teardown; it does not make duplicate frontend starts safe. In particular, do not call its cleanup early while JS can still send an end event. Stop interaction/destroy the page as part of teardown, on the message thread.
+This is a JUCE 9.0.1 workaround verified against that implementation, not a recommended abstraction to copy unchanged across JUCE versions. The example uses relay listener hooks marked internal by JUCE; recheck them when upgrading. It assumes frontend begin/end events are balanced except for teardown; it does not make duplicate frontend starts safe. In particular, do not call its cleanup early while JS can still send an end event. Stop interaction/destroy the page as part of teardown, on the message thread.
 
 To run its headless native test inside an existing JUCE CMake project, add:
 

@@ -6,6 +6,8 @@
 #include <iostream>
 #include <stdexcept>
 
+// This is a JUCE 9.0.1 workaround verified against that implementation, not a
+// recommended abstraction to copy unchanged across JUCE versions.
 // Declare after the WebSliderParameterAttachment so the guard is destroyed first.
 // Normal gestures remain owned by that attachment; this observer only closes a
 // gesture abandoned by editor destruction. All access is on the message thread.
