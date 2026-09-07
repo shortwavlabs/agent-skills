@@ -1,6 +1,6 @@
 ---
 name: guitar-product-render
-description: Light, frame, preview, and render guitar pedals and amplifiers in Blender as polished commercial product photography with controlled reflections and repeatable studio setups.
+description: Light, frame, preview, and render guitar pedals and amplifiers in Blender as polished commercial product photography with controlled reflections and repeatable studio setups. Includes runtime camera presets and lighting translation for WebGL plugin editors.
 ---
 
 # Guitar Product Render
@@ -8,6 +8,10 @@ description: Light, frame, preview, and render guitar pedals and amplifiers in B
 Use this skill for product-camera setup, studio lighting, Cycles rendering, framing, background treatment, and iterative render refinement of guitar pedals, amplifiers, cabinets, and related gear.
 
 Read [studio recipes](references/studio-recipes.md) for lighting patterns, fixed-rig diagnostics, two-distance testing, render freshness and comparison evidence. Read [the shot list](references/shot-list.md) to choose deliverable and QA views by the feature being tested.
+
+## Runtime camera and lighting translation
+
+Use when deriving an interactive editor from an accepted Blender product scene. Read [runtime presentation](references/runtime-presentation.md) for evaluated camera presets, coordinate/FOV conversion, framing constraints, studio-reflection intent and Blender/WebGL parity. Keep accepted Blender cameras/lights intact and validate a separate runtime presentation.
 
 ## Refinement decision rules
 

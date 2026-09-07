@@ -110,7 +110,8 @@ skills/juce-plugin/
     ├── parameter-management.md APVTS patterns: parameter layout, attachments, state, groups
     ├── dsp-patterns.md         DSP cookbook: ProcessorChain, filters, oscillators, wavetable synthesis, delay, distortion
     ├── ui-patterns.md          Editor patterns: layout, custom widgets, LookAndFeel, meters, FFT spectrum analyser
-    ├── webview-ui.md           WebView UIs (JUCE 8): React/Vue frontends, JS parameter bindings, hot reloading
+    ├── webview-ui.md           JUCE 9 WebView2, offline resources, relays, frontend integration
+    ├── threejs-webview-ui.md   Interactive guitar-gear GLBs, physical controls, APVTS, idle rendering
     ├── audio-thread-safety.md  Real-time safety: processBlock rules, lock-free patterns, debugging
     ├── cmake-reference.md      Full CMake API: juce_add_plugin, SDK paths, CI/CD, platform specifics
     └── production-plugin-practices.md  Product plugin practices: validation, assets, state restore
@@ -124,7 +125,8 @@ skills/juce-plugin/
 | **Parameter management** | APVTS: ParameterLayout, SliderAttachment, raw pointers, ParameterReferences struct |
 | **DSP module** | ProcessorChain, IIR/FIR/SVF filters, Oscillator, WaveShaper, Convolution, DelayLine, LadderFilter, wavetable synthesis, LFO at control rate, two-level chain architecture |
 | **Editor/GUI** | Component layout (FlexBox, Grid), custom widgets, LookAndFeel, meters, FFT spectrum analyser, binary data |
-| **WebView UIs (JUCE 8)** | WebBrowserComponent, React/Vue frontends, JS parameter bindings, resource providers, hot reloading |
+| **WebView UIs (JUCE 9)** | WebView2, local resources, relay/attachment lifetime, framework bindings, explicit dev mode |
+| **Interactive 3D gear** | Blender → GLB → Three.js → WebView; physical controls, APVTS authority, automation/state, render-on-demand |
 | **State serialization** | XML state save/load, non-parameter state via ValueTree children |
 | **Audio thread safety** | No-allocation rules, lock-free patterns, denormal prevention, debugging |
 | **Synths** | Synthesiser/SynthesiserVoice/SynthesiserSound framework, polyphonic MIDI, gain ramping |
@@ -141,6 +143,20 @@ skills/juce-plugin/
 - [JUCE Development Forum](https://forum.juce.com/c/development/21) — community Q&A and best practices
 - [JUCE Tutorials](https://juce.com/learn/tutorials/) — official tutorials on plugins, DSP, synth, MIDI, GUI, and more
 - [Pamplejuce](https://github.com/sudara/pamplejuce) — community CMake template for production plugins
+
+### Interactive guitar-gear asset skills
+
+Use these existing skills together for Blender-authored amps, pedals and rack gear. Keep the accepted master intact, validate the semantic GLB in a browser, then embed the same frontend in JUCE. The [16-phase integration workflow](skills/juce-plugin/references/threejs-webview-ui.md#implementation-sequence) connects the responsibilities below without duplicating their detailed instructions.
+
+| Skill | Responsibility | Runtime reference |
+|---|---|---|
+| [guitar-gear-modeling](skills/guitar-gear-modeling/SKILL.md) | Real dimensions, reusable construction; runtime collections, semantic nodes, pivots and hit proxies | [Runtime export](skills/guitar-gear-modeling/references/runtime-export.md) |
+| [guitar-gear-materials](skills/guitar-gear-materials/SKILL.md) | Material identity and graphics; glTF-safe PBR baking, cloth and texture budgets | [Runtime PBR](skills/guitar-gear-materials/references/runtime-pbr.md) |
+| [guitar-gear-qa](skills/guitar-gear-qa/SKILL.md) | Blender audits; GLB/WebGL parity, runtime metrics and host acceptance | [Runtime QA/report](skills/guitar-gear-qa/references/runtime-qa.md) |
+| [guitar-product-render](skills/guitar-product-render/SKILL.md) | Product photography; runtime camera presets, framing and lighting intent | [Runtime presentation](skills/guitar-product-render/references/runtime-presentation.md) |
+| [juce-plugin](skills/juce-plugin/SKILL.md) | Three.js bindings, offline WebView2, APVTS/gestures, physical switch/jack semantics and instance performance | [Three.js/WebView UI](skills/juce-plugin/references/threejs-webview-ui.md) |
+
+**Triggers on:** exporting Blender guitar gear for an interactive plugin, semantic GLB controls, Three.js amp/pedal editors, runtime PBR/camera parity, JUCE WebView integration and validation.
 
 ### guitar-dsp
 

@@ -1,6 +1,6 @@
 ---
 name: guitar-gear-materials
-description: Create and apply physically plausible Blender materials for guitar pedals and amps, including powder coat, metal, plastic, rubber, tolex, grille cloth, wood, LEDs, and printed graphics.
+description: Create and apply physically plausible Blender materials for guitar pedals and amps, including powder coat, metal, plastic, rubber, tolex, grille cloth, wood, LEDs, and printed graphics. Includes glTF/PBR baking and WebGL texture preparation.
 ---
 
 # Guitar Gear Materials
@@ -13,6 +13,10 @@ Read only the references needed for the task:
 - [Amplifier surfaces](references/amplifier-surfaces.md): vinyl grain, cloth, vintage hardware, cups, sockets and piping when those surfaces are involved.
 - [Material diagnostics](references/material-diagnostics.md): unexpected black levels, saturated coatings, isolated material candidates, sparkle or physical-scale mismatches. The visual patch test is primary; anisotropic math is an advanced optional fallback.
 - [Graphics and decals](references/graphics-and-decals.md): source logos/arrows, registration, flush printing, molded relief and glyph verification.
+
+## Runtime glTF materials
+
+Use when exporting guitar gear to Three.js/WebGL. Read [runtime PBR](references/runtime-pbr.md) for procedural baking, supported material inputs, panel graphics, grille sampling, LED isolation and measured texture budgets. Preserve master shaders and judge the translated material at actual plugin resolution and intended maximum zoom.
 
 ## Refinement decision rules
 

@@ -1,6 +1,6 @@
 ---
 name: juce-plugin
-description: Build JUCE audio plugins (VST3, AU, AAX, Standalone, LV2) in C++ with CMake. Covers the full development workflow from project scaffolding to multi-format builds, including AudioProcessor lifecycle, parameter management with APVTS, DSP module chains, custom editor GUIs, state serialization, real-time audio safety, and cross-platform CI/CD. Use this skill whenever the user mentions JUCE, audio plugins, VST plugins, AU plugins, audio effects, synthesizers, MIDI processors, AudioProcessor, AudioProcessorEditor, Projucer, or wants to create audio software — even if they just say "make a plugin" or "audio plugin". Also applies when users are working in an existing JUCE codebase (files like PluginProcessor.cpp, PluginEditor.cpp, CMakeLists.txt with juce_add_plugin).
+description: Build JUCE audio plugins (VST3, AU, AAX, Standalone, LV2) in C++ with CMake. Covers the full development workflow from project scaffolding to multi-format builds, including AudioProcessor lifecycle, parameter management with APVTS, DSP module chains, custom editor GUIs, Three.js/GLB WebView interfaces, state serialization, real-time audio safety, and cross-platform CI/CD. Use this skill whenever the user mentions JUCE, audio plugins, VST plugins, AU plugins, audio effects, synthesizers, MIDI processors, AudioProcessor, AudioProcessorEditor, Projucer, or wants to create audio software — even if they just say "make a plugin" or "audio plugin". Also applies when users are working in an existing JUCE codebase (files like PluginProcessor.cpp, PluginEditor.cpp, CMakeLists.txt with juce_add_plugin).
 ---
 
 # JUCE Audio Plugin Development
@@ -316,100 +316,11 @@ Modules are the building blocks. Link the top-level module and transitive depend
 
 The 24 JUCE modules are: `juce_analytics`, `juce_animation`, `juce_audio_basics`, `juce_audio_devices`, `juce_audio_formats`, `juce_audio_plugin_client`, `juce_audio_processors`, `juce_audio_utils`, `juce_box2d`, `juce_core`, `juce_cryptography`, `juce_data_structures`, `juce_dsp`, `juce_events`, `juce_graphics`, `juce_gui_basics`, `juce_gui_extra`, `juce_javascript`, `juce_midi_ci`, `juce_opengl`, `juce_osc`, `juce_product_unlocking`, `juce_video`.
 
-## WebView UIs (JUCE 8)
+## WebView UIs (JUCE 9)
 
-JUCE 8 supports building plugin UIs with web technologies (React, Vue, Svelte, plain HTML/CSS/JS) via `WebBrowserComponent`. This allows rapid UI iteration with hot reloading, use of mature web frontend frameworks, and cross-platform hardware-accelerated graphics via WebGL. Frontend web developers can participate in plugin UI development without touching C++.
+For web-based editors, enable the browser module and use the current [WebView integration reference](references/webview-ui.md) for CMake/WebView2, relay lifetime, frontend package compatibility, offline resources and gestures. The native editor example's `JUCE_WEB_BROWSER=0` must become `1`. Verify API signatures against the installed JUCE version.
 
-The WebView feature lives in the `juce_gui_extra` module. It works by embedding a native browser component — WebKit on macOS/iOS, Edge (Chromium) on Windows, GTK WebKit2 on Linux.
-
-### CMake Setup
-
-```cmake
-juce_add_plugin(MyPlugin
-    ...
-    NEEDS_WEBVIEW2 TRUE)   # Required on Windows
-
-target_compile_definitions(MyPlugin PUBLIC
-    JUCE_WEB_BROWSER=1
-    JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1)  # Windows best practice
-```
-
-### C++ Side: WebBrowserComponent with Parameter Attachments
-
-```cpp
-#include <juce_gui_extra/juce_gui_extra.h>
-
-class WebViewEditor : public juce::AudioProcessorEditor
-{
-public:
-    WebViewEditor (MyProcessor& p)
-        : AudioProcessorEditor (p),
-          processor (p),
-          gainRelay (webComponent, "gain"),
-          gainAttachment (*processor.apvts.getParameter ("gain"), gainRelay, nullptr)
-    {
-        addAndMakeVisible (webComponent);
-        setSize (600, 400);
-    }
-
-    void resized() override { webComponent.setBounds (getLocalBounds()); }
-
-private:
-    MyProcessor& processor;
-
-    juce::WebBrowserComponent webComponent {
-        juce::WebBrowserComponent::Options()
-            .withNativeIntegrationEnabled()
-            .withBackend (juce::WebBrowserComponent::Options::Backend::webview2)
-            .withWinWebView2Options (juce::WebBrowserComponent::Options::WinWebView2{}
-                .withUserDataFolder (juce::File::getSpecialLocation (
-                    juce::File::tempDirectory)))
-            .withOptionsFrom (gainRelay)
-            .withResourceProvider ([this] (const auto& url) -> std::optional<juce::WebBrowserComponent::Resource> {
-                // Serve BinaryData resources to the WebView
-                return std::nullopt;
-            })
-    };
-
-    juce::WebSliderRelay gainRelay;
-    juce::WebSliderParameterAttachment gainAttachment;
-};
-```
-
-### JavaScript Side: JUCE Frontend Library
-
-The JUCE frontend library is at `modules/juce_gui_extra/native/javascript/index.js`. It works standalone — no C++ backend needed for visual testing.
-
-```js
-import * as Juce from "./index.js";
-
-// Connect to a parameter
-const gainState = Juce.getSliderState("gain");
-
-// Listen for value changes from the DAW
-gainState.valueChangedEvent.addListener(() => {
-    mySlider.value = gainState.getNormalisedValue();
-});
-
-// Send value changes back to the DAW
-mySlider.addEventListener("input", (event) => {
-    gainState.setNormalisedValue(event.target.value / 100);
-});
-
-// Call native C++ functions
-const loadPreset = Juce.getNativeFunction("loadPreset");
-loadPreset(45).then(result => console.log(result));
-
-// Access backend resources
-const resourceUrl = Juce.getBackendResourceAddress("spectrum.json");
-```
-
-### Development Workflow
-
-- **Debug**: Run a dev server (`npm start`) and point the WebView at `localhost:3000` for hot reloading
-- **Release**: Serve frontend assets from `BinaryData` via the resource provider, or bundle as a zip
-
-Read **`references/webview-ui.md`** for the complete guide: resource providers, native functions, event listeners, all attachment types, the React integration pattern, and platform-specific quirks.
+For interactive Blender-authored amps, pedals or rack gear, read [Three.js/WebView UI](references/threejs-webview-ui.md). It covers the staged Blender → semantic GLB → mock Three.js → JUCE WebView → APVTS workflow, absolute controls, switches, input jacks, derived LEDs/cables, render-on-demand and host acceptance. Keep APVTS authoritative, construct relays before the browser and attachments after it, and keep all WebView work off the audio thread.
 
 ## Reference Files
 
@@ -419,7 +330,8 @@ Read these as needed based on what you're implementing:
 - **`references/parameter-management.md`** — APVTS patterns: parameter layout, attachments, raw pointers, non-parameter state, parameter groups
 - **`references/dsp-patterns.md`** — DSP cookbook: ProcessorChain, filters, oscillators, waveshapers, convolution reverb, delay lines, wavetable synthesis, LFO at control rate, two-level chain architecture, per-sample vs block processing
 - **`references/ui-patterns.md`** — Editor patterns: component layout, custom widgets, LookAndFeel, meters, FFT spectrum analyser, responsive resize, binary data for assets
-- **`references/webview-ui.md`** — WebView UIs (JUCE 8): WebBrowserComponent, resource providers, native functions, JS parameter bindings, React integration, hot reloading
+- **`references/webview-ui.md`** — JUCE 9 WebBrowserComponent, WebView2, local resources, native functions, parameter bindings, frontend frameworks and explicit development mode
+- **`references/threejs-webview-ui.md`** — Interactive guitar-gear GLBs, mock/JUCE bindings, physical controls, derived visual state, render-on-demand and staged host validation
 - **`references/audio-thread-safety.md`** — Real-time safety rules: what you can/cannot do in processBlock, lock-free patterns, atomics, debugging audio glitches
 - **`references/cmake-reference.md`** — Full CMake API: all juce_add_plugin properties, SDK paths, binary data, CI/CD, platform specifics
 - **`references/production-plugin-practices.md`** — Product-shaped plugin practices: CMake presets, test/measurement targets, asset/model loading, state restore, latency/tail updates, host validation, and release gates

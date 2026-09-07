@@ -1,6 +1,6 @@
 ---
 name: guitar-gear-qa
-description: Audit Blender guitar-gear scenes for dimensional, geometric, shading, material, camera, lighting, naming, and render issues before final delivery, then fix only high-confidence problems.
+description: Audit Blender guitar-gear scenes for dimensional, geometric, shading, material, camera, lighting, naming, and render issues before final delivery, then fix only high-confidence problems. Includes runtime GLB, WebGL and embedded plugin UI acceptance.
 ---
 
 # Guitar Gear QA
@@ -8,6 +8,10 @@ description: Audit Blender guitar-gear scenes for dimensional, geometric, shadin
 Use this skill as the final audit for guitar pedal, amplifier, cabinet, and related Blender product scenes.
 
 Read [the QA checklist](references/qa-checklist.md) for the inspection matrix, mounting tests, boundary diagnosis, preservation evidence and delivery gates. `scripts/scene_audit.py` is an optional direct-scene heuristic; it does not validate nested evaluated assemblies, physical clearances or visual quality.
+
+## Runtime GLB and WebView QA
+
+For interactive plugin assets, read [runtime QA](references/runtime-qa.md) for semantic hierarchy/pivot checks, browser visual parity, a reusable metrics report, host automation/state restore and 1/5/10-instance profiling. Run standalone WebGL acceptance before JUCE integration and repeat on each target WebView backend. The static Blender audit is insufficient for these claims.
 
 ## Refinement decision rules
 
