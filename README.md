@@ -96,7 +96,7 @@ skills/vcv-rack-plugin/
 
 ### juce-plugin
 
-Build JUCE audio plugins (VST3, AU, AAX, LV2, Standalone) in C++ with CMake. Covers the full development workflow from project scaffolding to multi-format builds — AudioProcessor lifecycle, parameter management with APVTS, DSP module chains, custom editor GUIs, WebView UIs with web technologies (React, Vue, Svelte), state serialization, real-time audio safety, and cross-platform CI/CD.
+Build JUCE audio plugins (VST3, AU, AAX, LV2, Standalone) in C++ with CMake. Covers the full development workflow from project scaffolding to multi-format builds — AudioProcessor lifecycle, parameter management with APVTS, DSP module chains, custom editor GUIs, WebView UIs with web technologies (React, Vue, Svelte, Three.js) and semantic GLB controls, state serialization, real-time audio safety, and cross-platform CI/CD.
 
 **Triggers on:** JUCE, audio plugins, VST plugins, AU plugins, audio effects, synthesizers, MIDI processors, AudioProcessor, AudioProcessorEditor, Projucer, `juce_add_plugin`, PluginProcessor.cpp, PluginEditor.cpp.
 
@@ -105,6 +105,8 @@ Build JUCE audio plugins (VST3, AU, AAX, LV2, Standalone) in C++ with CMake. Cov
 ```
 skills/juce-plugin/
 ├── SKILL.md                    Main skill instructions & plugin development workflow
+├── scripts/
+│   └── webview_gesture_check.cpp  JUCE 9.0.1 gesture teardown regression check
 └── references/
     ├── plugin-lifecycle.md     AudioProcessor contract: overrides, bus configs, Synthesiser framework
     ├── parameter-management.md APVTS patterns: parameter layout, attachments, state, groups
@@ -125,8 +127,8 @@ skills/juce-plugin/
 | **Parameter management** | APVTS: ParameterLayout, SliderAttachment, raw pointers, ParameterReferences struct |
 | **DSP module** | ProcessorChain, IIR/FIR/SVF filters, Oscillator, WaveShaper, Convolution, DelayLine, LadderFilter, wavetable synthesis, LFO at control rate, two-level chain architecture |
 | **Editor/GUI** | Component layout (FlexBox, Grid), custom widgets, LookAndFeel, meters, FFT spectrum analyser, binary data |
-| **WebView UIs (JUCE 9)** | WebView2, local resources, relay/attachment lifetime, framework bindings, explicit dev mode |
-| **Interactive 3D gear** | Blender → GLB → Three.js → WebView; physical controls, APVTS authority, automation/state, render-on-demand |
+| **WebView UIs (JUCE 9)** | Pinned compatibility guidance, WebView2, offline resources/CSP, relay lifetime, tested gesture cleanup, explicit dev mode |
+| **Interactive 3D gear** | Blender → GLB → Three.js → WebView; physical controls, APVTS authority, accessibility, state-space checks, render-on-demand |
 | **State serialization** | XML state save/load, non-parameter state via ValueTree children |
 | **Audio thread safety** | No-allocation rules, lock-free patterns, denormal prevention, debugging |
 | **Synths** | Synthesiser/SynthesiserVoice/SynthesiserSound framework, polyphonic MIDI, gain ramping |
@@ -157,6 +159,16 @@ Use these existing skills together for Blender-authored amps, pedals and rack ge
 | [juce-plugin](skills/juce-plugin/SKILL.md) | Three.js bindings, offline WebView2, APVTS/gestures, physical switch/jack semantics and instance performance | [Three.js/WebView UI](skills/juce-plugin/references/threejs-webview-ui.md) |
 
 **Triggers on:** exporting Blender guitar gear for an interactive plugin, semantic GLB controls, Three.js amp/pedal editors, runtime PBR/camera parity, JUCE WebView integration and validation.
+
+#### Implementation and validation references
+
+- [Project layout](skills/juce-plugin/references/threejs-webview-ui.md#minimal-project-layout) connects the Blender derivative, frontend assets and JUCE BinaryData.
+- [Independent validation manifest](skills/guitar-gear-modeling/references/runtime-export.md#validation-manifest-example) specifies semantic nodes, unique names, hit targets and choice indices. The runtime camera file is separate from the QA-only `expected_camera_presets` snapshot.
+- [Runtime QA](skills/guitar-gear-qa/references/runtime-qa.md) distinguishes static asset totals from frame metrics and covers legal state combinations, automation, restoration, accessibility and instance profiling.
+- [WebView compatibility and packaging](skills/juce-plugin/references/webview-ui.md) covers version checks, offline resources, production CSP and resource-copy costs.
+- [Native gesture regression check](skills/juce-plugin/scripts/webview_gesture_check.cpp) covers normal completion, cancellation-equivalent completion, active teardown and idle teardown. Its guard is a JUCE 9.0.1-specific workaround; see [build instructions and scope](skills/juce-plugin/references/webview-ui.md#gesture-cleanup-on-editor-destruction) before adapting it to another version.
+
+Native gesture checks complement actual WebView keyboard, screen-reader and host testing; source verification alone is not a runtime test result.
 
 ### guitar-dsp
 
