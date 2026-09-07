@@ -1,6 +1,6 @@
 ---
 name: guitar-gear-modeling
-description: Model guitar pedals, amplifiers, cabinets, controls, and hardware in Blender with real dimensions, clean hard-surface construction, reusable parts, and inspection-driven iteration.
+description: Model guitar pedals, amplifiers, cabinets, controls, and hardware in Blender with real dimensions, clean hard-surface construction, reusable parts, and inspection-driven iteration. Includes semantic GLB preparation for interactive plugin UIs.
 ---
 
 # Guitar Gear Modeling
@@ -8,6 +8,10 @@ description: Model guitar pedals, amplifiers, cabinets, controls, and hardware i
 Use this skill for dimensionally grounded Blender modeling of guitar pedals, amplifiers, speaker cabinets, rack gear, footswitches, knobs, jacks, switches, handles, corners, vents, fasteners, and related product hardware.
 
 Read [construction standards](references/construction-standards.md) for reference hierarchy, corner diagnosis, mechanical gaps, panel constraints, slant geometry and support placement. Read [component construction](references/component-library.md) for knobs, jacks, toggles and repeated hardware. Read [Blender operations](references/blender-operations.md) when scripting, handling nested instances, saving standalone libraries or exporting. Use `templates/product-brief.md` when the request lacks a compact specification.
+
+## Runtime GLB export
+
+Use for an interactive guitar-gear plugin asset. Preserve the accepted master and build a separate runtime derivative. Read [runtime export](references/runtime-export.md) for export collections, semantic nodes, rest pivots, extras, hit proxies and static consolidation. Source-level separate-part rules above remain appropriate for the master; runtime joining is scoped to the derivative.
 
 ## Refinement decision rules
 

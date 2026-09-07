@@ -322,3 +322,7 @@ sudo apt-get install -y clang libasound2-dev libjack-jackd2-dev \
 ```
 
 Optional: `libwebkit2gtk-4.1-dev` (for `juce::WebBrowserComponent`).
+
+## WebView editor targets
+
+For JUCE 9 browser/WebView2 flags, NuGet package discovery, loader/runtime distinctions and frontend resource build dependencies, use the maintained [WebView CMake guidance](webview-ui.md#cmake-and-webview2). Its browser-enabled flags replace the native-editor example's `JUCE_WEB_BROWSER=0`; do not combine both definitions.
