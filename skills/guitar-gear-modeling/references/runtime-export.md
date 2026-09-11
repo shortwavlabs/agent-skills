@@ -8,6 +8,12 @@ Inspect the accepted file, evaluated instances, dimensions, controls, materials 
 
 Use the existing [Blender operations](blender-operations.md) procedure for nested instances and context-sensitive conversion. Source object counts are not evaluated assembly counts.
 
+## Evaluated conversion and consolidation
+
+Before converting or joining evaluated objects, capture the effective material slots and any source-local coordinates that drive visible procedural variation. Evaluated mesh creation can preserve the shape while losing an object-linked material override; joining can also collapse `Generated`/`Object` coordinates into a different frame. Copy the evaluated slot assignments explicitly and, when the bake depends on per-part coordinates or deterministic object variation, preserve those values as named mesh attributes before consolidation. Compare a representative aged part before and after conversion rather than trusting matching material names.
+
+Protect silhouette-critical curved parts from automatic reduction. Speaker rims, cones, cable curves and rear hardware can distort under a decimation rule that is harmless on a flat shell. Reduce them only after a matched front/rear/grazing comparison shows the result is acceptable at maximum zoom.
+
 ## Semantic hierarchy
 
 Export application roles, not construction history. An amplifier example (adapt counts/names to the actual product):
@@ -36,6 +42,8 @@ Join a knob's cap, skirt, pointer and grip ribs into its visual mesh while retai
 
 Bake flat ticks, numbers, section rules, logos and warning text into panel graphics. Keep relief geometry only where raised/engraved detail changes silhouette or visibly contributes parallax at maximum intended zoom. Fiber-level grille geometry is normally replaced by the material workflow.
 
+Retain secondary construction—speakers, tubes, chassis, wiring, rear fasteners or cabinet layers—when an allowed rear/orbit/zoom view can reveal it. Match its detail to the closest intended inspection distance: it may reward exploration without dominating the default view. Do not expose it through a surface that should be opaque, and do not delete it merely because the hero camera hides it.
+
 ## Pivot and metadata contract
 
 Place the moving node origin at its shaft/pivot and verify the local rotation axis. Preserve its imported rest quaternion. Resolve transform application in the derivative before recording calibration; do not apply transforms again after calibration. Keep parent scales well behaved and test mirrored controls. Blender's Z-up to glTF Y-up conversion means a source-world axis is not automatically the loaded node's local axis: validate the exported result.
@@ -58,7 +66,9 @@ Enable custom-property/extras export in the installed Blender glTF exporter. Exa
 
 Define angles in degrees about the loaded node's local axis. In this convention `min_angle`, `max_angle` and `rest_angle` are calibration coordinates before applying direction; apply `rotation_sign` once to the angle difference. If existing metadata stores already-signed physical angles, preserve that convention and do not apply another sign. Record which convention is used.
 
-For a toggle provide `ui_type = "toggle"`, `parameter_id = "ampMode"`, `state_count = 3`, local axis, `state_angles`, `rest_angle`, `state_labels` and a hit-target name. Angles must come from the actual switch travel, not a universal amp angle. Indicators use `ui_type = "indicator"` and a derived `state_id`, such as `power`; they are not extra host parameters. Two input nodes may deliberately reference one `inputMode` with distinct choice indices; one parameter binding serves both targets.
+For a discrete switch provide `ui_type = "toggle"`, its actual boolean/choice `parameter_id`, `state_count`, local axis, `state_angles`, `rest_angle`, `state_labels` and a hit-target name. A three-way selector may use `ampMode` with three entries; a two-state power lever must declare two. Angles must come from the actual switch travel, not a universal amp angle. Indicators use `ui_type = "indicator"` and a derived `state_id`, such as `power`; they are not extra host parameters. Multiple levers may deliberately share one logical parameter when the product requires coupled motion. Two input nodes may similarly reference one `inputMode` with distinct choice indices; one parameter binding serves both targets.
+
+A pull-capable knob has two independent transforms and normally two parameters. Use a pull parent at the shaft datum and a rotary child at the same axis; translate the parent between recorded push/pull offsets and rotate the child from its own rest quaternion. Give the cap/pull region and rotary rim separate forgiving hit targets when one proxy cannot express both gestures. This keeps a binary push/pull update from changing the continuous rotation, and vice versa.
 
 Semantic interactive nodes and their hit targets must have unique, explicitly assigned names in the derivative before export. Blender auto-suffixes such as `.001` and realized duplicate instances are not stable semantic IDs. Inspect the raw exported node list too: fail on duplicate contract names, missing expected names or unexpected suffixed replacements before a loader can rename them. Do not rely on `getObjectByName()` returning an arbitrary first match. Static construction names outside the contract need not be renamed cosmetically.
 
@@ -95,7 +105,7 @@ Keep an expected contract beside the GLB, independently maintained from the expo
 
 The manifest is validation input, not another parameter store or a glTF-standard schema. Compare each expected node/parent and metadata field against parsed GLB nodes/extras, and compare the separate preset file against `expected_camera_presets`. `camera_presets_file` identifies the sole runtime camera source; `expected_camera_presets` is an independent expected-value snapshot used only by QA, never a second production source or runtime fallback. Validate unique names, exactly one root, finite camera vectors, valid FOV/distance ranges and every referenced hit target. Include static nodes only if their identity is part of the application contract. Do not generate expected values from the same possibly broken export and call that independent validation.
 
-`choice_index` is the exported zero-based APVTS choice index: Regular = 0, High = 1. On a jack hit, resolve its `parameter_id` and write `choice_index / (choiceCount - 1)` through that binding (for a one-choice parameter use 0). Reject noninteger/out-of-range indices. Node names identify geometry; never infer High/Regular behavior from spelling. When adding a toggle, include its expected `state_count`, `state_labels`, `state_angles`, axis and rest angle in the same manifest.
+`choice_index` is the example's exported zero-based APVTS choice index: Regular = 0, High = 1. Preserve an existing equivalent field such as `choice_value` rather than renaming a working contract; choose one field per product and validate it consistently. On a jack hit, resolve its `parameter_id` and write the index divided by `(choiceCount - 1)` through that binding (for a one-choice parameter use 0). Reject noninteger/out-of-range indices. Node names identify geometry; never infer High/Regular behavior from spelling. When adding a toggle, include its expected `state_count`, `state_labels`, `state_angles`, axis and rest angle in the same manifest.
 
 Three.js reads extras through `object.userData`. Validate finite angles, valid axis/sign, state array lengths, unique node names and resolved target names at startup. Register by metadata against the processor's supported parameter IDs; do not silently create a host parameter for every mesh.
 

@@ -179,6 +179,8 @@ Keep one slider state per control, subscribe in an effect, apply its current val
 
 Build the frontend before BinaryData generation. Declare HTML/JS/CSS/GLB/camera outputs and source dependencies in CMake so edits rebuild the package. Use `juce_add_binary_data` and link its target into the plugin. Large GLBs are binary resources, never Base64 inside JS. Fixed filenames or a generated manifest keep provider routes aligned with bundled output.
 
+Treat `dist` as generated unless a separate deployment process explicitly consumes committed artifacts. Ignore it in source control, but make both clean local builds and CI run the frontend build before native BinaryData compilation. List every embedded output and its source/asset dependency so changing an SVG, GLB, camera file or stylesheet invalidates the custom command. A browser dev-server preview is not evidence that the standalone/plugin contains the same build; verify a known visible asset change in the packaged editor when stale output is suspected.
+
 | Resource | MIME |
 |---|---|
 | HTML | `text/html` |
@@ -189,6 +191,8 @@ Build the frontend before BinaryData generation. Declare HTML/JS/CSS/GLB/camera 
 Serve `/` as the entry HTML; use an explicit route map and return `std::nullopt` for unknown resources. Package fonts, environments, textures and optional KTX2/Draco decoder/transcoder assets locally. Production must not require CDN imports, remote GLBs or localhost. Verify with the server stopped and networking unavailable.
 
 Make dev-server loading an explicit build option, default OFF, independent of Debug/Release. Development can use Vite/esbuild in a normal browser with mocks or a native WebView at `http://127.0.0.1:5173/`. If that page needs native resources, `withResourceProvider(provider, origin)` takes one optional origin string, such as `http://127.0.0.1:5173`, not a StringArray. Keep the origin allowance out of production. Production navigates to `getResourceProviderRoot()`.
+
+Test layout and rasterization in the actual system WebKit/WebView2 backend. For SVG/image branding, start by preserving intrinsic aspect ratio with one explicit dimension and `height: auto` (or an equivalent contained box), then inspect the SVG `viewBox`/whitespace. If a backend-specific optical correction remains necessary, scope and document it rather than silently stretching every image. A correct result in Chromium can still expose stale embedded assets or backend-specific sizing in the plugin.
 
 Preserve a scoped CSP. GLB embedded images commonly decode through `blob:` URLs: permit `blob:` in `img-src` when required. Allow only schemes/sources actually used for images, local fetches and optional workers/decoders. Missing grille or face graphics with an otherwise loaded model warrants CSP/console/resource inspection before rebaking. Do not disable CSP globally.
 

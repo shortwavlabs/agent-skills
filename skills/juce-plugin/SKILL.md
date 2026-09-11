@@ -320,7 +320,7 @@ The 24 JUCE modules are: `juce_analytics`, `juce_animation`, `juce_audio_basics`
 
 For web-based editors, enable the browser module and use the current [WebView integration reference](references/webview-ui.md) for CMake/WebView2, relay lifetime, frontend package compatibility, offline resources and gestures. The native editor example's `JUCE_WEB_BROWSER=0` must become `1`. Verify API signatures against the installed JUCE version.
 
-For interactive Blender-authored amps, pedals or rack gear, read [Three.js/WebView UI](references/threejs-webview-ui.md). It covers the staged Blender → semantic GLB → mock Three.js → JUCE WebView → APVTS workflow, absolute controls, switches, input jacks, derived LEDs/cables, render-on-demand and host acceptance. Keep APVTS authoritative, construct relays before the browser and attachments after it, and keep all WebView work off the audio thread.
+For interactive Blender-authored amps, pedals or rack gear, read [Three.js/WebView UI](references/threejs-webview-ui.md). It covers the staged Blender → semantic GLB → mock Three.js → JUCE WebView → APVTS workflow, absolute and pull/rotate controls, switches, input jacks, coupled visible state, plugin-only utility chrome, render-on-demand and host acceptance. Keep APVTS authoritative, construct relays before the browser and attachments after it, and keep all WebView work off the audio thread.
 
 ## Reference Files
 

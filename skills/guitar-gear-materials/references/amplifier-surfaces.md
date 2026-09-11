@@ -14,6 +14,20 @@ Keep embossing separate from slow manufacturing/handling variation. A weak field
 
 Place sparse contact masks in plausible regions: near handle mounts, selected transport corners or actual grasp/contact zones. Check that source-local coordinates follow instances and mirrored variants correctly. A mask entirely hidden under a bracket cannot prove visible improvement. Do not amplify it into a halo just to make the change obvious. Wear should follow physical use, not outline every mathematical edge.
 
+## Causal aging across the assembly
+
+Establish clean material identity first, then age each family from a use map: touch, insertion, transport, floor contact, heat, exposure and gravity. A working vintage instrument usually needs asymmetric, localized, overlapping low-amplitude changes; a large tear or rust patch is rare focal evidence, not a global style. Inspect the result at hero, detail and reduced UI size.
+
+| Family | Plausible evidence | Avoid |
+|---|---|---|
+| Covering/tolex | Handling polish, sparse edge abrasion/scratches, occasional cut or substrate exposure concentrated at transport/contact zones | Uniform bright edge mask or equal damage on every face |
+| Grille | Mild uneven warmth/staining, localized darker fibers and small tension/weave variation when supported by reference | Global brown wash or exaggerated speaker visibility |
+| Knobs and molded controls | Softened sheen, touch polish, fine scratches and slight part-to-part variation | Random grunge that ignores grasp surfaces |
+| Jacks and panel | Repeated-insertion marks, subdued plating, local rubs/scratches and restrained print loss around frequently used controls | Dirt halos around every control or illegible legends |
+| Plated hardware | Local polish loss, scratches and limited oxidation; rust only where construction/exposure supports it | Uniform pristine mirror chrome or widespread orange rust |
+| Casters and cables | Wheel scuffs/grime, yoke abrasion, uneven cable roughness and plausible bends/sag | Perfect cylinders, identical wear or unsupported damage |
+| Speakers/internal parts | Subtle dust, fiber/cone variation and nonuniform dark values visible only as construction allows | Brightening hidden parts until they compete with the grille |
+
 
 ## Woven grille: construction and sampling
 

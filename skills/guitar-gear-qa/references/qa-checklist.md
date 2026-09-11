@@ -137,6 +137,8 @@ Check the actual visible glyphs as well as string contents, particularly easily 
 
 A render's existence, a completed progress bar, an automatic image score or a clean static audit is not a visual pass. Open each requested final image and inspect the features it is supposed to establish. Full-sheet thumbnails help compare overall appearance; open individual pairs/crops where detail is too small to assess.
 
+For screen-bound work, also inspect a fixed comparison sheet at native size and approximately 50% and 25% scale. Keep baseline/candidate ordering, resampling and crop identical. Use the reduced views to reject detail that turns into noise or vanishes, not to excuse a defect that remains visible at the required close inspection distance.
+
 Before/after evidence should use matching camera, crop, lighting, exposure, color management and quality settings unless one of those is the deliberate subject of the comparison. When a new detail camera is added, render the prior source with that same camera in a temporary unsaved setup. Do not overwrite the prior source to obtain a baseline.
 
 Record PASS, FAIL, NOT CHECKED or NOT APPLICABLE for applicable requirements, with a concrete measurement/image and any reference uncertainty. Do not prefill every criterion as PASS or claim that preservation establishes realism. If an early diagnosis is disproved by better crops, correct the source, report and ledger, then invalidate affected renders.

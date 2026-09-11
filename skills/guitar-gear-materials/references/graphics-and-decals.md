@@ -76,10 +76,16 @@ Treat registration independently from typography and material response. Check ba
 
 Preserve correct supplied vector outlines, aspect ratio and accepted rotation/scale/placement. Do not replace a logo with text or redraw it from memory. Preserve custom arrow shapes rather than substituting Unicode/font arrows. Change scale, registration, spacing or edge quality only within the pass scope. Verify arrow direction against photographs and the latest explicit instruction; do not infer it solely from connector side or assumed signal flow.
 
+When a replica is intentionally rebranded, keep reference fidelity and brand reproduction as separate requirements. Make an explicit list of supplied marks, replacements and forbidden legacy marks. Search visible geometry, texture atlases, rear labels and exported metadata for surviving old marks/strings, then inspect every delivered view. Require the legacy brand to be absent from visible output; rename nonvisible internal identifiers only when the product/package contract requires it, not at the cost of destabilizing functional IDs. Approve the supplied mark's evaluated bounds, aspect ratio, scale, orientation, placement and physical material behavior; a correct SVG file can still be stretched or assigned a badge-like metal material downstream.
+
 Use separate annotated reference/current/candidate images for baselines, arrow centers, panel edges and neighboring artwork. Keep raw images and preserve perspective. For a local atlas edit, compare pixels outside the allowed regions so unrelated legends, dots and logos cannot change silently.
 
 ## Printed edges versus molded relief
 
 Screen/pad print remains surface ink: at macro scale allow tiny edge softness, mild source-derived density variation and small real irregularity. Preserve delivery-size legibility without antialias halos, arbitrary blur, invented wear or random distress. Do not make an otherwise flush graphic float above the coating to show it more clearly.
+
+For WebGL, prefer putting flush ink in the panel texture or a dedicated print atlas. If vector geometry is required, keep its depth negligible and resolve close coplanar competition with a narrowly scoped raster-depth bias such as material polygon offset while retaining depth testing/writing. Do not fix z-fighting by embossing the logo, disabling depth, or giving ink relief shadows. Test the mark and panel-border rules at close, normal and grazing camera angles.
+
+Thin rules and microtext can receive only a subpixel footprint in a large surface atlas even when the image resolution sounds adequate. Allocate UV area by delivery importance or use a small dedicated print atlas, then verify mipmapped output at native editor size.
 
 For molded rubber branding, separate outline registration from relief height, edge roll, seating depth and contact plane. The logo should grow from the pad, not resemble an applied decal or detached letters. Reducing relief and softening its edge often helps more than greater extrusion. Preserve the accepted vector silhouette while adjusting only allowed depth/profile parameters; judge native hero pixels before the macro.

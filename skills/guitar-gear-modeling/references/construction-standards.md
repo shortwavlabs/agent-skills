@@ -46,6 +46,8 @@ Typical assembly:
 
 Avoid making the cabinet a single textured cube. Small physical offsets between trim, grille, panel, and shell create important real-world shadow lines.
 
+Treat an applicable service manual or construction drawing as a constraint source, not merely a styling reference. Use documented board, baffle, rear-panel and chassis materials/thicknesses where they affect visible edges, openings, fastener reach or massing. Do not replace known construction with a generic cabinet-wall guess. Gate material polish on accepted straight front, side/profile and rear blockouts: coating, wear and lighting cannot repair the wrong control-panel rake, depth, rear opening or speaker plane.
+
 ## Speaker cabinets
 
 Separate:
@@ -135,13 +137,14 @@ Classify each reference by what it can establish; prefer measured dimensions for
 
 | Reference | Strongest use | Limitation |
 |---|---|---|
+| Manual/service drawing | Control grouping/order, switch type, construction layers and documented dimensions/materials | May simplify profiles and omit cosmetic detail; verify the correct revision/variant |
 | Direct top/front/side | Footprint, control centers, symmetry, spacing, print registration | Check lens/perspective; one view cannot establish depth |
 | Low side/profile | Wedge/slope, vertical proportions, knob height, jack height, mechanical gaps | Projecting components can occlude their seating plane |
 | Three-quarter hero | Overall likeness, visual mass, silhouette, material identity | Foreshortening is not dimensional truth |
 | Grazing macro | Edge roll, highlight continuity, coating, embossing and seams | Magnification exaggerates microtexture and relief |
 | Hardware macro | Jack stack, fastener drive, plating, lens/bezel and molding | May show wear or a variant absent from the target |
 
-Cross-check variant, age and visible construction before combining references. Do not transfer a special edition's hardware or an aged specimen's damage to another target without evidence. Use profile and sectional checks before diagnosing a proportion problem as a shader problem.
+Cross-check variant, age and visible construction before combining references. Choose the target variant separately for silhouette, panel, hardware, rear construction and age; record rejected alternatives rather than averaging incompatible examples together. Do not transfer a special edition's hardware or an aged specimen's damage to another target without evidence. Use profile and sectional checks before diagnosing a proportion problem as a shader problem.
 
 ## Diagnose a rounded corner before editing
 

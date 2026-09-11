@@ -22,9 +22,10 @@ Use only the shots required by the deliverable.
 
 1. Front 3/4 hero.
 2. Straight front grille.
-3. Rear view.
-4. Speaker/grille detail if visible.
-5. Handle/corner/caster detail.
+3. Straight control panel when its grouping/print is under review.
+4. Straight rear and rear 3/4 when rear construction is part of the asset.
+5. True side/profile when depth, rake or enclosure closure matters.
+6. Only the details needed to prove the pass: speaker/grille, knob, jack, toggle/lamp, tolex, handle, corner, caster, rear panel, cable or wear region.
 
 ## Consistency rules
 
@@ -50,6 +51,10 @@ Do not reproduce a previous project's fixed number of shots. Add the smallest us
 | Tolex physical consistency | Equal-world-size front/top/side/frame patches plus normal product detail |
 | Cloth hinge or side seam | Close-up at fixed camera under studio and broad diagnostic light |
 | Restrained age level | Matched hero and corner/piping/grip/material detail pairs |
+| Rear enclosure and internal construction | Straight rear plus rear 3/4 showing board coverage, chassis, speakers/tubes and wiring depth |
+| Opaque shell or alpha concern | Front-to-side and rear-to-side grazing orbit crops |
+| Speaker ghosting | Straight front at native size plus one closer oblique view through the grille |
+| Caster, cable or rear-panel wear | Local detail with surrounding construction visible, plus native-size rear crop |
 
 Use separate head-only, cabinet-only and assembled-stack scenes where they make isolation reproducible; do not hide arbitrary objects in a shared scene without restoring their state. Choose focal length together with camera distance and framing. Orthographic views measure shape/placement; perspective product views judge appearance. Neither replaces the other.
 

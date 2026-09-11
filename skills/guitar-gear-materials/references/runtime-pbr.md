@@ -8,7 +8,15 @@ Inventory each material's visible contributions. Use glTF-supported Base Color, 
 
 Create suitable UVs with sufficient padding at intended mip levels. Bake unsupported color, grain, bump/normal and roughness variation separately. Bake color without studio illumination; do not freeze highlights or moving-knob shadows into base color. Keep AO restrained and avoid baking a dynamic control's shadow onto the panel. Inspect seams, mirrored UVs, tangent orientation and bake margins on the loaded GLB.
 
+If a normal-map seam or spike appears only after export, inspect tangent normalization/orthogonality and collapsed UV derivatives in the GLB. Repair the exporter/input data deterministically; use a stable perpendicular fallback only for genuinely degenerate vertices, not a random tangent or blanket normal-map removal.
+
+Audit the evaluated appearance before baking. Object-linked material overrides and source-local `Generated`/`Object` coordinates can disappear when evaluated meshes are created or many parts are joined. Copy effective material slots and preserve the required per-part coordinates/variation as mesh attributes before consolidation. A matching material name is not proof that localized wear survived.
+
 Use sRGB for base-color/emissive images and non-color data for metallic, roughness, AO and normal. In glTF, packed occlusion/roughness/metallic use R/G/B respectively when sharing one image. Check the actual exported channels and UV sets. GLTFLoader sets imported texture conventions; do not globally override color space or flipY on loaded maps. Manually supplied replacement maps must match the loader's UV/color conventions.
+
+Keep source bakes immutable while packing channels. In particular, do not repeatedly load an already encoded sRGB base-color image through color management merely to add alpha; treat the alpha mask as non-color data and pack once into a new output. Compare the RGB bytes before/after packing so a transparency fix cannot silently change color.
+
+Choose alpha mode by construction. Use opaque for continuous shells, `MASK`/alpha-test for hard cutouts or worn covering where the surface still owns depth, and `BLEND` only for genuinely translucent layers such as some cloth or glass. Blended materials may disable depth writes and expose interior/rear objects through an otherwise solid side panel. Orbit every opaque enclosure edge and rear board in the target loader before accepting it.
 
 | Surface | Runtime representation and check |
 |---|---|
@@ -28,6 +36,8 @@ Clone materials for independently driven LEDs and per-plugin state before changi
 Use the existing [graphics rules](graphics-and-decals.md) for source artwork, alignment and glyph fidelity. Atlas flat graphics where beneficial; retain separate artwork sources. Inspect numbers and pointer alignment at actual editor resolution and maximum zoom, not only a large texture preview. Check alpha halos, mip bleeding, z-fighting and grazing views.
 
 For cloth, inspect hero, medium and maximum zoom while orbiting. Tune contrast/filtering and representation before distorting physical weave scale to hide moiré. Compare opaque, masked or blended alpha only as needed for the required appearance; transparent sorting, overdraw, speaker visibility and backfaces must be tested in the target WebView. Do not layer many transparent weave sheets as a substitute for a workable texture.
+
+Set AO distance from the physical relationship being represented. Millimetre-scale AO can define washers and seams yet leave a cabinet recess or rear opening visually flat; add or rebake restrained enclosure-scale occlusion when those large relationships need grounding. Do not compensate by globally darkening the base color.
 
 ## Budget from pixels, then profile
 
