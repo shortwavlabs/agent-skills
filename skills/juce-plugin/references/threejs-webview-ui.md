@@ -128,13 +128,15 @@ Another product may expose one `ampEnabled` boolean through two synchronized lev
 
 As an optional extension, the same subscriber may modulate a cloned per-instance tube-heater emissive material. Keep the glow restrained and avoid a dynamic light or bloom unless target-size comparison justifies it; report it as a recommendation, not an implemented feature, until the target runtime validates it.
 
-For two alternative input jacks, use one `inputMode = Regular | High` choice with indices 0 and 1. Read each target's exported choice-index field as defined in the [validation manifest](../../guitar-gear-modeling/references/runtime-export.md#validation-manifest-example); preserve an existing `choice_index`/`choice_value` contract and do not special-case the node name. Clicking High writes High; clicking Regular/Low writes Regular. The DSP-facing mapping can be `highInput = (inputMode == High)`. These alternative physical sockets do not imply two audio buses or two independent booleans. Keep the existing plugin bus layout.
+For two alternative input jacks, use one choice parameter whose labels and order come from the product/manual; examples include High/Low, input 1/2 and Regular/High. Read each target's exported choice-index field as defined in the [validation manifest](../../guitar-gear-modeling/references/runtime-export.md#validation-manifest-example); preserve an existing `choice_index`/`choice_value` contract and do not special-case the node name. Clicking a jack writes its verified choice index. Name and derive any DSP-facing flag from that contract rather than geometry spelling. These alternative physical sockets do not imply two audio buses or two independent booleans. Keep the existing plugin bus layout.
 
 Derive a plug's position/visibility from `inputMode`: attach it to the selected jack frame. A lightweight cable is optional visual state, never another parameter authority. Implement click-to-select before drag-and-drop cable interaction. A debug readout should expose the enum index/label and selected jack so tests can compare the physical representation to host state.
 
 ## Pull/rotate controls
 
 A pull-capable rotary has two degrees of freedom and usually two host parameters: continuous rotation plus a binary mechanical position. Export a pull parent with a rotary child and independent metadata/hit targets. Bind rotation to the continuous parameter and parent translation to the binary parameter, each from its cached rest transform. Clicking or keyboard-activating the pull cap edits only the binary state; dragging the rotary rim edits only rotation. Verify all four endpoint combinations and repeat updates to catch transform drift.
+
+Expose those two actions as two accessible semantic controls—for example, a `Clean Volume` range and a `Bright` toggle—even when both highlight the same physical knob. Avoiding duplicate focus targets means one accessible target per action, not hiding the pull action because rotation already has one.
 
 ## Plugin utilities and camera controls
 

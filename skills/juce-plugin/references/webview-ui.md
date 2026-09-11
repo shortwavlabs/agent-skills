@@ -179,7 +179,7 @@ Keep one slider state per control, subscribe in an effect, apply its current val
 
 Build the frontend before BinaryData generation. Declare HTML/JS/CSS/GLB/camera outputs and source dependencies in CMake so edits rebuild the package. Use `juce_add_binary_data` and link its target into the plugin. Large GLBs are binary resources, never Base64 inside JS. Fixed filenames or a generated manifest keep provider routes aligned with bundled output.
 
-Treat `dist` as generated unless a separate deployment process explicitly consumes committed artifacts. Ignore it in source control, but make both clean local builds and CI run the frontend build before native BinaryData compilation. List every embedded output and its source/asset dependency so changing an SVG, GLB, camera file or stylesheet invalidates the custom command. A browser dev-server preview is not evidence that the standalone/plugin contains the same build; verify a known visible asset change in the packaged editor when stale output is suspected.
+Treat `dist` as generated and do not commit it by default, but preserve an existing intentional committed-`dist` workflow when the repository or deployment process relies on it. Do not reorganize that convention merely to integrate the WebView. In either case, make clean local builds and CI run or verify the frontend build before native BinaryData compilation. List every embedded output and its source/asset dependency so changing an SVG, GLB, camera file or stylesheet invalidates the custom command. A browser dev-server preview is not evidence that the standalone/plugin contains the same build; verify a known visible asset change in the packaged editor when stale output is suspected.
 
 | Resource | MIME |
 |---|---|
