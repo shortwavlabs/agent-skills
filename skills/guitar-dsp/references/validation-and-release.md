@@ -85,7 +85,7 @@ For processor-level tests, include:
 
 ## Circuit-Reference Regressions
 
-When circuit fidelity is a product target, use [circuit-reference-validation.md](circuit-reference-validation.md) for optional versioned reference gates alongside the existing runtime/host gates. Preserve compact, independently verified operating-point, response/control-grid, harmonic or transient results with units, source/model revisions and regeneration instructions. Use fidelity-specific tolerances and turn confirmed mismatches into failing-before/passing-after checks where practical. A matching simulator trace does not replace controlled listening or establish hardware accuracy.
+Circuit-reference validation is product-specific, not universally required. Once circuit fidelity is declared an acceptance requirement, the selected versioned reference regressions are release-blocking unless explicitly waived and documented. Use [circuit-reference-validation.md](circuit-reference-validation.md) alongside the existing runtime/host gates. Preserve compact, independently verified operating-point, response/control-grid, harmonic or transient results with units, source/model revisions and regeneration instructions. Use fidelity-specific tolerances and turn confirmed mismatches into failing-before/passing-after checks where practical. A matching simulator trace does not replace controlled listening or establish hardware accuracy.
 
 ## Neural Export Validation
 

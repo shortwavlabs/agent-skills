@@ -124,6 +124,8 @@ Before RMSE, ESR, correlation or a null test, verify polarity, lag, gain referen
 
 SPICE transient timestamps can be nonuniform. Integrate using actual time intervals or resample to a common uniform grid with a documented interpolation/anti-alias policy. Do not FFT an adaptive trace as though its rows were evenly spaced. Clip/interpolate exact analysis-window boundaries. Retain and report DC/bias separately; remove the window's time-weighted DC before AC/harmonic quadrature so a large bias does not leak into estimated harmonics. Do not subtract DC when DC movement is the quantity being tested.
 
+When converting an analog/reference transient to the DSP sample rate, define the observation bandwidth and apply an appropriate anti-alias filter before decimation. Report in-band agreement separately from out-of-band harmonic generation. Do not let reference resampling create alias products and then attribute them to the DSP.
+
 Useful metrics include:
 
 ```text
