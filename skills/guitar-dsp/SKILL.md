@@ -1,6 +1,6 @@
 ---
 name: guitar-dsp
-description: Design, implement, debug, train, and validate guitar amp/effects DSP systems, especially realtime C++/JUCE plugins, C++ DSP block modeling, nonlinear waveshaping, aliasing and oversampling strategy, tone stack modeling, diode/fuzz circuits, triode and tube stage approximation, speaker cabinet dynamics, RTNeural/neural amp models, cabinet IRs, pedal chains, capture/training/export workflows, neural modeling math theory, plugin validation, and DAW-safe release checks. Use when building guitar amp modelers, pedal emulations, neural audio model training/export, RTNeural loaders, cabinet simulators, tone stacks, guitar-focused realtime DSP, DSP measurement harnesses, or troubleshooting guitar plugin tone quality, latency, CPU, aliasing, oversampling, metrics, losses, or host behavior.
+description: Design, implement, debug, train, and validate guitar amp/effects DSP systems, especially realtime C++/JUCE plugins, C++ DSP block modeling, schematic/SPICE reference comparison, nonlinear waveshaping, aliasing and oversampling strategy, tone stack modeling, diode/fuzz circuits, triode and tube stage approximation, speaker cabinet dynamics, RTNeural/neural amp models, cabinet IRs, pedal chains, capture/training/export workflows, neural modeling math theory, plugin validation, and DAW-safe release checks. Use when building guitar amp modelers, pedal emulations, neural audio model training/export, RTNeural loaders, cabinet simulators, tone stacks, guitar-focused realtime DSP, DSP measurement harnesses, or troubleshooting guitar plugin tone quality, latency, CPU, aliasing, oversampling, metrics, losses, or host behavior.
 ---
 
 # Guitar DSP
@@ -20,6 +20,7 @@ Use this skill for guitar-centric DSP work that spans tone, realtime safety, C++
    - Nonlinear DSP: waveshaping, clipping, diode/fuzz circuits, tube-like stages, aliasing, DC, harmonic measurement, oversampling.
    - Tone and cabinet modeling: tone stacks, presence/depth, cabinet IR, speaker dynamics, cabinet compression.
    - C++/JUCE DSP modeling: block class shape, parameter snapshots, smoothing, circuit-to-DSP translation, tests, measurement fixtures.
+   - Circuit-reference validation: schematic interpretation, verified SPICE/reference circuits, equivalent stage/control/level measurements, mismatch isolation, and regression tests.
    - Neural modeling: capture, alignment, training preset selection, export package validation.
    - Runtime integration: RTNeural model loading, inference, sample-rate policy, model metadata, state restore.
    - Product validation: tests, measurement harnesses, plugin validation, DAW smoke, release gates.
@@ -35,6 +36,7 @@ Use this skill for guitar-centric DSP work that spans tone, realtime safety, C++
 | `references/failure-diagnosis.md` | Debugging audible or host failures: bad tone despite metrics, clicks, zipper noise, aliasing, gate chatter, stereo image shift, preset/model/IR restore bugs, or validation failures. |
 | `references/guitar-signal-chain.md` | Designing amp/effects order, mono/stereo routing, gain staging, cabinet IR, pedal/tone-stack behavior, or DSP block tests. |
 | `references/cpp-juce-dsp-modeling.md` | Implementing or reviewing C++/JUCE DSP blocks for gates, compressors, drives, fuzzes, tone/EQ, cabinet, modulation, delay, reverb, tuner/metronome, or post color. |
+| [references/circuit-reference-validation.md](references/circuit-reference-validation.md) | Building or checking a schematic-derived executable reference, comparing it with actual DSP across stages and operating points, or attributing mismatches before corrections. |
 | `references/nonlinear-waveshaping.md` | Designing or reviewing memoryless/dynamic waveshapers, transfer curves, asymmetry, output compensation, nonlinear control mapping, or harmonic-growth tests. |
 | `references/aliasing-oversampling.md` | Diagnosing aliasing, choosing local oversampling islands, using ADAA, measuring harmonic/non-harmonic energy, or handling nonlinear CPU/latency tradeoffs. |
 | `references/tone-stack-modeling.md` | Modeling amp tone stacks, pedal tone controls, passive loaded networks, active EQ macros, presence/depth controls, smoothing, and response tests. |

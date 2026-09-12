@@ -36,6 +36,8 @@
 
 ## Validation Prompts
 
+- "Use $guitar-dsp to verify this pedal schematic's circuit reference, compare its loaded tone and clipping stages with our DSP across controls and input levels, and turn confirmed mismatches into regression tests."
+- "Use $guitar-dsp to compare this analog compressor sidechain and our DSP detector using matched bias, levels and bursts; identify whether attack/release differences come from the reference, harness or implementation."
 - "Use $guitar-dsp to write a release validation checklist for a JUCE guitar amp modeler."
 - "Use $guitar-dsp to design unit tests for bypass identity, reset determinism, automation safety, stereo routing, and finite output."
 - "Use $guitar-dsp to define an offline render matrix for gate, compressor, drive, cabinet, delay, and reverb behavior."

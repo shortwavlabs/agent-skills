@@ -48,7 +48,7 @@ Keep gain decisions visible and stable:
 - Input trim is pre-pedal and pre-amp.
 - Pedal output gain belongs after the pedal and before the amp.
 - Amp input gain should drive the neural or physical amp model.
-- Amp master should sit after amp/tone processing.
+- Place a modeled master/output control at its verified circuit location; it can change loading and drive into later stages. Keep final utility trim separate. Use [circuit-reference-validation.md](circuit-reference-validation.md) when checking circuit parity.
 - Output gain is final trim.
 - Output meters and clip indicators should read after final trim.
 
@@ -82,7 +82,7 @@ Tone-stack rules:
 
 - Smooth gain targets around 5-20 ms for user/automation changes.
 - Update coefficients at a bounded control rate instead of rebuilding every sample unless the algorithm requires it.
-- Make neutral controls exact or near-exact passthrough.
+- Make neutral utility EQ exact or near-exact passthrough; retain passive tone-stack insertion loss at its nominal setting.
 - Test automation across extremes, not only static settings.
 - For passive, lossy, or interactive stacks, read `tone-stack-modeling.md` before reducing the circuit to generic EQ.
 

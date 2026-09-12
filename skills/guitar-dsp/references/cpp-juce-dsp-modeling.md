@@ -52,6 +52,8 @@ Rules:
 
 ## Circuit-To-DSP Translation
 
+For a schematic fidelity target, use [circuit-reference-validation.md](circuit-reference-validation.md) to verify topology and measurable stage behavior before musical calibration. Reuse the production processing path in an offline harness; do not replace it with a second implementation that can conceal runtime errors.
+
 Translate analog references into audible DSP constraints:
 
 - Coupling capacitors become high-pass behavior and DC cleanup.
@@ -119,7 +121,7 @@ Tone controls and cabinet stages can be clean utility DSP or part of the modeled
 
 Tone/EQ:
 
-- Use neutral passthrough when all controls are flat.
+- Use neutral passthrough for flat utility EQ; preserve the loaded insertion loss of passive circuit tone networks.
 - Smooth filter gains and frequencies over roughly 5-20 ms.
 - Rebuild coefficients at a bounded control interval or crossfade when coefficient jumps can click.
 - Validate response windows, not only finite output.

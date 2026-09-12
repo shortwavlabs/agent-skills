@@ -122,6 +122,8 @@ Automation is the most common failure mode.
 
 ## Measurement And Tests
 
+For a schematic-derived target, follow [circuit-reference-validation.md](circuit-reference-validation.md) for loaded network/control sweeps and independent reference data. Include taper, wiper orientation, source/load and switch branches; a centered response alone cannot establish parity.
+
 Measure:
 
 - frequency responses at min/default/max and representative combinations
@@ -132,7 +134,7 @@ Measure:
 
 Tests:
 
-- neutral passthrough
+- neutral passthrough for utility EQ; expected insertion loss for passive networks
 - finite output at extremes
 - sample-rate stability
 - reset determinism

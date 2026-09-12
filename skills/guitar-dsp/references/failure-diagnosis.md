@@ -5,6 +5,7 @@
 - How to diagnose
 - Neural model and RTNeural failures
 - Conventional DSP failures
+- Circuit-reference mismatches
 - Host and product integration failures
 - First reports to collect
 
@@ -55,6 +56,10 @@ Work from audible symptom to a measurable check. Avoid changing several tone var
 | Cabinet swap crashes or glitches | Convolution engine destroyed on callback, IR load/resample in process, latency update race | Publish immutable engine pointer; retire old engines off-thread; move file work outside callback |
 | Filter sounds different by sample rate | Frequency clamps wrong, bilinear math using stale sample rate, coefficient update missed | Sweep at 44.1/48/96 kHz; recompute on prepare/sample-rate change; clamp below Nyquist |
 | Silence produces CPU spikes | Denormals in filters/envelopes/reverbs | Use `juce::ScopedNoDenormals`; snap tiny state to zero; add silence benchmark |
+
+## Circuit-Reference Mismatches
+
+Use the [mismatch triage table](circuit-reference-validation.md#isolate-the-mismatch) when DSP and a schematic-derived executable reference disagree. Locate the first divergent equivalent stage, then classify gain, response, control, nonlinear, dynamic or numerical error before changing coefficients. Check reference/harness validity and intentional approximation as well as DSP; do not compensate an upstream defect with downstream EQ or output normalization.
 
 ## Host And Product Integration Failures
 
