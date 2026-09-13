@@ -11,6 +11,7 @@
 - Align signals and interpret metrics
 - Isolate the mismatch
 - Correct, preserve, and regress
+- Handoff to realtime DSP
 - Automate and report
 - Release integrity and versioning
 - Escalate to hardware measurements
@@ -29,7 +30,25 @@ source schematic -> verified circuit reference -> matched measurements
 
 Define the target first: nominal circuit behavior, a measured hardware specimen, or an intentionally simplified musical approximation. Set acceptable errors for the behavior that matters; do not demand exact harmonic parity from a deliberately coarse model.
 
-Use this preferred source order when reconstructing a documented design:
+### Reference Maturity
+
+Use the evidence and artifacts appropriate to the current question:
+
+| Maturity | Required scope |
+| --- | --- |
+| EXPLORATORY | Topology, operating point, measurement contract and basic convergence; no publication framework required |
+| REFERENCE CANDIDATE | Internal checkpoints, uncertainty labels, relevant sensitivity studies and separate calibration/validation |
+| FROZEN IMPLEMENTATION REFERENCE | Named fitting profile, golden captures, drift contract and source freeze |
+| PUBLISHED / ARCHIVED REFERENCE | Manifest/hashes, causal dependency DAG, corruption tests and immutable historical release |
+| HARDWARE-CALIBRATED REFERENCE | Documented measurements of identified target specimen(s), fitted parameters and measurement uncertainty |
+
+These describe maturity and evidence, not a mandatory sequence for every task. Hardware calibration can accompany the appropriate maturity level; publication does not create hardware evidence, and calibration still needs withheld measurements for independent validation. Apply the full release-integrity workflow when publishing/archiving, not while resolving an exploratory wiring question.
+
+### Claim-Specific Source Hierarchy
+
+Rank sources by the claim being established. Keep two evidence lanes:
+
+**DESIGN INTENT:** use this preferred order when reconstructing a documented design:
 
 1. Original schematic / factory service documentation.
 2. Original BOM / board layout / factory test table.
@@ -41,30 +60,66 @@ Use this preferred source order when reconstructing a documented design:
 8. Forum/community reports.
 9. Inference.
 
-Lower-tier evidence must not silently override higher-tier material. Calibrated hardware measurements establish the measured specimen's behavior, with setup and uncertainty; they do not silently redefine another revision or prove original factory intent. Existing DSP constants are assumptions until independently supported.
+**SPECIMEN BEHAVIOR:** calibrated measurements of the exact target specimen -> measurements of comparable specimens under comparable conditions -> published factory behavior for the relevant revision -> inferred behavior. Record specimen identity, setup and uncertainty. A measured amplifier may legitimately differ from a manual rating: the sources answer different claims without either necessarily being wrong.
+
+Lower-tier evidence must not silently override stronger evidence for the same claim. A specimen measurement does not silently redefine another revision or prove original factory intent; a schematic does not override a sound measurement of that specimen's behavior. Existing DSP constants are assumptions until independently supported.
 
 Preserve source problems: reversed table headings, ambiguous test-point units, undocumented generator amplitude/impedance, incomplete switching/loading conditions, duplicate designators, inconsistent pin numbering and sibling-model revision differences. For a suspected typo, retain both `LITERAL_SOURCE_TARGET` and `TYPO_HYPOTHESIS`, with evidence for each. Do not silently replace the printed target or merge sibling schematics without demonstrated revision compatibility.
 
-Keep provenance with consequential values, connections, and boundary choices:
+### Result Axes
 
-| Label | Meaning and required record |
+Keep four independent fields with consequential values, connections, boundaries and results. They are not one shared enum. Scope qualification to a named check/metric and hardware resolution to a specific claim; multiple checks may qualify different aspects of the same fixture.
+
+**PROVENANCE** — where a value/model comes from or how it was constructed:
+
+| Value | Meaning and required record |
 | --- | --- |
 | DOCUMENTED | Direct support from schematic, BOM, service/factory table or manufacturer documentation; cite revision/page |
-| SOURCE_COMPARISON | Simulation compared with a published source target; agreement alone is not independent validation |
 | MEASURED | Actual specimen, setup, units, calibration, controls and measurement uncertainty |
 | INFERRED | Evidence and reasoning; unresolved alternatives |
 | ASSUMED | Required physical parameter absent from sources; chosen value and sensitivity |
 | CALIBRATED | Parameter deliberately fitted/chosen to meet a target; record target, method and fitted value |
 | APPROXIMATE | Reduced behavioral representation; state omitted circuitry and applicable range |
 | HYPOTHESIS | Plausible external-research value/model, not established as original hardware |
-| SENSITIVITY | Dependence of results on uncertain parameters; not proof of their actual values |
-| SIMULATOR-SPECIFIC | Model/dialect behavior or numerical workaround and its scope |
+| SIMULATOR_SPECIFIC | Model/dialect behavior or numerical workaround and its scope |
+
+**EVIDENCE RELATIONSHIP** — how a target/result is used:
+
+| Value | Meaning |
+| --- | --- |
+| SOURCE_COMPARISON | Simulation compared with a published source target; agreement alone is not independent validation |
+| CALIBRATION_TARGET | Target used to select/fit parameters; excluded from independent validation of that fit |
+| INDEPENDENT_VALIDATION | Withheld or otherwise independent evidence, with independence and scope documented |
+| SENSITIVITY | Dependence on uncertain parameters; not proof of their actual values |
+
+**NUMERICAL / IMPLEMENTATION STATUS** — outcome of the named check:
+
+| Value | Meaning |
+| --- | --- |
 | PASS_IMPLEMENTATION | Structure/software behaves according to its specified contract |
 | PASS_NUMERICAL | Metrics stabilize within declared numerical criteria for the stated fixture |
-| UNRESOLVED_HARDWARE | Requires physical measurement to resolve responsibly |
+| UNQUALIFIED_NUMERICAL | Computation completed, but refinement/sensitivity evidence is insufficient for a numerical conclusion about this metric/event |
 | FAIL | A declared qualification criterion failed; preserve the failed evidence |
 
-Evidence labels and qualification outcomes are different axes: a `HYPOTHESIS` may receive `PASS_NUMERICAL` while remaining `UNRESOLVED_HARDWARE`. Never collapse these into generic PASS or one global accuracy percentage.
+An unqualified chatter event does not invalidate unrelated converged metrics. If numerical qualification of that event is a required acceptance gate, that gate remains unmet. Never relabel a breached criterion as unqualified merely to avoid FAIL; simulator errors, malformed data and incomplete windows are not completed unqualified computations.
+
+**HARDWARE RESOLUTION** — whether the specific physical claim is established:
+
+| Value | Meaning |
+| --- | --- |
+| RESOLVED_MEASURED | Documented target-specimen measurements resolve this claim within stated conditions/uncertainty; not universal hardware validity |
+| UNRESOLVED_HARDWARE | Requires physical measurement to resolve responsibly |
+
+For example, one result may carry:
+
+```text
+provenance: HYPOTHESIS
+relationship: SENSITIVITY
+qualification: PASS_NUMERICAL
+hardware_resolution: UNRESOLVED_HARDWARE
+```
+
+Never collapse the four axes into generic PASS or one global accuracy percentage. Hardware resolution is not inferred from implementation or numerical success.
 
 Retrace junctions and ambiguous labels visually; a parts inventory alone does not establish connectivity. Do not invent missing values, silently substitute another revision, or combine incompatible variants. Expose behaviorally significant uncertainties as reference parameters or documented alternatives, without automatically adding product UI controls.
 
@@ -103,7 +158,7 @@ A bounded overload run establishes behavior only over that interval. Do not labe
 
 Numerical qualification is an independent gate. For nonlinear transients, compare coarse/fine/finer maximum timesteps and inspect both refinement pairs against declared limits. Select steps and tolerances for the circuit and metric; no one project's values are universal. Report quantity, units, absolute/relative criterion and denominator floor.
 
-Power/supply fixtures may need crossing input, power, THD, rail mean/extrema/ripple, average/peak rectifier current, conduction duty and reservoir recharge timing. Measure reservoir recharge from its own current, not automatically from diode conduction. Define current thresholds and event interpolation. Switching/detector fixtures need transition count/timing, oscillation frequency, amplitude and envelope extrema. Preserve chatter and determine whether it survives refinement; nonconverged transitions remain `NUMERICAL / UNQUALIFIED`. A finite-time ascending/descending difference alone does not establish static hysteresis.
+Power/supply fixtures may need crossing input, power, THD, rail mean/extrema/ripple, average/peak rectifier current, conduction duty and reservoir recharge timing. Measure reservoir recharge from its own current, not automatically from diode conduction. Define current thresholds and event interpolation. Switching/detector fixtures need transition count/timing, oscillation frequency, amplitude and envelope extrema. Preserve chatter and determine whether it survives refinement; transitions lacking sufficient numerical evidence remain `UNQUALIFIED_NUMERICAL`; a breached declared convergence criterion remains `FAIL`. A finite-time ascending/descending difference alone does not establish static hysteresis.
 
 For a threshold metric such as first 5%-THD power, independently run:
 
@@ -146,7 +201,7 @@ Service-manual test points constrain internal stages more directly than headline
 
 If generator amplitude is missing, do not fit every stage independently. If necessary infer one common input from a defensible reference point and label it `CALIBRATED`; also compare ratios such as TP2/TP1 or TP3/TP2 that cancel common input amplitude in the linear regime. For nonlinear stages, retain the input-level dependence of those ratios. The point used for calibration is no longer independent validation of that calibration.
 
-Reports must structurally separate **SOURCE TARGET**, **CALIBRATION TARGET**, **INDEPENDENT VALIDATION**, and **SENSITIVITY / HYPOTHESIS**. Record which parameters were fitted to which targets and which conditions were withheld. A fitted factory number, the same formula on both sides, or a model acting as its own oracle cannot establish independent validity. Unfitted source comparisons still depend on the completeness and quality of the source contract.
+Reports must structurally separate **SOURCE TARGET**, **CALIBRATION TARGET**, **INDEPENDENT VALIDATION**, and **SENSITIVITY**. Keep `HYPOTHESIS` and other provenance fields separate from these evidence relationships. Record which parameters were fitted to which targets and which conditions were withheld. A fitted factory number, the same formula on both sides, or a model acting as its own oracle cannot establish independent validity. Unfitted source comparisons still depend on the completeness and quality of the source contract.
 
 ## Progress From Simple To Combined Behavior
 
@@ -179,7 +234,7 @@ Preserve speaker-return/current-feedback sensing and actual output/return connec
 
 | Load | Use and evidence |
 | --- | --- |
-| Pure resistance | Canonical implementation fixture with explicit terminals/value |
+| Pure resistance | Deterministic baseline with explicit terminals/value; canonical only when the declared fitting contract selects it |
 | Generic reactive electrical load | Sensitivity fixture; assumptions visible |
 | Speaker-specific impedance | Measured data or credible component impedance evidence; identify specimen/model and scope |
 
@@ -271,7 +326,7 @@ Separate nominal circuit matching from expected hardware variation. Where useful
 
 Freeze reusable audio topology once schematic connectivity/values, major switching/jack routing and repeatable core validation are audited. Further work should qualify uncertainty, numerical behavior and release integrity rather than endlessly refit topology. Reopen the model for an evidenced transcription error, newly acquired factory source, physical measurement or genuine numerical/modeling defect; document why. An assumed transformer, speaker, taper or effect missing a published target is not sufficient cause.
 
-Name one canonical fitting configuration and specify channel, source impedance, electrical/panel pot profile, control mode, device profile, PSU mode, effects/loading state, load terminals/type, input levels and sample/test frequencies. Choose stability and auditability, not the hypothesis with the smallest manual error. Ideal rails and a resistor can be appropriate; test uncertain physical profiles separately.
+Name one canonical fitting configuration and specify channel, source impedance, electrical/panel pot profile, control mode, device profile, PSU mode, effects/loading state, load terminals/type, input levels and sample/test frequencies. Choose stability and auditability, not the hypothesis with the smallest manual error. Ideal rails and a resistor can be appropriate when selected by that contract. If reactive loading/current feedback materially defines the target behavior, select and qualify that load explicitly; a resistor baseline does not supersede it. Test uncertain physical profiles separately.
 
 Track reusable-library identity separately from complete-deck identity: an unchanged audio subcircuit does not imply an unchanged demonstration/fixture deck. State exactly which files/regions and versions match. Use byte identity for an intentionally frozen library; do not silently ignore semantic edits through convenient normalization.
 
@@ -282,6 +337,23 @@ For the frozen fitting profile, retain self-describing captures over representat
 Reconstruct summaries from raw data with an independent analysis implementation, respecting adaptive time intervals and metric floors. Missing prior history is an explicit audit limitation, not proof of settling. Retain the bounded golden capture needed for this audit, optionally compressed, rather than every exploratory run.
 
 Declare drift limits for small-signal fundamental dB, nonlinear Vpp %, critical DC bias, harmonic levels above a floor and phase where resolvable. Distinguish implementation drift from intentional model change. Maintenance should preserve model behavior; identical capture and measurement code under the same numerical runtime should yield zero metric drift. Do not impose cross-simulator bit identity or loosen golden limits to hide a failure. A changed frozen topology requires a model/source change entry and requalification.
+
+## Handoff To Realtime DSP
+
+Once the reference is frozen, translate it to production DSP as a separate implementation problem. Before assembling the full circuit:
+
+1. Inventory the required component behaviors and circuit primitives: linear impedance/storage, nonlinear conduction, active-device limits and control/switch behavior as applicable.
+2. Reuse existing tested primitives or solver elements; implement missing behaviors once, with checks of their operating range, state and limits. Keep generic component behavior separate from schematic values/topology.
+3. Define one explicit digital-sample <-> physical-voltage calibration boundary, including input/output units and trims. Preserve physical internal gain/bias; do not normalize stages independently to hide errors.
+4. Select and document discretization/solver architecture for the needed loading, feedback and memory. State processing rates, initialization, convergence/iteration bounds and failure policy; validate coupled behavior before decomposing it into independent blocks.
+5. Assemble the model with schematic designators and connectivity traceable to the frozen reference. A reusable component correction should propagate to every dependent stage without editing duplicate equations.
+6. Instrument the actual production processing path with observational probes. Compare them upstream-to-downstream with golden captures under matched controls, drive, load, settling and observation bandwidth; do not validate a separately rewritten formula.
+7. Define oversampling islands and anti-alias filters as production numerical boundaries. Measure parity, aliasing, phase/latency and CPU at supported rates. Do not change the frozen analog reference to conceal discretization error.
+8. Keep uncertain hardware profiles separate from the selected fitting profile. Carry the golden drift contract into regression and qualify intentional approximations explicitly.
+
+Prefer the smallest reusable representation that covers the inventoried behaviors. Avoid both a monolithic hand-expanded `processSample()` full of duplicate equations and a heap-allocated virtual object for every trivial passive element. Construct/allocate outside the callback and preserve per-channel state; reference completeness does not require a general-purpose realtime SPICE engine.
+
+Use [cpp-juce-dsp-modeling.md](cpp-juce-dsp-modeling.md) for production block structure, [aliasing-oversampling.md](aliasing-oversampling.md) for numerical boundaries, and [diode-and-fuzz-circuits.md](diode-and-fuzz-circuits.md) for nonlinear primitives/solvers. Their musical approximation options do not authorize changing a frozen fidelity contract.
 
 ## Automate And Report
 
@@ -320,7 +392,7 @@ A useful report has these fields:
 | Result | Stage/control/level-specific differences, metrics/plots, tolerance and uncertainty |
 | Diagnosis | First divergent boundary, likely owner, isolating experiment and remaining alternatives |
 | Change | DSP, circuit, transcription or harness correction; before/after evidence |
-| Status | Evidence label plus PASS_IMPLEMENTATION, PASS_NUMERICAL, UNRESOLVED_HARDWARE or FAIL as applicable; state intentional differences and untested scope separately |
+| Status | Separate provenance, evidence relationship, per-check qualification (including UNQUALIFIED_NUMERICAL), and claim-specific hardware resolution; state intentional differences and untested scope |
 | Regression | Runnable check and reference provenance, or why no practical check was added |
 
 State what each result establishes and its limits. Prefer “topology passes implementation regression; PSU metrics converge under an unmeasured transformer hypothesis” over “the model is validated.” Prefer “reactive-load sensitivity evaluated; actual cabinet impedance unresolved” over “speaker validated.” State the remaining experiment needed to resolve uncertainty. Keep future recommendations separate from changes and tests actually performed.
@@ -374,13 +446,24 @@ Verify both directions: manifest -> filesystem requires every member with matchi
 
 On disposable copies, mutate a numeric result, model, research CSV, raw capture gzip, render-only SVG, README, required DSP source (remove it), checksum, dependency edge, causal cycle and undeclared file, where present. Include the exact-checksum format variants above. Require rejection and meaningful diagnostics; report completed counts and gaps. Recompute outer hashes for semantic graph mutations so a stale checksum does not mask an untested dependency validator. Test section seals directly as well as whole-file hashes.
 
-Use version semantics that distinguish:
+Track model identity separately from qualification/release identity, for example:
+
+```text
+reference_model_id: example-core
+reference_model_revision: 5
+qualification_schema: circuit-qualification/1
+qualification_release: 5.1.1
+```
+
+Model revision identifies topology, component/model values, reference DSP behavior and interpretation. Qualification schema identifies the result format; qualification release identifies the specific evidence/tooling bundle. Documentation, checksum or qualification changes can advance the release while preserving the model revision and its hashes. A new model revision still needs its own qualification; do not infer a model change merely from a release-number increment.
+
+Within this two-axis identity, describe changes as:
 
 | Version class | Change |
 | --- | --- |
-| Major / model | Topology, traced values, DSP reference behavior or hardware interpretation |
-| Minor validation | Meaningful additional physical/numerical qualification without changing core topology |
-| Patch / maintenance | Provenance, portability, documentation or verifier changes without scientific-result change |
+| Model revision | Topology, traced values, DSP reference behavior or hardware interpretation; advance the model identity |
+| Qualification release | Meaningful additional physical/numerical qualification; keep model identity unchanged when the model is unchanged |
+| Maintenance release | Provenance, portability, documentation or verifier changes without scientific-result change; preserve model identity |
 
 Before a maintenance edit, verify the qualified baseline, envelope, section/capture hashes and scientific identities. Stop on inconsistency. Retain old releases immutably; do not rewrite prior scientific records to clean up terminology. A delta/overlay snapshot can avoid recursive archive duplication if it maps every required original path to exact verified bytes, pins the base identity and can reconstruct an independently verifiable original bundle.
 
@@ -407,6 +490,7 @@ Mark inapplicable items with a reason; do not add absent subsystems just to chec
 | Power/load | [ ] Deterministic reference retained; supply assumptions explicit; reactive-load sensitivity considered; electrical load distinct from acoustic response |
 | Uncertainty | [ ] Nonlinear-device priors and replacement-component hypotheses labeled; hardware-only unknowns listed |
 | Regression | [ ] Named fitting profile; bounded raw golden captures with settling history; independent metric reconstruction; drift limits declared |
+| DSP handoff | [ ] Required primitives inventoried/reused; values/topology traceable; voltage calibration and solver/rate boundaries explicit; production probes compared with golden captures |
 | Software | [ ] No critical asserts; normal/-O/PYTHONOPTIMIZE failure probes pass; invalid/missing/incomplete data rejected; caches hash-bound to inputs |
 | Release | [ ] Scientific/render/verification relationships separated; causal DAG and edge contract pass; canonical hashing specified; raw hashes and exact-byte protocol checked; inventory verified both ways; corruption cases rejected |
-| Final claim | [ ] Implementation-reference scope distinguished from hardware truth; retained versus fresh results explicit; remaining bench measurements listed |
+| Final claim | [ ] Maturity and four result axes explicit; model/release identities separate; implementation-reference scope distinguished from hardware truth; retained versus fresh results and remaining bench measurements listed |
