@@ -40,9 +40,8 @@ Use the evidence and artifacts appropriate to the current question:
 | REFERENCE CANDIDATE | Internal checkpoints, uncertainty labels, relevant sensitivity studies and separate calibration/validation |
 | FROZEN IMPLEMENTATION REFERENCE | Named fitting profile, golden captures, drift contract and source freeze |
 | PUBLISHED / ARCHIVED REFERENCE | Manifest/hashes, causal dependency DAG, corruption tests and immutable historical release |
-| HARDWARE-CALIBRATED REFERENCE | Documented measurements of identified target specimen(s), fitted parameters and measurement uncertainty |
 
-These describe maturity and evidence, not a mandatory sequence for every task. Hardware calibration can accompany the appropriate maturity level; publication does not create hardware evidence, and calibration still needs withheld measurements for independent validation. Apply the full release-integrity workflow when publishing/archiving, not while resolving an exploratory wiring question.
+**HARDWARE-CALIBRATED** is a separate attribute, not a later maturity level. It requires documented measurements of identified target specimen(s), fitted parameters and measurement uncertainty; record which parts are calibrated and which remain unmeasured. It can accompany the appropriate maturity level. Publication does not create hardware evidence, and calibration still needs withheld measurements for independent validation. Apply the full release-integrity workflow when publishing/archiving, not while resolving an exploratory wiring question.
 
 ### Claim-Specific Source Hierarchy
 
@@ -70,7 +69,7 @@ Preserve source problems: reversed table headings, ambiguous test-point units, u
 
 Keep four independent fields with consequential values, connections, boundaries and results. They are not one shared enum. Scope qualification to a named check/metric and hardware resolution to a specific claim; multiple checks may qualify different aspects of the same fixture.
 
-**PROVENANCE** — where a value/model comes from or how it was constructed:
+**PROVENANCE** — where a value/model comes from or how it was constructed. Attach it to individual parameters, boundaries or model elements; a subsystem may contain multiple entries, such as documented topology, a hypothesized diode knee, a calibrated trim and an approximate switch. Do not reduce that combination to one subsystem-wide enum:
 
 | Value | Meaning and required record |
 | --- | --- |
@@ -261,7 +260,7 @@ Spring-tank impedance classes normally describe AC impedance, not literal DC coi
 Add offline checkpoints at meaningful boundaries: input network, gain stage, coupling filter, tone network, clipping stage, degeneration/feedback network, master/output network, power approximation and speaker/cabinet interface. Compare upstream to downstream to find the first discrepancy.
 
 - Reuse the actual production DSP implementation and normal processing path. Preserve parameter initialization, smoothing, oversampling and channel state; a separately rewritten formula does not verify that path.
-- Keep taps observational. In a deterministic build, compare instrumented and uninstrumented final output, preferably sample-bit hashes, to catch changed processing. This is a harness check, not a requirement for SPICE/DSP bit identity.
+- Keep taps non-invasive: instrumentation must not change processing state, ordering, latency, callback allocation behavior or numerical output. In the same deterministic build, require identical final output with probes enabled and disabled, using direct sample comparison or sample-bit hashes. Probe storage must be prepared outside processing. This is a harness check, not a requirement for SPICE/DSP bit identity.
 - Map each tap's units, polarity, rate, loading and included filters. An unloaded stage output is not the same node as a loaded circuit terminal; an output after a lumped coupling filter is not a raw device electrode. Inactive or crossfaded branches may also differ.
 - Isolate subsections with equivalent source/load impedance and bias. Bypassing a branch may remove loading; preserve that load or label the experiment's altered boundary. Shared supplies and feedback can make upstream stages depend on downstream settings.
 - Check passive feedback impedance separately from complete closed-loop behavior. Matching passive values does not prove matching loop gain, operating point, saturation or transformer/load response.
@@ -347,13 +346,33 @@ Once the reference is frozen, translate it to production DSP as a separate imple
 3. Define one explicit digital-sample <-> physical-voltage calibration boundary, including input/output units and trims. Preserve physical internal gain/bias; do not normalize stages independently to hide errors.
 4. Select and document discretization/solver architecture for the needed loading, feedback and memory. State processing rates, initialization, convergence/iteration bounds and failure policy; validate coupled behavior before decomposing it into independent blocks.
 5. Assemble the model with schematic designators and connectivity traceable to the frozen reference. A reusable component correction should propagate to every dependent stage without editing duplicate equations.
-6. Instrument the actual production processing path with observational probes. Compare them upstream-to-downstream with golden captures under matched controls, drive, load, settling and observation bandwidth; do not validate a separately rewritten formula.
+6. Instrument the actual production processing path using the [non-invasive probe contract](#compare-equivalent-stages), including proof of final-output identity with probes enabled/disabled. Compare upstream-to-downstream with golden captures under matched controls, drive, load, settling and observation bandwidth; do not validate a separately rewritten formula.
 7. Define oversampling islands and anti-alias filters as production numerical boundaries. Measure parity, aliasing, phase/latency and CPU at supported rates. Do not change the frozen analog reference to conceal discretization error.
 8. Keep uncertain hardware profiles separate from the selected fitting profile. Carry the golden drift contract into regression and qualify intentional approximations explicitly.
+
+For static reference parity, wait until parameter smoothing has settled or provide a test mode that establishes the exact target value before the measurement window. Keep that mode on the production processing path. Test automation/smoothing behavior separately from static circuit equivalence; a control still slewing is not evidence of a static circuit mismatch.
 
 Prefer the smallest reusable representation that covers the inventoried behaviors. Avoid both a monolithic hand-expanded `processSample()` full of duplicate equations and a heap-allocated virtual object for every trivial passive element. Construct/allocate outside the callback and preserve per-channel state; reference completeness does not require a general-purpose realtime SPICE engine.
 
 Use [cpp-juce-dsp-modeling.md](cpp-juce-dsp-modeling.md) for production block structure, [aliasing-oversampling.md](aliasing-oversampling.md) for numerical boundaries, and [diode-and-fuzz-circuits.md](diode-and-fuzz-circuits.md) for nonlinear primitives/solvers. Their musical approximation options do not authorize changing a frozen fidelity contract.
+
+### Realtime Translation Error Budget
+
+Attribute production/reference mismatch before changing the model. Define an overall fidelity target per metric, band and operating range, then allocate and measure contributions where applicable:
+
+- Reference numerical uncertainty and analysis-window/metric uncertainty.
+- Reference-to-uniform-grid resampling error.
+- Analog-to-discrete transform error.
+- Nonlinear solver/iteration error.
+- Oversampling reconstruction and anti-alias filter error.
+- Finite-precision error.
+- Delay/LUT interpolation error.
+- Control-rate and parameter-smoothing error.
+- Intentional approximation error.
+
+Do not spend the entire allowed tolerance independently in every layer. Contributions can interact; do not assume independent addition or cancellation. Verify the combined production result against the overall target.
+
+Where practical, compare the frozen analog/reference result, a high-rate/offline execution of the production algorithm, and the host-rate production path under matched physical conditions and observation bandwidth. The intermediate comparison helps separate implementation error from rate/precision optimization; it is a diagnostic, not an independent physical oracle. Keep measured contributions, remaining uncertainty and the final parity result visible.
 
 ## Automate And Report
 
@@ -490,7 +509,7 @@ Mark inapplicable items with a reason; do not add absent subsystems just to chec
 | Power/load | [ ] Deterministic reference retained; supply assumptions explicit; reactive-load sensitivity considered; electrical load distinct from acoustic response |
 | Uncertainty | [ ] Nonlinear-device priors and replacement-component hypotheses labeled; hardware-only unknowns listed |
 | Regression | [ ] Named fitting profile; bounded raw golden captures with settling history; independent metric reconstruction; drift limits declared |
-| DSP handoff | [ ] Required primitives inventoried/reused; values/topology traceable; voltage calibration and solver/rate boundaries explicit; production probes compared with golden captures |
+| DSP handoff | [ ] Required primitives inventoried/reused; values/topology traceable; voltage/solver/rate boundaries and error budget explicit; probe non-invasiveness proven; static smoothing settled; production path compared with golden captures |
 | Software | [ ] No critical asserts; normal/-O/PYTHONOPTIMIZE failure probes pass; invalid/missing/incomplete data rejected; caches hash-bound to inputs |
 | Release | [ ] Scientific/render/verification relationships separated; causal DAG and edge contract pass; canonical hashing specified; raw hashes and exact-byte protocol checked; inventory verified both ways; corruption cases rejected |
 | Final claim | [ ] Maturity and four result axes explicit; model/release identities separate; implementation-reference scope distinguished from hardware truth; retained versus fresh results and remaining bench measurements listed |
