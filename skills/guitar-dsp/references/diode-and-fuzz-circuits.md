@@ -74,7 +74,7 @@ Implementation rules:
 - Smooth drive and topology changes.
 - Keep the solver inside a local nonlinear island when oversampling is used.
 
-For circuit-accurate targets, aim for a residual of the form `G*v + I_D(v) - p` with `G > 0` and a non-decreasing diode law: it has exactly one root, so a bracketed, capped Newton solve is always safe. Match the simulator's actual diode equations (reverse-bias branches, recombination, high injection), prove any lookup table monotone as shipped, store solver memory at the returned root, and fuzz the solver. Details: the `circuit-to-dsp` skill's `references/nonlinear-solvers.md`.
+For circuit-accurate targets, aim for a residual of the form `G*v + I_D(v) - p` with `G > 0` and a non-decreasing diode law: it has at most one root (exactly one when the law is finite and continuous over the range, or a sign-changing bracket exists), which supports a unique, bounded safeguarded solve when a valid bracket is maintained and the device law remains finite. Match the simulator's actual diode equations (reverse-bias branches, recombination, high injection), prove any lookup table monotone as shipped, store solver memory at the returned root, and fuzz the solver. Details: the `circuit-to-dsp` skill's `references/nonlinear-solvers.md`.
 
 Do not expose diode type, count, or mismatch as public controls unless they are part of the product. Hidden voicing constants are easier to tune and safer for presets.
 
@@ -141,7 +141,7 @@ Keep full-chain oversampling as a last resort.
 
 ## Measurement And Tests
 
-Use [circuit-reference-validation.md](circuit-reference-validation.md) for nonlinear SPICE/reference checks: align source/load and bias, compare control/level grids at equivalent stages, then isolate clipping onset, feedback and charge/recovery differences before retuning.
+Use [circuit-reference-validation.md](../../circuit-to-dsp/references/circuit-reference-validation.md) for nonlinear SPICE/reference checks: align source/load and bias, compare control/level grids at equivalent stages, then isolate clipping onset, feedback and charge/recovery differences before retuning.
 
 Measure:
 

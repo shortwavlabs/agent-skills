@@ -91,9 +91,20 @@ def permutation_ids(n: int, n_slots: int, seed: int | str, stream: str) -> list[
 
 
 def require_same_circuit(original: list[str], variant: list[str]) -> None:
-    key = lambda ls: sorted(line.strip() for line in ls if line.strip())
-    if key(original) != key(variant):
-        raise StressError("a reordered deck does not contain exactly the original statements")
+    """Prove the variant is the same circuit: every fixed statement (title, directives, comments, .subckt and
+    .control blocks) is unchanged at its statement position, and the movable element statements, each taken
+    as a whole logical statement with its '+' continuations, form the same multiset. A continuation that
+    ends up under the wrong element changes a statement and is rejected."""
+    st_o, slots_o = statements(original)
+    st_v, slots_v = statements(variant)
+    canon = lambda s: "\n".join(line.strip() for line in s)
+    if len(st_o) != len(st_v) or slots_o != slots_v:
+        raise StressError("a reordered deck has a different statement structure")
+    fixed = [i for i in range(len(st_o)) if i not in set(slots_o)]
+    if any(canon(st_o[i]) != canon(st_v[i]) for i in fixed):
+        raise StressError("a fixed statement (title, directive, comment, .subckt or .control block) moved or changed")
+    if sorted(canon(st_o[i]) for i in slots_o) != sorted(canon(st_v[i]) for i in slots_v):
+        raise StressError("a reordered deck does not contain exactly the original element statements")
     if variant == original:
         raise StressError("a 'reordered' deck is identical to the original order")
 
@@ -185,6 +196,27 @@ def self_test() -> int:
         try:
             require_same_circuit(lines, lines)
             problems.append("identity order was not rejected")
+        except StressError:
+            pass
+        # A continuation line re-attached under the wrong element: same physical lines, different circuit.
+        bad = list(variant)
+        k = next(i for i, line in enumerate(bad) if line.startswith("+"))
+        cont = bad.pop(k)
+        c1 = next(i for i, line in enumerate(bad) if line.startswith("C1 "))
+        bad.insert(c1 + 1, cont)
+        if sorted(bad) != sorted(lines):
+            problems.append("continuation test did not preserve the physical line multiset")
+        try:
+            require_same_circuit(lines, bad)
+            problems.append("continuation re-attached to the wrong element was not rejected")
+        except StressError:
+            pass
+        moved = list(lines)
+        j = moved.index(".param A=1")
+        moved[j], moved[j + 1] = moved[j + 1], moved[j]       # a directive swapped with an element
+        try:
+            require_same_circuit(lines, moved)
+            problems.append("a moved directive was not rejected")
         except StressError:
             pass
         try:

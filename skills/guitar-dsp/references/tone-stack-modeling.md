@@ -122,7 +122,7 @@ Automation is the most common failure mode.
 
 ## Measurement And Tests
 
-For a schematic-derived target, follow [circuit-reference-validation.md](circuit-reference-validation.md) for loaded network/control sweeps and independent reference data. Include taper, wiper orientation, source/load and switch branches; a centered response alone cannot establish parity.
+For a schematic-derived target, follow [circuit-reference-validation.md](../../circuit-to-dsp/references/circuit-reference-validation.md) for loaded network/control sweeps and independent reference data. Include taper, wiper orientation, source/load and switch branches; a centered response alone cannot establish parity.
 
 Measure:
 

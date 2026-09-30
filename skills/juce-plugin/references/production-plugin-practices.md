@@ -154,7 +154,7 @@ Measurement target:
 JUCE-specific practices for plugins whose DSP runs an oversampled circuit model (the modelling method itself is in the `circuit-to-dsp` skill):
 
 - Choose the oversampling factor in `prepareToPlay()` from the host rate with an algorithm (smallest power of two reaching the model's minimum validated internal rate, with a flagged fallback), and build `juce::dsp::Oversampling` there with the maximum block size. Pass `useIntegerLatency = true` when the host must compensate an exact integer latency.
-- Call `setLatencySamples()` in the constructor as well as in `prepareToPlay()`: some hosts and validators query latency before the first prepare.
+- Some hosts and validators query latency before the first `prepareToPlay()`. Define a valid pre-prepare policy: if the latency is invariant, or can be computed correctly before the host rate is known (for example integer-latency oversampling whose latency is the same for every factor the policy can choose), report it in the constructor; otherwise do not invent a value. Always call `setLatencySamples()` with the correct value in `prepareToPlay()` and on every reconfiguration, and test the wrappers and hosts you actually target.
 - Expose bypass through `getBypassParameter()`. In current JUCE wrappers the host bypass then arrives as that parameter and `processBlockBypassed()` is used only when no bypass parameter exists; verify this on your JUCE version. Implement a dry path delayed by exactly the reported latency plus a crossfade, and test that the bypassed output equals the delayed input bit for bit after the crossfade.
 - Non-parameter state such as an interface calibration reference: a user edit notifies the host (`updateHostDisplay (ChangeDetails().withNonParameterStateChanged (true))`); `setStateInformation()` stores the value **without** notifying, so restoring a session does not mark it dirty.
 - Store a **model revision** string (changes only when the audio changes) separately from the **state schema version** (changes only when serialization changes). Test that a session saved by an older model revision restores every parameter unchanged and re-saves with the new revision.
@@ -184,3 +184,9 @@ DAW smoke should include:
 - Multiple instances of the heaviest expected preset.
 
 For signed distribution, add platform signing, notarization, installer validation, clean-machine install, strict plugin validation, and checksums.
+
+## Sources
+
+- JUCE `AudioProcessor` reference (https://docs.juce.com/master/classAudioProcessor.html): `setLatencySamples()`, `getBypassParameter()`, `processBlockBypassed()`, `updateHostDisplay()`.
+- JUCE `dsp::Oversampling` reference (https://docs.juce.com/master/classdsp_1_1Oversampling.html).
+- Wrapper behaviour (when latency is queried, how host bypass is delivered) differs between JUCE versions and plugin formats; check the pinned JUCE version's wrapper sources and test in the target hosts.

@@ -10,7 +10,7 @@
 - Tiers and populations
 - Checklist
 
-This reference covers the generator side: producing compact, independent expected data from a frozen SPICE oracle for a C++ (or other) realtime model's regression tests. For frozen-release golden captures, drift limits and release integrity see the `guitar-dsp` skill's `references/circuit-reference-validation.md`. For how tests turn fixtures into gates (hard gates, quality targets, population completeness) see the `circuit-to-dsp` skill's `references/validation-gates.md`.
+This reference covers the generator side: producing compact, independent expected data from a frozen SPICE oracle for a C++ (or other) realtime model's regression tests. For frozen-release golden captures, drift limits and release integrity see the `circuit-to-dsp` skill's [circuit-reference-validation.md](../../circuit-to-dsp/references/circuit-reference-validation.md#golden-captures-and-drift). For how tests turn fixtures into gates (hard gates, quality targets, population completeness) see the `circuit-to-dsp` skill's `references/validation-gates.md`.
 
 ## Purpose And Independence
 
@@ -69,7 +69,7 @@ Typical tiers:
 | Tier | Size and use |
 | --- | --- |
 | QUICK | Small, tracked; every build; smoke coverage of each family |
-| STANDARD | Tracked; release gates; complete populations for every gate that defines one |
+| STANDARD | Tracked; core regression, and a release gate in many projects: must then contain the complete population of every gate it evaluates |
 | FULL | Generated on demand; large grids; release confirmation |
 | RESEARCH | Sensitivity and hypothesis ensembles; never gates on their own |
 

@@ -3,22 +3,31 @@
 
 Pairs elements by name (with an optional alias map), infers ONE consistent 1:1 net map from every paired
 terminal, and reports pin swaps, wrong nets, unmapped nets, missing/extra elements, value, model and
-subcircuit-parameter differences, and .param/.func/.options/.ic/.nodeset differences. Net NAMES may differ
-freely (they are mapped); net TOPOLOGY may not. Project adapter subcircuits (dual op-amp packages, pot
-wrappers) can be flattened one level with --adapters so the derived deck is compared element by element.
+subcircuit differences, and .param/.func/.options/.temp/.global/.ic/.nodeset differences. Net NAMES may
+differ (they are mapped); net TOPOLOGY may not. Project adapter subcircuits (dual op-amp packages, pot
+wrappers) can be flattened with --adapters so the derived deck is compared element by element.
 
   netlist_compare.py REFERENCE.cir DERIVED.cir [--adapters LIB] [--alias MAP.json] [--inert NAME]
                      [--analyses] [--mutation-check]
   netlist_compare.py --self-test
 
---mutation-check re-runs the comparison on deliberately broken copies of DERIVED (reversed polarised
-parts, swapped pins, changed values and models, deleted parts, moved terminals) and fails unless every
-mutation is detected: a validator that cannot see a planted fault proves nothing.
-
-Limitations: behavioural/controlled-source expressions and source specs are compared as normalised text
-(net names inside them are not mapped); `.include`/`.lib` files are not followed (hash them with
-spice_manifest.py instead); an ambiguous symmetric part (R/C/L) with no mapped neighbour is bound in its
-written orientation. Exit status: 0 equivalent, 1 differences found, 2 usage/parse error.
+FAIL-CLOSED GRAMMAR. Equivalence is claimed only inside the supported grammar; anything else is a parse
+error (exit 2, "NOT QUALIFIED"), never a silent pass.
+  Elements: R C L (value), V I (source spec), D Q J M Z S (terminals + model), W (2 terminals, controlling
+    source, model), X (subcircuit call), E G (linear 4-terminal gain, or behavioural value=/vol=/cur=/poly/
+    table/laplace), F H (2 terminals, controlling source, gain or poly), B (v= or i=), T (4 terminals),
+    K (coupled inductor names and value). XSPICE `A` devices and every other element letter are rejected.
+  Directives compared: .param .func .options/.option .temp .global .ic .nodeset .model (bodies) .subckt
+    (bodies, compared structurally with ports bound in order); analyses (.tran .ac .dc .op .noise .tf .four
+    .sens .pz .disto) only with --analyses. Ignored as output-only: .end .title .save .print .plot .probe
+    .meas/.measure .width .csparam. Reported but NOT followed: .include/.inc/.lib FILE (hash those files with
+    spice_manifest.py). .control blocks: output/analysis commands are ignored; circuit-altering commands
+    (alter, altermod, option(s), reset, source, shell) are rejected. Any other directive is rejected.
+Limits: behavioural expressions are compared as normalised text after remapping v(net)/v(a,b) through the
+net map and i(name) through the element pairing; controlled-source poly controls given as bare node lists
+are not remapped (they are reported as differences when names differ). Adapters are flattened ONE level;
+an adapter that calls another adapter is rejected. Include files and model libraries are not read.
+Exit status: 0 equivalent, 1 differences found, 2 unsupported syntax or usage error.
 """
 
 from __future__ import annotations
@@ -28,7 +37,6 @@ import copy
 import json
 import re
 import sys
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -37,12 +45,18 @@ SUFFIX = {"t": 1e12, "g": 1e9, "meg": 1e6, "k": 1e3, "mil": 25.4e-6, "m": 1e-3, 
 NUMBER = re.compile(r"^([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)(meg|mil|[tgkmunpf])?[a-z]*$")
 NUM_IN_EXPR = re.compile(r"(?<![a-z_0-9.])((?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)(meg|mil|[tgkmunpf])?[a-z]*", re.I)
 SYMMETRIC = set("rcl")
-MODEL_KINDS = set("dqjmzsw")   # positional tokens end with a model name (optionally followed by an area factor)
+MODEL_TERMINALS = {"d": (2, 2), "q": (3, 5), "j": (3, 3), "m": (4, 7), "z": (3, 3), "s": (4, 4)}
+SUPPORTED = set("rclvidqjmzswxefghbtk")
 GROUND = {"0", "gnd", "gnd!"}
+ANALYSES = {".tran", ".ac", ".dc", ".op", ".noise", ".tf", ".four", ".sens", ".pz", ".disto"}
+OUTPUT_ONLY = {".end", ".title", ".save", ".print", ".plot", ".probe", ".meas", ".measure", ".width", ".csparam"}
+INCLUDES = {".include", ".inc", ".lib"}
+CONTROL_ALTERING = {"alter", "altermod", "option", "options", "reset", "source", "shell"}
+BEHAVIOURAL_KEYS = ("value", "vol", "cur")
 
 
 class NetlistError(RuntimeError):
-    pass
+    """Unsupported or malformed syntax: structural equivalence cannot be established."""
 
 
 @dataclass
@@ -54,6 +68,8 @@ class Element:
     value: str | None = None
     params: dict[str, str] = field(default_factory=dict)
     spec: str = ""
+    ctrl: list[str] = field(default_factory=list)      # controlling element names (W F H K)
+    behavioural: bool = False
 
 
 @dataclass
@@ -71,12 +87,16 @@ class Deck:
     params: dict[str, str] = field(default_factory=dict)
     funcs: dict[str, str] = field(default_factory=dict)
     options: set[str] = field(default_factory=set)
+    temp: str | None = None
+    globals: set[str] = field(default_factory=set)
     initial: dict[tuple[str, str], str] = field(default_factory=dict)   # (.ic|.nodeset, node) -> value
     analyses: list[str] = field(default_factory=list)
     models: dict[str, str] = field(default_factory=dict)                 # name -> canonical definition
+    includes: list[str] = field(default_factory=list)
+    control_commands: list[str] = field(default_factory=list)
 
 
-# ----------------------------------------------------------------- parsing
+# ----------------------------------------------------------------- lexical helpers
 def logical_lines(text: str, has_title: bool) -> list[str]:
     raw = text.replace("\r", "").split("\n")
     if has_title and raw:
@@ -123,6 +143,11 @@ def spice_number(tok: str) -> float | None:
     return float(m.group(1)) * SUFFIX.get(m.group(2) or "", 1.0) if m else None
 
 
+def canonical_numbers(text: str) -> str:
+    """Rewrite every SPICE number in `text` as a canonical float (20e3, 20k and 20000 compare equal)."""
+    return NUM_IN_EXPR.sub(lambda m: repr(float(m.group(1)) * SUFFIX.get((m.group(2) or "").lower(), 1.0)), text)
+
+
 def evaluate(expr: str | None) -> float | None:
     """Numeric value of a number or of a brace expression using only numbers and + - * / ( )."""
     if expr is None:
@@ -133,7 +158,7 @@ def evaluate(expr: str | None) -> float | None:
     direct = spice_number(s)
     if direct is not None:
         return direct
-    py = NUM_IN_EXPR.sub(lambda m: repr(float(m.group(1)) * SUFFIX.get((m.group(2) or "").lower(), 1.0)), s)
+    py = canonical_numbers(s)
     if not re.fullmatch(r"[0-9.e+\-*/() ]+", py):
         return None
     try:
@@ -142,23 +167,18 @@ def evaluate(expr: str | None) -> float | None:
         return None
 
 
-def canonical_numbers(text: str) -> str:
-    """Rewrite every SPICE number in `text` as a canonical float (20e3, 20k and 20000 compare equal)."""
-    return NUM_IN_EXPR.sub(lambda m: repr(float(m.group(1)) * SUFFIX.get((m.group(2) or "").lower(), 1.0)), text)
-
-
 def source_spec(spec: str) -> tuple:
     """Canonical independent-source specification: DC value, AC magnitude/phase, transient function and any
     other tokens. Defaults are made explicit (DC 0, AC 1 0) and SIN's trailing zero defaults are dropped
     (other functions keep every argument: PULSE/EXP defaults are not zero)."""
-    raw, toks = tokens(spec), []
-    for t in raw:   # 'sin (0 1 1k)' -> 'sin(0 1 1k)'
+    toks: list[str] = []
+    for t in tokens(spec):   # 'sin (0 1 1k)' -> 'sin(0 1 1k)'
         if t.startswith("(") and toks and re.fullmatch(r"[a-z]+", toks[-1]):
             toks[-1] += t
         else:
             toks.append(t)
-    dc, ac, fn, other = "0", ("1", "0"), None, []
-    has_ac, i = False, 0
+    dc, ac, fn, other = "0", None, None, []
+    i = 0
     while i < len(toks):
         t = toks[i]
         if t == "dc" and i + 1 < len(toks):
@@ -168,7 +188,7 @@ def source_spec(spec: str) -> tuple:
             while i < len(toks) and len(vals) < 2 and evaluate(toks[i]) is not None:
                 vals.append(toks[i])
                 i += 1
-            ac, has_ac = (vals[0] if vals else "1", vals[1] if len(vals) > 1 else "0"), True
+            ac = (vals[0] if vals else "1", vals[1] if len(vals) > 1 else "0")
         elif re.match(r"^[a-z]+\(", t):
             name, args = t.split("(", 1)
             args = tokens(args.rstrip(")").replace(",", " "))
@@ -181,45 +201,90 @@ def source_spec(spec: str) -> tuple:
         else:
             other.append(canonical_numbers(t))
             i += 1
-    return (canonical_numbers(dc), tuple(canonical_numbers(x) for x in ac) if has_ac else None, fn, tuple(other))
+    return (canonical_numbers(dc), tuple(canonical_numbers(x) for x in ac) if ac else None, fn, tuple(other))
 
 
 def node(n: str) -> str:
     return "0" if n in GROUND else n
 
 
+def split_params(rest: list[str]) -> tuple[list[str], dict[str, str]]:
+    params = {k: v for k, v in (t.split("=", 1) for t in rest if "=" in t and not t.startswith(("{", "(")))}
+    pos = [t for t in rest if not ("=" in t and not t.startswith(("{", "("))) and t != "params:"]
+    return pos, params
+
+
+# ----------------------------------------------------------------- element grammar
 def element(toks: list[str]) -> Element:
     name, kind = toks[0], toks[0][0]
-    rest = toks[1:]
-    params = {k: v for k, v in (t.split("=", 1) for t in rest if "=" in t and not t.startswith(("{", "(")))}
-    pos = [t for t in rest if not ("=" in t and not t.startswith(("{", "(")))]
+    if kind == "a":
+        raise NetlistError(f"{name}: XSPICE code-model instances (A) are not supported; "
+                           "structural equivalence not established")
+    if kind not in SUPPORTED:
+        raise NetlistError(f"{name}: unsupported element type {kind.upper()}; structural equivalence not established")
+    pos, params = split_params(toks[1:])
+
+    def need(n: int) -> None:
+        if len(pos) < n:
+            raise NetlistError(f"{name}: expected at least {n} positional fields, found {len(pos)}")
+
     if kind in SYMMETRIC:
-        return Element(name, kind, [node(n) for n in pos[:2]], value=pos[2] if len(pos) > 2 else params.get(kind),
-                       params=params, spec=" ".join(pos[3:]))
-    if kind in MODEL_KINDS:
-        if kind == "w":    # W n+ n- vcontrol model
-            return Element(name, kind, [node(n) for n in pos[:2]], model=pos[3] if len(pos) > 3 else None,
-                           params=params, spec=pos[2] if len(pos) > 2 else "")
-        k = len(pos) - 1
-        if k > 0 and is_number(pos[k]) and not is_number(pos[k - 1]):
-            k -= 1          # trailing area/multiplier factor
-        return Element(name, kind, [node(n) for n in pos[:k]], model=pos[k] if pos else None, params=params,
-                       spec=" ".join(pos[k + 1 :]))
-    if kind == "x":
-        if not pos:
-            raise NetlistError(f"{name}: subcircuit call without a subcircuit name")
-        pos = [p for p in pos if p != "params:"]
-        return Element(name, kind, [node(n) for n in pos[:-1]], model=pos[-1], params=params)
-    if kind in "eg" and len(pos) == 5 and not any(c in "".join(pos) for c in "({"):
-        return Element(name, kind, [node(n) for n in pos[:4]], value=pos[4])
-    if kind == "t":
-        return Element(name, kind, [node(n) for n in pos[:4]], params=params, spec=" ".join(pos[4:]))
-    if kind == "k":
-        return Element(name, kind, [], params=params, spec=" ".join(rest))
+        need(2)
+        value = pos[2] if len(pos) > 2 else params.pop(kind, None)
+        if value is None:
+            raise NetlistError(f"{name}: no value")
+        return Element(name, kind, [node(n) for n in pos[:2]], value=value, params=params, spec=" ".join(pos[3:]))
     if kind in "vi":
-        return Element(name, kind, [node(n) for n in pos[:2]], params=params, spec=" ".join(rest[2:]))
-    # E G F H B and anything else: two nodes plus a normalised specification string
-    return Element(name, kind, [node(n) for n in pos[:2]], params=params, spec=" ".join(rest[2:]).replace(" ", ""))
+        need(2)
+        return Element(name, kind, [node(n) for n in pos[:2]], spec=" ".join(toks[3:]))
+    if kind in MODEL_TERMINALS:
+        lo, hi = MODEL_TERMINALS[kind]
+        flags = []
+        while pos and pos[-1] in ("on", "off"):
+            flags.insert(0, pos.pop())
+        k = len(pos) - 1
+        if k > lo and is_number(pos[k]) and not is_number(pos[k - 1]):
+            flags.insert(0, pos[k])      # trailing area / multiplier factor
+            k -= 1
+        if not lo <= k <= hi:
+            raise NetlistError(f"{name}: {k} terminals before the model name; {kind.upper()} supports {lo}-{hi}")
+        return Element(name, kind, [node(n) for n in pos[:k]], model=pos[k], params=params, spec=" ".join(flags))
+    if kind == "w":
+        need(4)
+        return Element(name, kind, [node(n) for n in pos[:2]], model=pos[3], params=params, ctrl=[pos[2]],
+                       spec=" ".join(pos[4:]))
+    if kind == "x":
+        need(1)
+        return Element(name, kind, [node(n) for n in pos[:-1]], model=pos[-1], params=params)
+    if kind in "eg":
+        need(2)
+        text = " ".join(toks[1:])
+        if any(k in params for k in BEHAVIOURAL_KEYS) or re.search(r"\b(poly|table|laplace|freq)\b", text):
+            return Element(name, kind, [node(n) for n in pos[:2]], behavioural=True,
+                           spec=" ".join(toks[3:]).replace(" ", ""))
+        if len(pos) == 5 and evaluate(pos[4]) is not None and not params:
+            return Element(name, kind, [node(n) for n in pos[:4]], value=pos[4])
+        raise NetlistError(f"{name}: unsupported {kind.upper()} source syntax")
+    if kind in "fh":
+        need(4)
+        if pos[2].startswith("poly("):
+            return Element(name, kind, [node(n) for n in pos[:2]], behavioural=True, spec=" ".join(toks[3:]))
+        if len(pos) != 4 or params:
+            raise NetlistError(f"{name}: unsupported {kind.upper()} source syntax")
+        return Element(name, kind, [node(n) for n in pos[:2]], ctrl=[pos[2]], value=pos[3])
+    if kind == "b":
+        need(2)
+        if not ({"v", "i"} & set(params)):
+            raise NetlistError(f"{name}: behavioural source needs v= or i=")
+        return Element(name, kind, [node(n) for n in pos[:2]], behavioural=True,
+                       spec=" ".join(toks[3:]).replace(" ", ""))
+    if kind == "t":
+        need(4)
+        return Element(name, kind, [node(n) for n in pos[:4]], params=params, spec=" ".join(pos[4:]))
+    # k: coupling between inductors
+    if len(pos) != 3:
+        raise NetlistError(f"{name}: unsupported K syntax")
+    return Element(name, kind, [], ctrl=pos[:2], value=pos[2])
 
 
 def parse(text: str, has_title: bool = True) -> Deck:
@@ -227,41 +292,64 @@ def parse(text: str, has_title: bool = True) -> Deck:
     for line in logical_lines(text, has_title):
         toks = tokens(line)
         head = toks[0]
-        if head == ".control" or control:      # simulator control scripts are not circuit
-            control = head != ".endc"
+        if control:
+            if head == ".endc":
+                control = False
+            elif head in CONTROL_ALTERING:
+                raise NetlistError(f".control command '{line}' can alter the circuit; not supported")
+            else:
+                deck.control_commands.append(head)
+            continue
+        if head == ".control":
+            control = True
             continue
         target = stack[-1].elems if stack else deck.elems
         if head == ".subckt":
-            ports = [t for t in toks[2:] if "=" not in t and t != "params:"]
-            params = dict(t.split("=", 1) for t in toks[2:] if "=" in t)
-            stack.append(Subckt(toks[1], [node(p) for p in ports], params, {}))
+            if len(toks) < 2:
+                raise NetlistError(".subckt without a name")
+            ports = [node(t) for t in toks[2:] if "=" not in t and t != "params:"]
+            stack.append(Subckt(toks[1], ports, dict(t.split("=", 1) for t in toks[2:] if "=" in t), {}))
         elif head == ".ends":
             if not stack:
                 raise NetlistError(".ends without .subckt")
             sub = stack.pop()
             deck.subckts[sub.name] = sub
-        elif head == ".param" and not stack:
-            for t in toks[1:]:
-                if "=" in t:
-                    k, v = t.split("=", 1)
-                    deck.params[k] = v
-        elif head == ".func" and not stack:
-            deck.funcs[toks[1].split("(")[0]] = "".join(toks[1:])
-        elif head == ".options" or head == ".option":
-            deck.options |= {t for t in toks[1:]}
-        elif head in (".ic", ".nodeset"):
-            for t in toks[1:]:
-                m = re.fullmatch(r"v\((.+)\)=(.+)", t)
-                if m:
-                    deck.initial[(head, node(m.group(1)))] = m.group(2)
         elif head == ".model" and len(toks) > 2:
             body = " ".join(toks[2:]).replace("(", " ").replace(")", " ")
             kind_tok, *rest = tokens(body) or [""]
             deck.models[toks[1]] = kind_tok + " " + " ".join(sorted(canonical_numbers(x) for x in rest))
-        elif head in (".tran", ".ac", ".dc", ".op", ".noise", ".tf"):
+        elif head.startswith(".") and stack:
+            raise NetlistError(f"directive {head} inside .subckt {stack[-1].name} is not supported")
+        elif head == ".param":
+            for t in toks[1:]:
+                if "=" not in t:
+                    raise NetlistError(f"malformed .param: {line}")
+                k, v = t.split("=", 1)
+                deck.params[k] = v
+        elif head == ".func":
+            deck.funcs[toks[1].split("(")[0]] = "".join(toks[1:])
+        elif head in (".options", ".option"):
+            deck.options |= set(toks[1:])
+        elif head == ".temp":
+            deck.temp = " ".join(toks[1:])
+        elif head == ".global":
+            deck.globals |= {node(t) for t in toks[1:]}
+        elif head in (".ic", ".nodeset"):
+            for t in toks[1:]:
+                m = re.fullmatch(r"v\((.+)\)=(.+)", t)
+                if not m:
+                    raise NetlistError(f"unsupported {head} entry '{t}'")
+                deck.initial[(head, node(m.group(1)))] = m.group(2)
+        elif head in ANALYSES:
             deck.analyses.append(" ".join(toks))
-        elif head == ".end" or head.startswith("."):
-            continue    # .model/.include/.lib/.control/.save/... are not topology (hash models separately)
+        elif head in INCLUDES:
+            if len(toks) < 2:
+                raise NetlistError(f"{head} without a file (library sections are not supported)")
+            deck.includes.append(line.split(None, 1)[1].split()[0].strip('"'))   # original case
+        elif head in OUTPUT_ONLY:
+            continue
+        elif head.startswith("."):
+            raise NetlistError(f"unsupported directive {head}; structural equivalence not established")
         else:
             e = element(toks)
             if e.name in target:
@@ -269,11 +357,13 @@ def parse(text: str, has_title: bool = True) -> Deck:
             target[e.name] = e
     if stack:
         raise NetlistError(f".subckt {stack[-1].name} has no .ends")
+    if control:
+        raise NetlistError(".control without .endc")
     return deck
 
 
 def flatten(deck: Deck, adapters: dict[str, Subckt]) -> dict[str, Element]:
-    """Expand one level of adapter subcircuits: inner element 'r1' of instance 'xu1' becomes 'xu1.r1'."""
+    """Expand ONE level of adapter subcircuits: inner element 'r1' of instance 'xu1' becomes 'xu1.r1'."""
     out: dict[str, Element] = {}
     for e in deck.elems.values():
         sub = adapters.get(e.model) if e.kind == "x" else None
@@ -291,6 +381,8 @@ def flatten(deck: Deck, adapters: dict[str, Subckt]) -> dict[str, Element]:
             return re.sub(r"\b(%s)\b" % "|".join(map(re.escape, values)), lambda m: values[m.group(1)].strip("{}"), text)
 
         for inner in sub.elems.values():
+            if inner.kind == "x" and inner.model in adapters:
+                raise NetlistError(f"adapter {sub.name} calls adapter {inner.model}; only one level is flattened")
             f = copy.deepcopy(inner)
             f.name = f"{e.name}.{inner.name}"
             f.nodes = [ports.get(n, n if n == "0" else f"{e.name}.{n}") for n in inner.nodes]
@@ -309,32 +401,40 @@ def same_value(a: str | None, b: str | None, rel: float) -> bool:
     return norm(a) == norm(b)
 
 
-def compare(ref: Deck, der: Deck, adapters: dict[str, Subckt], alias: dict[str, str], inert: set[str],
-            analyses: bool = False, rel: float = 1e-9) -> tuple[list[str], list[str]]:
+def remap_refs(spec: str, fmap: dict[str, str], names: dict[str, str]) -> str:
+    """Rewrite v(net), v(a,b) through the net map and i(name) through the element pairing."""
+    def sub(m: re.Match) -> str:
+        fn, args = m.group(1), [a.strip() for a in m.group(2).split(",")]
+        if fn == "v":
+            return "v(" + ",".join(fmap.get(node(a), a) for a in args) + ")"
+        return "i(" + ",".join(names.get(a, a) for a in args) + ")"
+    return re.sub(r"\b([vi])\(([^()]+)\)", sub, spec)
+
+
+def compare_elements(ref: dict[str, Element], der: dict[str, Element], alias: dict[str, str], inert: set[str],
+                     seed: dict[str, str], context: str = "") -> tuple[list[str], list[str], dict, list]:
+    """Pair elements and infer one consistent net map. Returns (errors, notes, net map, pairs)."""
     errors, notes = [], []
-    rel_elems, der_elems = ref.elems, flatten(der, adapters)
     pairs, seen = [], set()
-    for dname, de in der_elems.items():
+    for dname, de in der.items():
         if dname in inert:
             if len(set(de.nodes)) != 1:
-                errors.append(f"{dname}: declared inert but its terminals are on different nets {de.nodes}")
+                errors.append(f"{context}{dname}: declared inert but its terminals are on different nets {de.nodes}")
             else:
-                notes.append(f"{dname}: inert (all terminals on one net)")
+                notes.append(f"{context}{dname}: inert (all terminals on one net)")
             continue
         rname = alias.get(dname, dname)
-        if rname not in rel_elems:
-            errors.append(f"derived element {dname} has no reference counterpart ({rname})")
+        if rname not in ref:
+            errors.append(f"{context}derived element {dname} has no reference counterpart ({rname})")
             continue
         if rname in seen:
-            errors.append(f"reference element {rname} matched twice")
+            errors.append(f"{context}reference element {rname} matched twice (duplicate mapping)")
             continue
         seen.add(rname)
-        pairs.append((rel_elems[rname], de))
-    for rname in rel_elems:
-        if rname not in seen:
-            errors.append(f"reference element {rname} missing from the derived netlist")
+        pairs.append((ref[rname], de))
+    errors += [f"{context}reference element {r} missing from the derived netlist" for r in ref if r not in seen]
 
-    fmap, inv = {"0": "0"}, {"0": "0"}
+    fmap, inv = dict(seed), {v: k for k, v in seed.items()}
     fits = lambda r, d: fmap.get(r, d) == d and inv.get(d, r) == r
 
     def bind(rn: list[str], dn: list[str]) -> None:
@@ -344,15 +444,16 @@ def compare(ref: Deck, der: Deck, adapters: dict[str, Subckt], alias: dict[str, 
     pending = []
     for re_, de in pairs:
         if re_.kind != de.kind or len(re_.nodes) != len(de.nodes):
-            errors.append(f"{re_.name}/{de.name}: type or terminal count differs ({re_.kind}{len(re_.nodes)} vs "
-                          f"{de.kind}{len(de.nodes)})")
+            errors.append(f"{context}{re_.name}/{de.name}: type or terminal count differs "
+                          f"({re_.kind}{len(re_.nodes)} vs {de.kind}{len(de.nodes)})")
         elif re_.kind in SYMMETRIC:
             pending.append((re_, de))
         elif all(fits(r, d) for r, d in zip(re_.nodes, de.nodes)):
             bind(re_.nodes, de.nodes)
         else:
-            errors.append(f"{re_.name}: terminals {re_.nodes} vs derived {de.name} {de.nodes} (pin swap or wrong net)")
-    while pending:
+            errors.append(f"{context}{re_.name}: terminals {re_.nodes} vs derived {de.name} {de.nodes} "
+                          "(pin swap or wrong net)")
+    while pending:      # symmetric parts: prefer the orientation already implied by the mapped nets
         progress, left = False, []
         for re_, de in pending:
             a, b = re_.nodes, de.nodes
@@ -364,7 +465,7 @@ def compare(ref: Deck, der: Deck, adapters: dict[str, Subckt], alias: dict[str, 
                 bind(a, b[::-1])
                 progress = True
             elif not fwd and not rev:
-                errors.append(f"{re_.name}: {a} vs derived {de.name} {b} (wrong net)")
+                errors.append(f"{context}{re_.name}: {a} vs derived {de.name} {b} (wrong net)")
                 progress = True
             else:
                 left.append((re_, de))
@@ -372,30 +473,76 @@ def compare(ref: Deck, der: Deck, adapters: dict[str, Subckt], alias: dict[str, 
             re_, de = left.pop(0)
             bind(re_.nodes, de.nodes)
         pending = left
-    ref_nets = {n for e in rel_elems.values() for n in e.nodes}
-    der_nets = {n for e in der_elems.values() if e.name not in inert for n in e.nodes}
-    errors += [f"reference net {n} is not mapped to any derived net" for n in sorted(ref_nets - set(fmap))]
-    errors += [f"derived net {n} is not mapped to any reference net (extra connection?)" for n in sorted(der_nets - set(inv))]
+    ref_nets = {n for e in ref.values() for n in e.nodes}
+    der_nets = {n for e in der.values() if e.name not in inert for n in e.nodes}
+    errors += [f"{context}reference net {n} is not mapped to any derived net" for n in sorted(ref_nets - set(fmap))]
+    errors += [f"{context}derived net {n} is not mapped to any reference net (extra connection?)"
+               for n in sorted(der_nets - set(inv))]
+    return errors, notes, fmap, pairs
+
+
+def compare_model(ref: Deck, der: Deck, re_: Element, de: Element, errors: list[str], notes: list[str]) -> None:
+    rn, dn = re_.model or "", de.model or ""
+    if re_.kind == "x":
+        rs, ds = ref.subckts.get(rn), der.subckts.get(dn)
+        if rs is None and ds is None:
+            if rn != dn:
+                errors.append(f"{re_.name}: subckt {rn} vs derived {dn}")
+            return
+        if rs is None or ds is None:
+            errors.append(f"{re_.name}: subckt {rn if rs else dn} is defined inline on only one side; "
+                          "the other definition cannot be verified")
+            return
+        if len(rs.ports) != len(ds.ports):
+            errors.append(f"{re_.name}: subckt {rn} has {len(rs.ports)} ports vs derived {dn} {len(ds.ports)}")
+            return
+        seed = {"0": "0", **dict(zip(rs.ports, ds.ports))}
+        errs = compare_elements(rs.elems, ds.elems, {}, set(), seed, context=f"subckt {rn}: ")[0]
+        for r_el in rs.elems.values():   # values and models inside the body
+            d_el = ds.elems.get(r_el.name)
+            if d_el and (not same_value(r_el.value, d_el.value, 1e-9) or r_el.model != d_el.model):
+                errs.append(f"subckt {rn}: {r_el.name} value/model {r_el.value}/{r_el.model} vs {d_el.value}/{d_el.model}")
+        errors += errs
+        if not errs and rn != dn:
+            notes.append(f"{re_.name}: subckt renamed {rn} -> {dn} with an identical body")
+        return
+    ra, da = ref.models.get(rn), der.models.get(dn)
+    if ra is None and da is None:
+        if rn != dn:
+            errors.append(f"{re_.name}: model {rn} vs derived {dn}")
+    elif ra is None or da is None:
+        errors.append(f"{re_.name}: model {rn if ra else dn} is defined inline on only one side; "
+                      "the other definition cannot be verified")
+    elif ra != da:
+        errors.append(f"{re_.name}: model {rn} body differs from derived {dn}")
+    elif rn != dn:
+        notes.append(f"{re_.name}: model renamed {rn} -> {dn} with an identical definition")
+
+
+def compare(ref: Deck, der: Deck, adapters: dict[str, Subckt], alias: dict[str, str], inert: set[str],
+            analyses: bool = False, rel: float = 1e-9) -> tuple[list[str], list[str]]:
+    der_elems = flatten(der, adapters)
+    errors, notes, fmap, pairs = compare_elements(ref.elems, der_elems, alias, inert, {"0": "0"})
+    names = {r.name: d.name for r, d in pairs}   # reference element name -> derived element name
 
     for re_, de in pairs:
         if re_.kind != de.kind:
             continue
         if not same_value(re_.value, de.value, rel):
             errors.append(f"{re_.name}: value {re_.value} vs derived {de.value}")
-        if (re_.model or "") != (de.model or ""):
-            ra, da = ref.models.get(re_.model or ""), der.models.get(de.model or "")
-            if ra is not None and ra == da:
-                notes.append(f"{re_.name}: model renamed {re_.model} -> {de.model} with an identical definition")
-            else:
-                errors.append(f"{re_.name}: model/subckt {re_.model} vs derived {de.model}")
         for key in sorted(set(re_.params) | set(de.params)):
             if not same_value(re_.params.get(key), de.params.get(key), rel):
                 errors.append(f"{re_.name}: parameter {key}={re_.params.get(key)} vs derived {de.params.get(key)}")
+        if [names.get(c, "?" + c) for c in re_.ctrl] != de.ctrl:
+            errors.append(f"{re_.name}: controlling element(s) {re_.ctrl} vs derived {de.ctrl}")
         if re_.kind in "vi":
             if source_spec(re_.spec) != source_spec(de.spec):
                 errors.append(f"{re_.name}: source '{re_.spec}' vs derived '{de.spec}'")
-        elif canonical_numbers(re.sub(r"\s", "", re_.spec)) != canonical_numbers(re.sub(r"\s", "", de.spec)):
+        elif canonical_numbers(remap_refs(re_.spec, fmap, names).replace(" ", "")) != \
+                canonical_numbers(de.spec.replace(" ", "")):
             errors.append(f"{re_.name}: specification '{re_.spec}' vs derived '{de.spec}'")
+        if re_.model or de.model:
+            compare_model(ref, der, re_, de, errors, notes)
 
     for what, a, b in ((".param", ref.params, der.params), (".func", ref.funcs, der.funcs)):
         for key in sorted(set(a) | set(b)):
@@ -403,11 +550,21 @@ def compare(ref: Deck, der: Deck, adapters: dict[str, Subckt], alias: dict[str, 
                 errors.append(f"{what} {key}: {a.get(key)} vs derived {b.get(key)}")
     if ref.options != der.options:
         errors.append(f".options {sorted(ref.options)} vs derived {sorted(der.options)}")
+    if not same_value(ref.temp, der.temp, rel):
+        errors.append(f".temp {ref.temp} vs derived {der.temp}")
+    if {fmap.get(g, "?" + g) for g in ref.globals} != der.globals:
+        errors.append(f".global {sorted(ref.globals)} vs derived {sorted(der.globals)}")
     want = {(k, fmap.get(n, "?" + n)): v for (k, n), v in ref.initial.items()}
     if want.keys() != der.initial.keys() or any(not same_value(v, der.initial[k], rel) for k, v in want.items()):
         errors.append(f".ic/.nodeset {sorted(want.items())} vs derived {sorted(der.initial.items())}")
     if analyses and ref.analyses != der.analyses:
         errors.append(f"analyses {ref.analyses} vs derived {der.analyses}")
+    for label, deck in (("reference", ref), ("derived", der)):
+        if deck.includes:
+            notes.append(f"{label} includes not followed (verify their content with spice_manifest.py): "
+                         + ", ".join(deck.includes))
+        if deck.control_commands:
+            notes.append(f"{label} .control block ignored (commands: {', '.join(sorted(set(deck.control_commands)))})")
     return errors, notes
 
 
@@ -429,15 +586,15 @@ def mutations(der: Deck) -> list[tuple[str, Deck]]:
             e.nodes[i], e.nodes[j] = e.nodes[j], e.nodes[i]
         return f
 
-    kinds_done: set[str] = set()
+    done: set[str] = set()
     for name, e in der.elems.items():
-        if e.kind in kinds_done:
+        if e.kind in done:
             continue
-        kinds_done.add(e.kind)
-        if e.kind not in SYMMETRIC and len(e.nodes) >= 2 and e.nodes[0] != e.nodes[1]:
-            variant(f"{name}: first two terminals swapped", name, swap(0, 1))
-        if len(e.nodes) >= 3 and e.nodes[1] != e.nodes[2]:
-            variant(f"{name}: terminals 2/3 swapped", name, swap(1, 2))
+        done.add(e.kind)
+        swaps = [(0, 2), (1, 3)] if e.kind == "m" else [(0, 1), (1, 2)]   # MOSFET: drain/source, gate/bulk
+        for i, j in swaps:
+            if e.kind not in SYMMETRIC and len(e.nodes) > j and e.nodes[i] != e.nodes[j]:
+                variant(f"{name}: terminals {i + 1}/{j + 1} swapped", name, swap(i, j))
         if e.kind in SYMMETRIC and spice_number(e.value or "") is not None:
             variant(f"{name}: value +1%", name, lambda x: setattr(x, "value", repr(spice_number(x.value) * 1.01)))
         if e.model and e.kind != "x":
@@ -451,7 +608,7 @@ def mutations(der: Deck) -> list[tuple[str, Deck]]:
     if der.params:
         d = copy.deepcopy(der)
         k = sorted(d.params)[0]
-        d.params[k] = d.params[k] + "*1.01" if not d.params[k].startswith("{") else "{1.01*(" + d.params[k].strip("{}") + ")}"
+        d.params[k] = "{1.01*(" + d.params[k].strip("{}") + ")}"
         out.append((f".param {k} changed", d))
     return out
 
@@ -472,6 +629,8 @@ def mutation_check(ref: Deck, der: Deck, adapters, alias, inert, analyses) -> li
 SELF_REF = """clipper reference
 .param DRIVE=0.5
 .options klu
+.global vcc
+.temp 27
 VIN in 0 SIN(0 0.1 1k)
 R1 in n1 10k
 C1 n1 inp 100n
@@ -483,30 +642,65 @@ RP1 out w 3k
 RP2 w 0 7k
 Q1 vcc w e1 QMOD
 RE e1 0 4.7k
+M1 out g1 e1 0 NMOS1 W=10u L=1u
+RG g1 0 1meg
+E1 buf 0 out 0 2
+RB buf 0 10k
+G1 0 gout in 0 1m
+RGO gout 0 1k
+F1 0 fo VIN 0.5
+RFO fo 0 1k
+B1 bo 0 V={V(out)*0.5+V(in,0)}
+RBO bo 0 1k
 VCC vcc 0 9
+SW1 sw 0 bo 0 SWMOD
+RSW sw vcc 1k
 .ic v(out)=0
 .model DMOD D(IS=1e-14)
 .model QMOD NPN(BF=100)
+.model NMOS1 NMOS(VTO=1)
+.model SWMOD SW(VT=0.5 RON=1 ROFF=1meg)
 .subckt OPAMP p n vp vn o
 E1 o 0 p n 1e5
 .ends OPAMP
 .end
 """
-SELF_DER = """derived (net names and order changed, pot as an adapter)
+SELF_DER = """derived (net names and order changed, pot as an adapter, a switch model renamed)
 .param DRIVE=0.5
 .options klu
+.global /VCC
+.temp 27
 Q1 /VCC /W Net-_Q1-E_ QMOD
 XRV1 /OUT /W 0 POT params: rtot=10k pos=0.3
-RE Net-_Q1-E_ 0 4.7K
-VIN1 /IN 0 SIN(0 0.1 1k)
+RE 0 Net-_Q1-E_ 4.7K
+VIN1 /IN 0 SIN(0 0.1 1k 0 0)
 XU1 /INP /INN /VCC 0 /OUT OPAMP
 D2 /INN /OUT DMOD
 D1 /OUT /INN DMOD
 RF /OUT /INN {100k*DRIVE+1k}
+M1 /OUT /G1 Net-_Q1-E_ 0 NMOS1 W=10u L=1u
+RG /G1 0 1meg
+E1 /BUF 0 /OUT 0 2
+RB /BUF 0 10k
+G1 0 /GOUT /IN 0 1m
+RGO /GOUT 0 1k
+F1 0 /FO VIN1 0.5
+RFO /FO 0 1k
+B1 /BO 0 V={V(/OUT)*0.5+V(/IN,0)}
+RBO /BO 0 1k
 C1 /N1 /INP 0.1u
 R1 /IN /N1 10k
-VCC /VCC 0 9
+VCC /VCC 0 DC 9
+SW1 /SW 0 /BO 0 __SW1
+RSW /SW /VCC 1k
 .ic v(/OUT)=0
+.model DMOD D(IS=1e-14)
+.model QMOD NPN(BF=100)
+.model NMOS1 NMOS(VTO=1)
+.model __SW1 SW(RON=1 VT=0.5 ROFF=1meg)
+.subckt OPAMP a b c d e
+E1 e 0 a b 1e5
+.ends OPAMP
 .end
 """
 SELF_ADAPTERS = """.subckt POT p1 w p3 params: rtot=1k pos=0.5
@@ -515,32 +709,59 @@ RB w p3 {rtot*(1-pos)}
 .ends POT
 """
 SELF_ALIAS = {"vin1": "vin", "xrv1.ra": "rp1", "xrv1.rb": "rp2"}
-SELF_FAULTS = [   # (label, derived-deck text edit)
-    ("diode reversed", lambda t: t.replace("D1 /OUT /INN", "D1 /INN /OUT")),
-    ("BJT collector/emitter swapped", lambda t: t.replace("Q1 /VCC /W Net-_Q1-E_", "Q1 Net-_Q1-E_ /W /VCC")),
-    ("op-amp inputs swapped", lambda t: t.replace("XU1 /INP /INN", "XU1 /INN /INP")),
-    ("resistor value changed", lambda t: t.replace("R1 /IN /N1 10k", "R1 /IN /N1 10.1k")),
-    ("capacitor missing", lambda t: t.replace("C1 /N1 /INP 0.1u\n", "")),
-    ("resistor on the wrong net", lambda t: t.replace("RE Net-_Q1-E_ 0", "RE /W 0")),
-    ("model changed", lambda t: t.replace("D2 /INN /OUT DMOD", "D2 /INN /OUT DLED")),
-    ("pot ends reversed", lambda t: t.replace("XRV1 /OUT /W 0", "XRV1 0 /W /OUT")),
-    ("pot position changed", lambda t: t.replace("pos=0.3", "pos=0.4")),
-    (".ic on the wrong node", lambda t: t.replace("v(/OUT)=0", "v(/INN)=0")),
-    (".param default changed", lambda t: t.replace("DRIVE=0.5", "DRIVE=0.6")),
-    (".options dropped", lambda t: t.replace(".options klu\n", "")),
-    ("extra element", lambda t: t.replace(".end", "C9 /OUT 0 1n\n.end")),
+SELF_FAULTS = [   # (label, text in SELF_DER, replacement): each must be reported as a difference
+    ("diode reversed", "D1 /OUT /INN", "D1 /INN /OUT"),
+    ("BJT collector/emitter swapped", "Q1 /VCC /W Net-_Q1-E_", "Q1 Net-_Q1-E_ /W /VCC"),
+    ("MOSFET drain/source swapped", "M1 /OUT /G1 Net-_Q1-E_ 0", "M1 Net-_Q1-E_ /G1 /OUT 0"),
+    ("MOSFET gate/bulk swapped", "M1 /OUT /G1 Net-_Q1-E_ 0", "M1 /OUT 0 Net-_Q1-E_ /G1"),
+    ("MOSFET model changed", "NMOS1 W=10u", "NMOS2 W=10u"),
+    ("MOSFET W changed", "W=10u L=1u", "W=12u L=1u"),
+    ("op-amp inputs swapped", "XU1 /INP /INN", "XU1 /INN /INP"),
+    ("resistor value changed", "R1 /IN /N1 10k", "R1 /IN /N1 10.1k"),
+    ("capacitor missing", "C1 /N1 /INP 0.1u\n", ""),
+    ("resistor on the wrong net", "RE 0 Net-_Q1-E_", "RE 0 /W"),
+    ("diode model changed", "D2 /INN /OUT DMOD", "D2 /INN /OUT DLED"),
+    ("pot ends reversed", "XRV1 /OUT /W 0", "XRV1 0 /W /OUT"),
+    ("pot position changed", "pos=0.3", "pos=0.4"),
+    ("VCVS control inputs swapped", "E1 /BUF 0 /OUT 0 2", "E1 /BUF 0 0 /OUT 2"),
+    ("VCVS gain changed", "E1 /BUF 0 /OUT 0 2", "E1 /BUF 0 /OUT 0 3"),
+    ("VCCS gain changed", "/IN 0 1m", "/IN 0 2m"),
+    ("CCCS controlling source changed", "F1 0 /FO VIN1 0.5", "F1 0 /FO VCC 0.5"),
+    ("behavioural source reads the wrong net", "V(/OUT)*0.5", "V(/INN)*0.5"),
+    ("switch model body changed", "RON=1 VT=0.5", "RON=2 VT=0.5"),
+    ("subckt body changed", "E1 e 0 a b 1e5", "E1 e 0 b a 1e5"),
+    ("subckt gain changed", "E1 e 0 a b 1e5", "E1 e 0 a b 2e5"),
+    ("model definition missing", ".model NMOS1 NMOS(VTO=1)\n", ""),
+    ("subckt definition missing", ".subckt OPAMP a b c d e\nE1 e 0 a b 1e5\n.ends OPAMP\n", ""),
+    (".global changed", ".global /VCC", ".global /OUT"),
+    (".temp changed", ".temp 27", ".temp 50"),
+    (".ic on the wrong node", "v(/OUT)=0", "v(/INN)=0"),
+    (".param default changed", "DRIVE=0.5", "DRIVE=0.6"),
+    (".options dropped", ".options klu\n", ""),
+    ("extra element", ".model DMOD", "C9 /OUT 0 1n\n.model DMOD"),
+]
+SELF_REJECT = [   # (label, text in SELF_DER, replacement): each must be a parse error, never "equivalent"
+    ("XSPICE A device", ".end\n", "A1 /IN /OUT gain1\n.end\n"),
+    ("unknown primitive U", ".end\n", "U1 /IN /OUT 0 urc1 n=3\n.end\n"),
+    ("unsupported directive .step", ".end\n", ".step param DRIVE 0 1 0.5\n.end\n"),
+    ("circuit-altering control command", ".end\n", ".control\nalter R1 20k\nrun\n.endc\n.end\n"),
+    ("MOSFET with too few terminals", "M1 /OUT /G1 Net-_Q1-E_ 0 NMOS1", "M1 /OUT /G1 NMOS1"),
+    ("nested adapter", "XRV1 /OUT /W 0 POT", "XRV1 /OUT /W 0 POT2"),
 ]
 
 
 def self_test() -> int:
     problems = []
     adapters = parse(SELF_ADAPTERS, has_title=False).subckts
+    nested = parse(SELF_ADAPTERS + ".subckt POT2 a w b\nXIN a w b POT\n.ends POT2\n", has_title=False).subckts
     ref = parse(SELF_REF)
-    errors, _ = compare(ref, parse(SELF_DER), adapters, SELF_ALIAS, set())
+    errors, notes = compare(ref, parse(SELF_DER), adapters, SELF_ALIAS, set())
     if errors:
         problems.append("equivalent decks reported different: " + "; ".join(errors))
-    for label, edit in SELF_FAULTS:
-        text = edit(SELF_DER)
+    if not any("model renamed swmod -> __sw1" in n for n in notes):
+        problems.append(f"identical renamed model not reported as a rename: {notes}")
+    for label, old, new in SELF_FAULTS:
+        text = SELF_DER.replace(old, new, 1)
         if text == SELF_DER:
             problems.append(f"fault '{label}' did not change the deck")
             continue
@@ -550,14 +771,28 @@ def self_test() -> int:
             errs = [str(exc)]
         if not errs:
             problems.append(f"fault not detected: {label}")
+    for label, old, new in SELF_REJECT:
+        text = SELF_DER.replace(old, new, 1)
+        if text == SELF_DER:
+            problems.append(f"rejection case '{label}' did not change the deck")
+            continue
+        try:
+            compare(ref, parse(text), nested if "adapter" in label else adapters, SELF_ALIAS, set())
+            problems.append(f"unsupported syntax accepted: {label}")
+        except NetlistError:
+            pass
+    dup = dict(SELF_ALIAS, rf="r1")        # two derived elements mapped onto one reference element
+    if not any("matched twice" in e for e in compare(ref, parse(SELF_DER), adapters, dup, set())[0]):
+        problems.append("duplicate mapping not reported")
+    flipped = SELF_DER.replace("R1 /IN /N1 10k", "R1 /N1 /IN 10k")
+    if compare(ref, parse(flipped), adapters, SELF_ALIAS, set())[0]:
+        problems.append("reversed symmetric resistor reported as a difference")
     missed = mutation_check(ref, parse(SELF_DER), adapters, SELF_ALIAS, set(), False)
     problems += [f"generic mutation not detected: {m}" for m in missed]
-    if not re.search(r"x", "".join(e.kind for e in parse(SELF_DER).elems.values())):
-        problems.append("parser lost the subcircuit calls")
     for p in problems:
         print("SELF-TEST FAILURE:", p)
-    print(f"self-test: {len(SELF_FAULTS)} planted faults, {len(mutations(parse(SELF_DER)))} generic mutations: "
-          f"{'PASS' if not problems else 'FAIL'}")
+    print(f"self-test: {len(SELF_FAULTS)} planted faults, {len(SELF_REJECT)} rejected constructs, "
+          f"{len(mutations(parse(SELF_DER)))} generic mutations: {'PASS' if not problems else 'FAIL'}")
     return 1 if problems else 0
 
 
@@ -570,7 +805,7 @@ def main() -> int:
     ap.add_argument("--adapters", type=Path, action="append", default=[], help="library of adapter subckts to flatten")
     ap.add_argument("--alias", type=Path, help="JSON map: derived element name -> reference element name")
     ap.add_argument("--inert", action="append", default=[], help="derived element allowed only if fully shorted")
-    ap.add_argument("--analyses", action="store_true", help="also compare .tran/.ac/.dc/.op lines")
+    ap.add_argument("--analyses", action="store_true", help="also compare analysis lines")
     ap.add_argument("--rel", type=float, default=1e-9, help="relative tolerance for numeric values")
     ap.add_argument("--mutation-check", action="store_true", help="prove that planted faults are detected")
     a = ap.parse_args()
@@ -582,7 +817,10 @@ def main() -> int:
         alias = {k.lower(): v.lower() for k, v in json.loads(a.alias.read_text()).items()} if a.alias else {}
         inert = {n.lower() for n in a.inert}
         errors, notes = compare(ref, der, adapters, alias, inert, a.analyses, a.rel)
-    except (NetlistError, OSError, json.JSONDecodeError) as exc:
+    except NetlistError as exc:
+        print(f"NOT QUALIFIED: {exc}", file=sys.stderr)
+        return 2
+    except (OSError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
     for n in notes:
@@ -590,7 +828,7 @@ def main() -> int:
     for e in errors:
         print("DIFF:", e)
     print(f"{len(ref.elems)} reference elements, {len(errors)} differences: "
-          + ("STRUCTURALLY EQUIVALENT" if not errors else "NOT EQUIVALENT"))
+          + ("STRUCTURALLY EQUIVALENT (within the supported grammar)" if not errors else "NOT EQUIVALENT"))
     status = 1 if errors else 0
     if a.mutation_check:
         missed = mutation_check(ref, der, adapters, alias, inert, a.analyses)

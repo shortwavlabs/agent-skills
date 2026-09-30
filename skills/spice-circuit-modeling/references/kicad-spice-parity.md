@@ -35,7 +35,7 @@ Pass all four, in this order, and re-run them after every schematic edit.
 
 Make an explicit element-by-element and net-by-net mapping table from the oracle:
 
-- element count and designators (KiCad references must end in a digit, and KiCad infers device type from the reference prefix, so choose designators that export as the intended SPICE element letter);
+- element count and designators (in KiCad 10, references must end in a digit and the simulator infers the device type from the reference prefix; verify on your version, and choose designators that export as the intended SPICE element letter);
 - device identity: model/subcircuit name and the file it comes from;
 - node names for the nets you will label, and the rest left to the tool;
 - polarity/orientation of every diode, electrolytic capacitor, source and switch;
@@ -58,15 +58,17 @@ Rules: the adapter `.include`s the same model file the oracle uses (so there is 
 
 ## Structural Validation
 
-Export the netlist with the tool's command line (for KiCad: `kicad-cli sch export netlist --format spice`), then compare with the oracle programmatically (`scripts/netlist_compare.py`):
+Export the netlist with the tool's command line (for KiCad 10: `kicad-cli sch export netlist --format spice`; confirm the options with `kicad-cli sch export netlist --help` on the installed version), then compare with the oracle programmatically (`scripts/netlist_compare.py`):
 
-1. Parse both decks: join continuation lines, drop comments and control blocks, normalise case and numbers (`20e3` = `20k`), treat ground aliases as one net.
-2. Flatten project adapters one level.
+1. Parse both decks within a declared grammar: join continuation lines, drop comments, normalise case and numbers (`20e3` = `20k`), treat ground aliases as one net. Anything outside the grammar (an unknown element letter, XSPICE `A` devices, an unrecognised directive, a circuit-altering `.control` command) must stop the comparison as **not qualified**, never be skipped: a validator that silently drops syntax can report false equivalence.
+2. Flatten project adapters one level (reject an adapter that calls another adapter rather than guessing).
 3. Pair elements by name through an explicit alias map (for example `vtest1 → vtest`, `xic1.xa → xic_a`), and list tool-only elements that are allowed because all their terminals sit on one net (for example a strapped pot segment).
 4. Infer **one consistent 1:1 net map** from every paired terminal: polarised and multi-terminal parts bind first; symmetric parts (R, C, L) are oriented by the nets already mapped. Any conflict is a pin swap or a wrong net.
 5. Report every unmapped net on either side (a missing or extra connection).
-6. Compare values numerically, model names (or model definitions when the tool renames per-instance models), subcircuit names and parameters, source specifications with defaults made explicit, and `.param`, `.func`, `.options`, `.ic`/`.nodeset` (with nodes mapped).
+6. Compare values numerically, model names (or model definitions when the tool renames per-instance models), inline subcircuit bodies (with ports bound in order), source specifications with defaults made explicit, behavioural expressions with `v(net)` references remapped, and `.param`, `.func`, `.options`, `.temp`, `.global`, `.ic`/`.nodeset` (with nodes mapped). A model or subcircuit defined inline on only one side cannot be verified and is a difference.
 7. Check which **file** each model comes from, not just its name: two libraries can define the same name differently. Hash the files with the manifest (see `oracle-provenance.md`).
+
+When the comparison reports **not qualified**, equivalence has not been established. Either extend the comparator's grammar for the construct, adding a self-test with a planted fault that the extension must catch, or review the unsupported construct manually and record the review (what it is, why it is equivalent, who checked it). Until one of those is done, report the schematic as unverified.
 
 ## Mutation Self-Test
 
@@ -88,14 +90,14 @@ After structural equivalence, simulate the oracle and the exported deck with **i
 
 ## Simulator Workbook And GUI Caveats
 
-- GUI simulation tabs may **rebuild analysis lines** from dialog fields. In KiCad, editing an AC tab through the Simulation Command dialog regenerates the `.ac` line and drops extra lines such as `.options itl1=...` or a `.param` that selects an operating state. Use custom tabs for multi-line commands and re-inspect the workbook file after any GUI edit.
+- GUI simulation tabs may **rebuild analysis lines** from dialog fields. In KiCad 10 (verify on your version), editing an AC tab through the Simulation Command dialog regenerates the `.ac` line and drops extra lines such as `.options itl1=...` or a `.param` that selects an operating state. Use custom tabs for multi-line commands and re-inspect the workbook file after any GUI edit.
 - Lines that exist only in a GUI tab are not in the command-line export, so the structural check never sees them. Keep state-selecting parameters and solver options that the analysis needs visible in the documentation and validated separately.
-- Some GUIs accept only a bare `.op`; read operating points from a transient tab at t = 0 when needed.
-- Keep a documented sanity value per tab (for example "EFFECT tab, 1 kHz: about +25 dB") so a silently broken tab is noticed.
+- Some GUIs accept only a bare `.op` (KiCad 10's does); read operating points from a transient tab at t = 0 when needed.
+- Keep a documented sanity value per tab (for example "state-A tab, 1 kHz: about +N dB", with N taken from the validated oracle) so a silently broken tab is noticed.
 
 ## KiCad SPICE-Export Pitfalls
 
-Observed with KiCad 10 and its bundled ngspice (verify on your version):
+Observed with KiCad 10.0 and its bundled ngspice 45 (tool-version dependent: verify each on the installed version before relying on it, and do not change generic SPICE practice because of one KiCad release):
 
 - A multi-unit symbol (dual op-amp) exports as **one** SPICE item; it needs a package-level wrapper subcircuit.
 - References must end in a digit, otherwise annotation errors block simulation, and the reference prefix decides the device type (an `LED` reference can be inferred as an inductor).
@@ -120,3 +122,8 @@ Simulation parity is not a PCB. Symbol pin numbers are not proof of physical pac
 - [ ] Workbook/GUI tabs re-inspected after GUI edits; their extra lines documented.
 - [ ] Both GUI and command-line engines exercised.
 - [ ] Physical pinouts verified separately before any layout work.
+
+## Sources
+
+- KiCad documentation for the installed version (https://docs.kicad.org/): the Command-Line Interface chapter (`kicad-cli sch erc`, `kicad-cli sch export netlist`) and the Schematic Editor's simulator chapter (symbol simulation fields, workbooks).
+- ngspice User's Manual for the engine version KiCad bundles (https://ngspice.sourceforge.io/docs.html): subcircuits, `.include` resolution, XSPICE code models.

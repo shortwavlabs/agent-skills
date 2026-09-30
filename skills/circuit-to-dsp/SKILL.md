@@ -12,10 +12,12 @@ Use this skill to go from a frozen circuit oracle to a realtime model whose accu
 Ownership (load the other skills for their parts):
 
 - `spice-circuit-modeling`: building and freezing the SPICE/KiCad oracle, device-model qualification, golden-fixture generation.
-- `guitar-dsp`: guitar-specific decisions (signal chain, calibration, tone, aliasing ladders) and `references/circuit-reference-validation.md`, the authority for comparing DSP with a reference (measurement contract, evidence axes, drift, release integrity).
+- `guitar-dsp`: guitar-specific decisions (signal chain, drive and control feel, tone, aliasing ladders, guitar release checks).
 - `dsp-engineer`: measurement methodology (spectra, windows, coherent tones, error metrics).
 - `dsp`: filter and numerical building blocks.
 - `juce-plugin`: AudioProcessor/APVTS, lifecycle, latency and bypass APIs, CMake, formats, host validation.
+
+This skill also owns [references/circuit-reference-validation.md](references/circuit-reference-validation.md), the instrument-agnostic authority for comparing DSP with a circuit reference: source hierarchy, the four result axes, the measurement contract (including the digital-sample ↔ physical-voltage calibration and electrical versus panel pot position), stage comparison, golden captures, drift and release integrity.
 
 ## Core Principles
 
@@ -36,8 +38,8 @@ A reusable checklist; each step names the skill/reference that owns the details.
 
 | # | Step | Owner |
 | --- | --- | --- |
-| 1 | Establish schematic/source provenance and the oracle's role | `spice-circuit-modeling` (oracle-provenance); `guitar-dsp` (circuit-reference-validation) |
-| 2 | Build and verify the canonical SPICE netlist | `spice-circuit-modeling` (netlist and simulator mechanics); `guitar-dsp` circuit-reference-validation (reference verification checklist) |
+| 1 | Establish schematic/source provenance and the oracle's role | `spice-circuit-modeling` (oracle-provenance); [circuit-reference-validation.md](references/circuit-reference-validation.md) (source hierarchy, result axes) |
+| 2 | Build and verify the canonical SPICE netlist | `spice-circuit-modeling` (netlist and simulator mechanics); [circuit-reference-validation.md](references/circuit-reference-validation.md) (reference verification checklist) |
 | 3 | Qualify device models in isolation and in-circuit | `spice-circuit-modeling` (device-model-qualification) |
 | 4 | Stress numerical convergence, operating states and statement order | `spice-circuit-modeling` (numerical-qualification) |
 | 5 | Convert/map to KiCad if needed | `spice-circuit-modeling` (kicad-spice-parity) |
@@ -50,12 +52,12 @@ A reusable checklist; each step names the skill/reference that owns the details.
 | 12 | Choose integrator and internal rate from evidence | [integrators-and-rates.md](references/integrators-and-rates.md) |
 | 13 | Build realtime-safe nonlinear solvers and prove tables | [nonlinear-solvers.md](references/nonlinear-solvers.md) |
 | 14 | Generate independent golden data with complete gate populations | `spice-circuit-modeling` (golden-fixtures) |
-| 15 | Implement the C++ DSP (allocation-free, per-channel state, cached coefficients) | `guitar-dsp` cpp-juce-dsp-modeling; `dsp` |
+| 15 | Implement the C++ DSP (allocation-free, per-channel state, cached coefficients) | `dsp`; `juce-plugin` audio-thread-safety; `guitar-dsp` cpp-juce-dsp-modeling for guitar products |
 | 16 | Validate oracle → reduced model → production path, with decomposed errors | [validation-gates.md](references/validation-gates.md) |
 | 17 | Integrate into JUCE: rate policy, latency, bypass, state | `juce-plugin`; [integrators-and-rates.md](references/integrators-and-rates.md) |
-| 18 | Validate hosts (pluginval, auval, DAW smoke) | `juce-plugin` production-plugin-practices; `guitar-dsp` validation-and-release |
+| 18 | Validate hosts (pluginval, auval, DAW smoke) | `juce-plugin` production-plugin-practices; `guitar-dsp` validation-and-release for guitar products |
 | 19 | Benchmark realtime performance (back-to-back and live callback) | [integrators-and-rates.md](references/integrators-and-rates.md) |
-| 20 | Preserve evidence, known limitations, omission register and model/document identities | [validation-gates.md](references/validation-gates.md); `guitar-dsp` circuit-reference-validation (release integrity) |
+| 20 | Preserve evidence, known limitations, omission register and model/document identities | [validation-gates.md](references/validation-gates.md); [circuit-reference-validation.md](references/circuit-reference-validation.md) (release integrity) |
 
 Iterate: a failed gate at step 16 usually sends you back to 9–13, not to a wider tolerance.
 
@@ -63,6 +65,7 @@ Iterate: a failed gate at step 16 usually sends you back to 9–13, not to a wid
 
 | Reference | Read when |
 | --- | --- |
+| [references/circuit-reference-validation.md](references/circuit-reference-validation.md) | Verifying a reference circuit, claim-specific source hierarchy and result axes, measurement contracts, stage comparison, mismatch attribution, golden captures and drift, handoff to realtime DSP, release integrity and versioning, bench escalation |
 | [references/circuit-reduction.md](references/circuit-reduction.md) | Choosing the realtime formulation, classifying subsystems, testing simplifications, state inventory, shared-node coupling, reduced op-amps, exact reset, automation, fidelity envelope |
 | [references/nonlinear-solvers.md](references/nonlinear-solvers.md) | Deriving the nonlinear residual, feedback clipping, monotone scalar solvers, solver memory, fuzzing, device laws, table proofs |
 | [references/integrators-and-rates.md](references/integrators-and-rates.md) | Comparing integrators, choosing the internal rate and oversampling policy, measuring production filters, latency/bypass, coefficient cadence, performance measurement |

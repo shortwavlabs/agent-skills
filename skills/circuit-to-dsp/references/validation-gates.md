@@ -15,7 +15,7 @@
 - Reporting
 - Checklist
 
-The reference data comes from the `spice-circuit-modeling` skill (`references/golden-fixtures.md`). The measurement contract, source hierarchy, result axes and release integrity are in the `guitar-dsp` skill's `references/circuit-reference-validation.md`. This reference is about turning comparisons into **gates** whose PASS means something.
+The reference data comes from the `spice-circuit-modeling` skill (`references/golden-fixtures.md`). The measurement contract, source hierarchy, result axes and release integrity are in [circuit-reference-validation.md](circuit-reference-validation.md). This reference is about turning comparisons into **gates** whose PASS means something.
 
 ## Decompose The Error Before Gating It
 
@@ -73,11 +73,11 @@ Never pin F to a historical number: the budget must track the current model.
 
 ## Coherent Tones And Phase Ensembles
 
-A test tone whose period is an exact integer number of samples at the internal rate samples the same points of every cycle, so its discretisation error depends on the sub-sample phase of the stimulus and can vary by tens of dB with that phase. Consequences:
+A test tone whose period is an exact integer number of samples at the internal rate samples the same points of every cycle, so its discretisation error depends on the sub-sample phase of the stimulus and can vary by tens of dB with that phase. This commensurate-tone phase sensitivity is a real response of the discrete model, not a measurement bug. Consequences:
 
 - A budget metric evaluated at one phase per case becomes a lottery at exact-period rates.
 - Keep exact-period cases in the **absolute** gate at every phase (A1): they are legitimate stress cases.
-- For **budget** metrics, average error **power** over a deterministic ensemble of sub-sample phases, for example φ_m = φ₀ + 2π·f·(m/M)/F_s for m = 0 … M−1 (M = 16 worked well), each phase compared with a reference run at the same phase. Report the phase-averaged value and the minimum/maximum over the phases.
+- For **budget** metrics, average error **power** over a deterministic ensemble of sub-sample phases, for example φ_m = φ₀ + 2π·f·(m/M)/F_s for m = 0 … M−1 (M = 16 was sufficient in the case study; check that the average is stable as M grows), each phase compared with a reference run at the same phase. Report the phase-averaged value and the minimum/maximum over the phases.
 - Never "fix" a coherent failure by detuning the test tones.
 
 The measurement mechanics (coherent sampling, windows, harmonic-vector error) are in the `dsp-engineer` skill's `references/engineering-checks.md`.
@@ -86,10 +86,10 @@ The measurement mechanics (coherent sampling, windows, harmonic-vector error) ar
 
 A metric defined over a population ("F = worst model error over all N in-envelope cases of the grid") is a property of **that** population. A smaller test subset cannot compute a different F and claim to have evaluated the same gate: a subset's worst case is a different, usually stricter, reference.
 
-- If a tier does not contain the complete population, the gate's status in that tier is **NOT EVALUATED**, with the reason (for example "requires the complete N-case population; this fixture holds a K-case subset"). This differs from the `UNQUALIFIED_NUMERICAL` status in the `guitar-dsp` skill's `references/circuit-reference-validation.md`: that one means a computation completed without enough refinement evidence; NOT EVALUATED means the available data cannot establish the gate at all.
+- If a tier does not contain the complete population, the gate's status in that tier is **NOT EVALUATED**, with the reason (for example "requires the complete N-case population; this fixture holds a K-case subset"). This differs from the `UNQUALIFIED_NUMERICAL` status in [circuit-reference-validation.md](circuit-reference-validation.md): that one means a computation completed without enough refinement evidence; NOT EVALUATED means the available data cannot establish the gate at all.
 - Keep the subset computation visible as an explicitly labelled **subset diagnostic** (subset floor, worst value, delta, case, phase range). It is informational.
 - Continue to hard-gate everything the subset **can** evaluate (absolute per-case bounds, per-case totals).
-- Release tiers (for example STANDARD and FULL) must contain every gate's complete population. A release-tier fixture that lacks it must **fail**, not quietly become NOT EVALUATED.
+- Every tier that gates a release (in the case study, STANDARD and FULL; the RELEASE tier in [circuit-reference-validation.md](circuit-reference-validation.md#qualification-failures-and-tiers) adds freeze and publication checks) must contain every gate's complete population. A release-tier fixture that lacks it must **fail**, not quietly become NOT EVALUATED.
 - Decide completeness from fixture **content**, not from the tier's name.
 - Population worsts need not come from the same case. Report per-case diagnostics (cases whose own discretisation error exceeds their own model error) so reviewers see the whole picture.
 
@@ -134,7 +134,7 @@ Framework-specific checks are in the `juce-plugin` skill (`references/production
 - For each rate: worst and median per gate, the worst case's identity, its phase range, and the margin (signed, in dB) to the gate and to any target.
 - For every revision: the old and new numbers side by side, and what changed in the model or criterion.
 - Keep diagnostic measurement modes (rate sweeps, phase studies, production-path comparisons) in the test executable, non-gating, so evidence can be regenerated.
-- Separate model identity (what the audio does) from document/qualification identity (what the evidence says); see the release-integrity section of `circuit-reference-validation.md`.
+- Separate model identity (what the audio does) from document/qualification identity (what the evidence says); see [release integrity and versioning](circuit-reference-validation.md#release-integrity-and-versioning).
 
 ## Checklist
 

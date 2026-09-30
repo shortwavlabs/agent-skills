@@ -45,7 +45,7 @@ Procedure:
 ## Choosing The Minimum Internal Rate
 
 1. Sweep the internal rate densely (not only the power-of-two candidates) over the complete gated case grid.
-2. Separate the smooth trend (error falling roughly with the method's order as the step shrinks) from isolated spikes. Spikes at rates where a test tone has an exact integer number of samples per period are **measurement alignment** effects; evaluate them with a sub-sample phase ensemble (see `validation-gates.md`) rather than choosing rates around them.
+2. Separate the smooth trend (error falling roughly with the method's order as the step shrinks) from isolated spikes. Spikes at rates where a test tone has an exact integer number of samples per period are **commensurate-tone phase sensitivity**: a real, phase-dependent response of the discrete model to a stimulus commensurate with its sample grid, not an FFT or measurement bug, and not by itself evidence of a bad rate band. Do not detune them away: keep them in every-phase absolute gates, use a sub-sample phase ensemble for population and error-budget metrics (see `validation-gates.md`), and check separately whether the effect reaches the production output.
 3. Choose the minimum validated rate from the smooth, phase-averaged behaviour with margin, and keep the exact-period cases as absolute gates.
 4. Record which driver sets it; when the driver is a stiff pole, the requirement does not relax at high host rates.
 
@@ -76,7 +76,7 @@ Polyphase IIR half-band filters have non-linear phase: waveform comparisons of t
 ## Latency And Bypass
 
 - Report the latency the host must compensate (prefer integer latency when the filters allow it) and keep it constant for a given configuration.
-- Report it early (before the first prepare if the framework allows) and update it when the rate or factor changes.
+- If hosts query latency before the first prepare, define a valid pre-prepare policy: report a value then only if it is invariant or can be computed correctly without the host rate, and never invent one. Always report the correct value on prepare and on every reconfiguration, and test the wrappers and hosts you target.
 - Bypass through a dry path delayed by exactly the reported latency, with a crossfade; test that the bypassed output equals the delayed input bit for bit once the crossfade completes.
 - Framework specifics (JUCE latency, bypass parameters, lifecycle) are in the `juce-plugin` skill.
 
@@ -104,6 +104,12 @@ Cache coefficients per control value and stage kind so static controls cost noth
 - [ ] Minimum internal rate chosen from dense, phase-averaged sweeps; exact-period cases kept as absolute gates.
 - [ ] Oversampling factor chosen by an algorithm covering unusual host rates, with a degraded flag.
 - [ ] Production filters measured: alias, broadband, passband, phase, latency, CPU.
-- [ ] Latency reported early and constant; bypass latency-matched and bit-exact.
+- [ ] Latency correct and constant per configuration (reported before prepare only when valid); bypass latency-matched and bit-exact.
 - [ ] Control update cadence chosen from automation measurements.
 - [ ] Back-to-back and live-callback performance reported separately, with solver statistics.
+
+## Sources
+
+- R. E. Bank, W. M. Coughran, W. Fichtner, E. H. Grosse, D. J. Rose and R. K. Smith, "Transient Simulation of Silicon Devices and Circuits," *IEEE Trans. Computer-Aided Design* 4(4), 1985, pp. 436–451: origin of the TR-BDF2 scheme.
+- M. E. Hosea and L. F. Shampine, "Analysis and Implementation of TR-BDF2," *Applied Numerical Mathematics* 20, 1996, pp. 21–37: stability and error properties.
+- JUCE `dsp::Oversampling` class reference (https://docs.juce.com/master/classdsp_1_1Oversampling.html): filter types, `useIntegerLatency`, `getLatencyInSamples()`. Behaviour can change between JUCE versions; check the pinned version.

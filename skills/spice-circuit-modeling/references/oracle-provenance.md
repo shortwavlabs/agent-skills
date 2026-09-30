@@ -11,7 +11,7 @@
 - Reproducibility gates: design, tooling, clean machine
 - Checklist
 
-This reference covers how a SPICE deck becomes a trustworthy, reproducible **oracle** (the frozen reference that DSP, fixtures and derived schematics are checked against). For evidence tags, the four result axes (provenance, evidence relationship, numerical status, hardware resolution) and release/versioning integrity, use the `guitar-dsp` skill's `references/circuit-reference-validation.md`; do not re-invent those taxonomies here.
+This reference covers how a SPICE deck becomes a trustworthy, reproducible **oracle** (the frozen reference that DSP, fixtures and derived schematics are checked against). For evidence tags, the four result axes (provenance, evidence relationship, numerical status, hardware resolution) and release/versioning integrity, use the `circuit-to-dsp` skill's [circuit-reference-validation.md](../../circuit-to-dsp/references/circuit-reference-validation.md); do not re-invent those taxonomies here.
 
 ## Roles Of The Artifacts
 
@@ -31,13 +31,18 @@ Write the policy down in one sentence the next agent cannot miss, for example: "
 
 ## Source-Priority Policy
 
-Rank sources per claim (design intent vs specimen behaviour are different claims; see the claim-specific hierarchy in `circuit-reference-validation.md`). For simulation work add these rules:
+Rank sources per claim (design intent vs specimen behaviour are different claims; see the [claim-specific source hierarchy](../../circuit-to-dsp/references/circuit-reference-validation.md#claim-specific-source-hierarchy)). For simulation work add these rules:
 
-1. The canonical netlist outranks any drawing derived from it; the original schematic outranks the netlist for **transcription** questions.
-2. Manufacturer datasheet values outrank a vendor SPICE model's behaviour when they disagree. A model is an implementation of a datasheet, not a source of truth about the part.
-3. A measured specimen outranks both for claims about that specimen only.
-4. Simulator source code outranks simulator documentation for what a device equation actually computes.
-5. Forum posts, "common knowledge" and other projects' netlists are hypotheses.
+Authority is **claim-specific**; do not force unlike evidence into one global order:
+
+| Claim | Authority |
+| --- | --- |
+| What the circuit is (topology, values) | The original schematic for transcription questions; the canonical netlist for everything derived from it |
+| Published part specifications | The manufacturer datasheet (typical/min/max and the stated conditions) |
+| What a vendor SPICE macro computes | The macro itself, run in the pinned simulator; its disagreement with the datasheet is a finding about the macro, not about the part |
+| How one physical specimen behaves | Calibrated measurements of that specimen, for that specimen only |
+| What a simulator's device equation computes | The simulator's source code for the pinned version, confirmed by its own DC sweeps; the manual is secondary |
+| Anything from forum posts, "common knowledge" or other projects' netlists | A hypothesis to test |
 
 ## Device-Model Labels
 
@@ -45,9 +50,9 @@ Label every device model with one of these and never upgrade a label silently:
 
 | Label | Meaning | Example wording |
 | --- | --- | --- |
-| EXACT MANUFACTURER MODEL | Published by the maker of the exact part number | "Renesas uPC4558 V01.00 model" |
+| EXACT MANUFACTURER MODEL | Published by the maker of the exact part number | "the maker's own model of part X, revision R" |
 | EXACT DEVICE, WRONG GRADE/VARIANT | Right part family and maker, different grade, package, bin or revision | "maker's model for the -Y gain grade; circuit uses -GR" |
-| ELECTRICALLY SIMILAR SUBSTITUTE | Different part with comparable datasheet behaviour | "RC4558 macro used for a uPC4558C" |
+| ELECTRICALLY SIMILAR SUBSTITUTE | Different part with comparable datasheet behaviour | "another maker's X-family macro used for part X" |
 | PROJECT-AUTHORED CALIBRATED MODEL | Written in the project and calibrated to named datasheet figures | "datasheet-calibrated project model" |
 | GENERIC FALLBACK | Default or textbook card | "generic silicon diode, IS/N only" |
 | DIAGNOSTIC CONTROL | Deliberately idealised model used only to separate circuit behaviour from model behaviour | "linear single-pole op-amp control" |
@@ -72,17 +77,27 @@ Record:
 
 | Item | Why |
 | --- | --- |
-| SHA-256 of the canonical netlist and every project model library | Any edit is a model change until proven otherwise |
-| SHA-256 and byte size of every external model file | Detect replaced or corrupted collections |
-| SHA-256 of the **used card text** (`.model` + continuations, or `.subckt` ... `.ends`) | An unrelated edit elsewhere in a large vendor library passes; any change to the used card fails |
+| SHA-256 and size of the canonical netlist and every project model library | Any edit is a model change until proven otherwise |
+| SHA-256 and size of every external model file | Detect replaced or corrupted collections |
+| SHA-256 of the **used card text** (`.model` + continuations, or `.subckt` ... `.ends`) | Names the card that changed, and is the hard identity under the `used_cards` policy |
+| Per-file hash policy | Decides whether the whole file or only the used cards must match (below) |
 | Simulator identity string and version | Device equations and defaults change between versions |
 | Required build features (for example a direct sparse solver such as KLU) | Some decks only converge with a particular solver |
-| Required options present in the deck (for example `.options klu`) | A dropped option silently changes numerics |
+| Required text in the deck (for example `.options klu`) | A dropped option silently changes numerics |
 | The exact card-hash rule | So another implementation can reproduce the hashes |
 
-On mismatch, print kind, name, path, expected and actual values for **every** mismatch (not just the first), and exit non-zero before simulating. Prove the failure path with deliberate corruptions (wrong card hash, wrong file hash, wrong project hash, wrong simulator version, missing file), and make sure the fixture generator also refuses to write anything when the check fails.
+**Hash policy, per file:**
 
-`scripts/spice_manifest.py` implements this (`make`, `check`, `hash`, `--self-test`). Its card rule reproduces the common "`.model` line plus `+` continuations, each stripped, joined with `\n`" convention.
+| Policy | Hard requirement | Use for |
+| --- | --- | --- |
+| `strict_file` (default) | Whole-file SHA-256 and size. Used-card hashes are checked too and name the card that changed. **Any** edit anywhere in the file fails. | The netlist, project libraries, and any external file small enough, or stable enough, to pin exactly |
+| `used_cards` | Used-card hashes only. The whole-file hash and size are still recorded and reported as advisories when they differ. | Large external collections where unrelated edits elsewhere must not block, provided every card the deck uses is listed |
+
+Choose `used_cards` deliberately and per file; never for the netlist or project libraries. Under `used_cards` a change to a card the deck uses but the manifest does not list goes undetected, so list every used card from that file.
+
+On mismatch, print kind, name, path, expected and actual values for **every** mismatch (not just the first), and exit non-zero before simulating. Prove the failure path with deliberate corruptions (wrong card hash, renamed or missing card, wrong file hash, wrong project hash, wrong simulator version, missing feature, missing required text, missing file), under both policies, and make sure the fixture generator also refuses to write anything when the check fails.
+
+`scripts/spice_manifest.py` implements this: `make` records files (`--file`), used cards (`--card PATH=NAME`), the per-file policy (`--used-cards PATH`), the simulator command with its detected or given version, required features, required deck text (`--require-text PATH=REGEX`) and the external root; `check` verifies all of it; `--self-test` exercises both policies. Its card rule reproduces the common "`.model` line plus `+` continuations, each stripped, joined with `\n`" convention.
 
 Keep external model roots configurable (a manifest root plus an environment-variable or CLI override) so another machine can point at its own copy of the same collection without editing the deck.
 

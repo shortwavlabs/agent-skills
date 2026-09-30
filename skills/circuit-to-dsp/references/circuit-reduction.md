@@ -155,3 +155,9 @@ Define, from measurements, the input range in which the model is claimed to be f
 - [ ] Exact DC reset implemented and tested.
 - [ ] Automation validated against a time-varying reference.
 - [ ] Fidelity envelope derived and documented.
+
+## Sources
+
+- D. T. Yeh, J. S. Abel and J. O. Smith, "Automated Physical Modeling of Nonlinear Audio Circuits for Real-Time Audio Effects—Part I," *IEEE Trans. Audio, Speech, Lang. Process.* 18(4), 2010: nodal DK method.
+- M. Holters and U. Zölzer, "A Generalized Method for the Derivation of Non-Linear State-Space Models from Circuit Schematics," EUSIPCO 2015.
+- K. J. Werner, V. Nangia, J. O. Smith and J. S. Abel, "Resolving Wave Digital Filters with Multiple/Multiport Nonlinearities," DAFx-15, 2015: wave digital filters with several nonlinearities.

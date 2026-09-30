@@ -148,7 +148,7 @@ Check numerical sensitivity where it could change the conclusion:
 - Reduce transient maximum step and tighten tolerances until the relevant metrics stabilize. Output sample spacing is not necessarily the internal integration step.
 - Record integration method and assess its damping; investigate artificial ringing or suppressed dynamics before retuning DSP.
 - Inspect convergence aids, conductance/leakage paths and resistor floors for unintended loading, especially near open circuits and control endpoints.
-- Verify initialization, capacitor charge, settling, temperature and device defaults. An ideal source can remove real pickup/interstage loading.
+- Verify initialization, capacitor charge, settling, temperature and device defaults. An ideal source can remove real source (for example pickup) and interstage loading.
 - Reject missing/nonfinite data, incomplete time windows, singular-node failures and failed analyses even if the process exits successfully.
 
 Simulator mechanics that decide whether a SPICE deck can be trusted at all (`.ic` versus `.nodeset`, iteration limits and stepping fallbacks, solver choice, statement-order stress, operating-state assertions for bistable circuits, device-model qualification, KiCad export parity and hash manifests) are covered by the `spice-circuit-modeling` skill.
@@ -215,7 +215,7 @@ Choose fixtures for specific questions; use the following order where applicable
 | Controls | Representative control grid at small signal | Taper, endpoints, switch branches and interaction behave as intended |
 | Large signal | Stepped sine amplitude; static sweep where meaningful; two-tone probe when needed | Transfer shape, peak/RMS, gain compression, clipping onset/asymmetry, harmonic spectrum/THD, even/odd balance, DC/bias shift, intermodulation |
 | Memory | Bursts, amplitude steps, low-frequency overload, repeated transients, silence after overload | Charge/discharge, bias movement, bypass dynamics, sag, attack/release, blocking and recovery; hysteresis-like/load dynamics when modeled |
-| Combined system | Same deterministic probes plus controlled guitar renders | Stage interactions, musical behavior, existing routing/host contracts and adjacent operating regions remain acceptable |
+| Combined system | Same deterministic probes plus controlled program-material renders (for example DI guitar for a guitar product) | Stage interactions, musical behavior, existing routing/host contracts and adjacent operating regions remain acceptable |
 
 Confirm the small-signal regime by reducing the transient/DSP amplitude and checking gain invariance. Stay above quantization, LUT and measurement noise floors. AC analysis linearizes about a bias point and cannot predict large-signal clipping or recovery. A finite-amplitude transient is not automatically a small-signal transfer measurement.
 
@@ -356,7 +356,7 @@ For static reference parity, wait until parameter smoothing has settled or provi
 
 Prefer the smallest reusable representation that covers the inventoried behaviors. Reuse should follow the numerical architecture: state-space, WDF, MNA or analytically collapsed networks may be the authoritative reusable representation, so resistors, capacitors and transistors need not each become an independent runtime object. Centralize repeated behavior at that representation. Avoid both a monolithic hand-expanded `processSample()` full of duplicate equations and a heap-allocated virtual object for every trivial passive element. Construct/allocate outside the callback and preserve per-channel state; reference completeness does not require a general-purpose realtime SPICE engine.
 
-Use [cpp-juce-dsp-modeling.md](cpp-juce-dsp-modeling.md) for production block structure, [aliasing-oversampling.md](aliasing-oversampling.md) for numerical boundaries, and [diode-and-fuzz-circuits.md](diode-and-fuzz-circuits.md) for nonlinear primitives/solvers. Their musical approximation options do not authorize changing a frozen fidelity contract.
+Use [circuit-reduction.md](circuit-reduction.md), [nonlinear-solvers.md](nonlinear-solvers.md) and [integrators-and-rates.md](integrators-and-rates.md) for the model structure, nonlinear primitives/solvers and numerical boundaries. For guitar products, the `guitar-dsp` skill's [cpp-juce-dsp-modeling.md](../../guitar-dsp/references/cpp-juce-dsp-modeling.md), [aliasing-oversampling.md](../../guitar-dsp/references/aliasing-oversampling.md) and [diode-and-fuzz-circuits.md](../../guitar-dsp/references/diode-and-fuzz-circuits.md) add block structure and musical approximation options. Those options do not authorize changing a frozen fidelity contract.
 
 ### Realtime Translation Error Budget
 
@@ -378,13 +378,13 @@ Where practical, compare the frozen analog/reference result, a high-rate/offline
 
 ## Automate And Report
 
-Keep simulator execution, file parsing, allocation, plots and heavy measurement offline in tests, analysis executables or scripts. None belongs in the production audio callback. Follow [validation-and-release.md](validation-and-release.md) for runtime and host gates.
+Keep simulator execution, file parsing, allocation, plots and heavy measurement offline in tests, analysis executables or scripts. None belongs in the production audio callback. Follow the `juce-plugin` skill's [production-plugin-practices.md](../../juce-plugin/references/production-plugin-practices.md) (and, for guitar products, `guitar-dsp`'s [validation-and-release.md](../../guitar-dsp/references/validation-and-release.md)) for runtime and host gates, and [validation-gates.md](validation-gates.md) for gate design.
 
 Reuse existing harnesses before extracting another tool. A repeatable harness should generate deterministic stimuli/control cases, run or load versioned reference results, run actual DSP, validate outputs, align/analyze them, emit tables/plots and machine-readable results, and return failures for breached tolerances. Record failures/timeouts as failures, not missing rows in a passing report. Keep originals immutable and name controlled variants explicitly.
 
 Keep routine regressions compact: operating points, response tables, selected traces and harmonic summaries with source/device revisions, settings, configuration, units and regeneration command. For a frozen release, also retain the bounded raw golden capture and settling history required for independent reconstruction above. Archive large exploratory runs only when their evidence is needed; do not create redundant captures for documentation or checksum changes.
 
-The existing [compare_audio_metrics.py](../scripts/compare_audio_metrics.py) can compare calibrated PCM WAV renders for lag, polarity, residual and DC metrics; it averages multichannel files to mono. Use separate channel renders when testing channel differences. It does not establish circuit-node equivalence or parse adaptive SPICE traces. Extract a new helper only when its inputs/units are explicit, its ports/controls are parameterized, deterministic tests are available, and it runs without proprietary project files or build-specific paths.
+The `guitar-dsp` skill's [compare_audio_metrics.py](../../guitar-dsp/scripts/compare_audio_metrics.py) can compare calibrated PCM WAV renders for lag, polarity, residual and DC metrics; it averages multichannel files to mono. Use separate channel renders when testing channel differences. It does not establish circuit-node equivalence or parse adaptive SPICE traces. Extract a new helper only when its inputs/units are explicit, its ports/controls are parameterized, deterministic tests are available, and it runs without proprietary project files or build-specific paths.
 
 ### Qualification Failures And Tiers
 

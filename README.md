@@ -8,6 +8,14 @@ AI coding agent skills for audio development workflows.
 npx skills add shortwavlabs/agent-skills
 ```
 
+## Validation
+
+```bash
+python3 scripts/validate_skills.py
+```
+
+Runs every skill script's `--self-test` (normally and under `python -O`), checks every relative Markdown link and anchor, validates SKILL.md frontmatter and `agents/openai.yaml`, and scans for leaked absolute user paths and embedded vendor model text. Standard library only; exits non-zero on any problem.
+
 ## Skills
 
 ### plugdata-patch
@@ -188,7 +196,6 @@ skills/guitar-dsp/
 │   └── receptive_field.py            Conv1D receptive-field calculator
 └── references/
     ├── aliasing-oversampling.md      Aliasing diagnosis, oversampling islands, ADAA, alias probes
-    ├── circuit-reference-validation.md  Schematic/SPICE reference comparison: provenance, measurement contracts, stage comparison, golden captures, release integrity
     ├── cpp-juce-dsp-modeling.md      C++/JUCE block modeling lessons for guitar effects
     ├── diode-and-fuzz-circuits.md    Diode clipping, feedback solvers, fuzz bias/loading behavior
     ├── example-prompts.md            Realistic prompts for testing and demonstrating skill use
@@ -228,7 +235,8 @@ Two skills cover circuit-accurate modeling end to end, and route to the existing
 |------|-------|
 | Simulator setup and netlist mechanics, model provenance and hashing, numerical convergence, statement-order stress, device-model qualification, KiCad ↔ SPICE parity, golden-data generation | [spice-circuit-modeling](skills/spice-circuit-modeling/SKILL.md) |
 | Circuit reduction, state inventory, reduced op-amps, nonlinear solvers and table proofs, integrator/rate/oversampling evidence, exact reset, automation, validation-gate design, end-to-end playbook | [circuit-to-dsp](skills/circuit-to-dsp/SKILL.md) |
-| Reference-circuit verification checklist and comparing DSP against a circuit reference: source hierarchy, evidence axes, measurement contract, stage comparison, golden captures, drift, release integrity (instrument-agnostic despite living in `guitar-dsp`); guitar-specific tone and calibration | [guitar-dsp](skills/guitar-dsp/SKILL.md) ([circuit-reference-validation.md](skills/guitar-dsp/references/circuit-reference-validation.md)) |
+| Reference-circuit verification and comparing DSP against a circuit reference: claim-specific source hierarchy, result axes, measurement contract (digital ↔ volts calibration, electrical vs panel pot position), stage comparison, golden captures, drift, release integrity | [circuit-to-dsp](skills/circuit-to-dsp/SKILL.md) ([circuit-reference-validation.md](skills/circuit-to-dsp/references/circuit-reference-validation.md)) |
+| Guitar-specific signal chain, drive and control feel, tone and product decisions (the digital ↔ volts calibration contract itself lives in circuit-reference-validation) | [guitar-dsp](skills/guitar-dsp/SKILL.md) |
 | Measurement methodology: spectra, windows, coherent tones, sub-sample phase ensembles, error metrics | [dsp-engineer](skills/dsp-engineer/SKILL.md) |
 | Realtime filter and numerical building blocks | [dsp](skills/dsp/SKILL.md) |
 | AudioProcessor/APVTS, lifecycle, latency/bypass APIs, CMake, formats, host validation | [juce-plugin](skills/juce-plugin/SKILL.md) |
@@ -245,9 +253,9 @@ Build, qualify and freeze trustworthy SPICE/ngspice circuit references ("oracles
 skills/spice-circuit-modeling/
 ├── SKILL.md                         Principles, workflow, reference routing, scripts
 ├── scripts/
-│   ├── spice_manifest.py            Hash-pin netlists, libraries, used .model/.subckt cards, simulator version; fail before simulating
-│   ├── netlist_compare.py           Structural equivalence of a derived netlist (e.g. KiCad export) vs the oracle, with mutation self-check
-│   └── spice_order_stress.py        Unique keyed statement-order permutations; failures and wrong states counted per engine
+│   ├── spice_manifest.py            Hash-pin files (strict_file or used_cards policy), used .model/.subckt cards, simulator version, features, deck text; fail before simulating
+│   ├── netlist_compare.py           Fail-closed structural equivalence of a derived netlist (e.g. KiCad export) vs the oracle, with mutation self-check
+│   └── spice_order_stress.py        Unique keyed statement-order permutations with a logical-statement identity proof; failures and wrong states per engine
 └── references/
     ├── oracle-provenance.md         Artifact roles, source priority, model labels, freeze rules, manifests, licensing, reproducibility gates
     ├── numerical-qualification.md   Analyses, initial conditions, solver/tolerance settings, convergence studies, order stress, bistable states
@@ -258,7 +266,7 @@ skills/spice-circuit-modeling/
 
 All scripts are standard-library Python with `--self-test`.
 
-**Relationship:** hands its frozen oracle and fixtures to `circuit-to-dsp`; uses `guitar-dsp`'s circuit-reference validation for evidence taxonomies and release integrity; uses `dsp-engineer` for measurement methodology.
+**Relationship:** hands its frozen oracle and fixtures to `circuit-to-dsp`, whose circuit-reference validation owns evidence taxonomies and release integrity; uses `dsp-engineer` for measurement methodology.
 
 ### circuit-to-dsp
 
@@ -272,6 +280,7 @@ Turn a validated analog circuit reference into a bounded realtime DSP model and 
 skills/circuit-to-dsp/
 ├── SKILL.md                         Principles, end-to-end playbook with owners, reference routing
 └── references/
+    ├── circuit-reference-validation.md  Reference verification, source hierarchy, result axes, measurement contracts, stage comparison, golden captures, release integrity
     ├── circuit-reduction.md         Formulation choice, physics partition, simplification tests, state inventory, reduced op-amps, reset, automation, envelope
     ├── nonlinear-solvers.md         KCL residuals, feedback clipping, monotone scalar solvers, solver memory, fuzzing, device laws, table proofs
     ├── integrators-and-rates.md     Integrator comparison, internal rate, oversampling policy, production filters, latency/bypass, coefficient cadence, performance
@@ -279,7 +288,7 @@ skills/circuit-to-dsp/
     └── case-study-sd1-overdrive.md  Labelled case study: decisions and surprises from an op-amp diode-clipper overdrive plugin
 ```
 
-**Relationship:** consumes the oracle and fixtures from `spice-circuit-modeling`; defers comparison contracts and release integrity to `guitar-dsp`'s circuit-reference validation, measurement methodology to `dsp-engineer`, building blocks to `dsp`, and plugin integration and host validation to `juce-plugin`.
+**Relationship:** consumes the oracle and fixtures from `spice-circuit-modeling`; owns the instrument-agnostic circuit-reference validation (moved here from `guitar-dsp`, which keeps a pointer and its guitar-specific decisions); defers measurement methodology to `dsp-engineer`, building blocks to `dsp`, and plugin integration and host validation to `juce-plugin`.
 
 ### dsp
 

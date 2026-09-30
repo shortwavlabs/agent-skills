@@ -48,7 +48,7 @@ Keep gain decisions visible and stable:
 - Input trim is pre-pedal and pre-amp.
 - Pedal output gain belongs after the pedal and before the amp.
 - Amp input gain should drive the neural or physical amp model.
-- Place a modeled master/output control at its verified circuit location; it can change loading and drive into later stages. Keep final utility trim separate. Use [circuit-reference-validation.md](circuit-reference-validation.md) when checking circuit parity.
+- Place a modeled master/output control at its verified circuit location; it can change loading and drive into later stages. Keep final utility trim separate. Use [circuit-reference-validation.md](../../circuit-to-dsp/references/circuit-reference-validation.md) when checking circuit parity.
 - Output gain is final trim.
 - Output meters and clip indicators should read after final trim.
 

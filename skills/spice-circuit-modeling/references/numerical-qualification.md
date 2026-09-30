@@ -13,7 +13,7 @@
 - Multiple engines and versions
 - Checklist
 
-General numerical-qualification criteria (declared limits, threshold searches, `UNQUALIFIED_NUMERICAL` versus `FAIL`, rejecting incomplete windows) live in the `guitar-dsp` skill's `references/circuit-reference-validation.md`. This reference adds the simulator-level mechanics that decide whether an ngspice-style oracle can be trusted.
+General numerical-qualification criteria (declared limits, threshold searches, `UNQUALIFIED_NUMERICAL` versus `FAIL`, rejecting incomplete windows) live in the `circuit-to-dsp` skill's [circuit-reference-validation.md](../../circuit-to-dsp/references/circuit-reference-validation.md). This reference adds the simulator-level mechanics that decide whether an ngspice-style oracle can be trusted.
 
 ## "Converged" Is Not "Accurate"
 
@@ -59,7 +59,7 @@ Record every setting that changes numerics in the manifest and the fixture metad
 | Compatibility mode (ngspice `ngbehavior` in `.spiceinit`: `ltpsa`, `psa`, `hs`...) | Changes parsing and defaults for vendor models; the same deck may behave differently without it |
 | Temperature (`.temp`, `TNOM`) | Device equations are temperature dependent; state it |
 
-Adaptive transient output has non-uniform timestamps. Resample onto a uniform grid with a documented method (or integrate with actual time intervals) before any FFT, and keep the window boundaries exact. The measurement-contract rules are in `circuit-reference-validation.md`.
+Adaptive transient output has non-uniform timestamps. Resample onto a uniform grid with a documented method (or integrate with actual time intervals) before any FFT, and keep the window boundaries exact. The measurement-contract rules are in [circuit-reference-validation.md](../../circuit-to-dsp/references/circuit-reference-validation.md#align-signals-and-interpret-metrics).
 
 ## Timestep And Tolerance Convergence Study
 
@@ -92,7 +92,7 @@ Matrix ordering, pivoting and initial guesses depend on the order of statements.
 Procedure (implemented by `scripts/spice_order_stress.py`):
 
 1. Reorder only top-level element statements; keep continuation lines with their statement; keep the title, directives, `.subckt` and `.control` blocks in place.
-2. Prove every variant is the same circuit (same multiset of statements, not the original order) before running.
+2. Prove every variant is the same circuit before running: fixed statements unchanged in place, and the same multiset of whole logical element statements (continuation lines attached to their parent), not the original order. Comparing sorted physical lines is not enough: it cannot see a continuation moved under the wrong element.
 3. Draw orders from a **keyed** generator: order `id` of stream `s` comes from `Random(f"{seed}:{s}:{id}")`. Deduplicate and report the number of **unique** orders.
 4. Use separate streams for separate corpora (primary operating states, control endpoints) and report their overlap.
 5. Run the **same order file** in every engine and state (a matched set), so engines and states are compared order for order.
@@ -124,3 +124,8 @@ Size the corpus to the claim: a handful of failures in a few thousand orders is 
 - [ ] `.ic`/`.nodeset`/`itl1` aids documented as scaffolding and retested after changes.
 - [ ] Order stress: unique keyed orders, matched across engines, failures and wrong states counted separately.
 - [ ] Every engine version that will be used (CLI and GUI) exercised on the same decks.
+
+## Sources
+
+- The ngspice User's Manual for the pinned version (https://ngspice.sourceforge.io/docs.html): `.options` (`itl1`, `itl4`, `reltol`, `abstol`, `vntol`, `gmin`, `method`, `klu`), `.ic` versus `.nodeset`, gmin and source stepping, and compatibility modes (`ngbehavior` in `.spiceinit`). Option names and defaults change between versions; check the manual that matches the pinned simulator.
+- L. W. Nagel, *SPICE2: A Computer Program to Simulate Semiconductor Circuits*, UC Berkeley ERL Memo M520, 1975: Newton iteration, junction voltage limiting and timestep control that SPICE descendants still use.

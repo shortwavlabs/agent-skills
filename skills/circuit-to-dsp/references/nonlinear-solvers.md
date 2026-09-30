@@ -45,11 +45,16 @@ If the residual can be written as
 r(v) = G·v + I(v) − p,   with G > 0 and I′(v) ≥ 0 everywhere
 ```
 
-then `r′(v) ≥ G > 0`: the residual is strictly increasing and has **exactly one root** for every right-hand side `p`. This is the property to aim for. It gives:
+then `r′(v) ≥ G > 0` wherever `I` is differentiable: the residual is strictly increasing, so it has **at most one** root. Existence needs more:
 
-- existence and uniqueness every step (no wrong-branch solutions, no chattering between roots);
-- a bracket that always contains the root and shrinks safely;
-- a guarantee that any safeguarded method converges.
+- if `I` is finite and continuous on the whole real line, `r(v) − G·v` is non-decreasing, so `r(v) → ±∞` as `v → ±∞` and a root exists for every `p`;
+- on a restricted domain (a table range, a clamped or overflowing exponential), existence needs an explicit sign-changing bracket `r(a) < 0 < r(b)` inside the domain.
+
+With both, the solve has exactly one root, and it supports a unique, bounded safeguarded solve when a valid bracket is maintained and the device law remains finite:
+
+- no wrong-branch solutions and no chattering between roots;
+- a bracket that contains the root and shrinks safely;
+- guaranteed convergence of a bracketing safeguard (bisection fallback) within the bracket.
 
 Check the conditions on the law actually shipped (for a table, on the interpolant, not only on the analytic equation) and on every operating mode (rails, cutoffs) that changes G or p.
 
@@ -63,7 +68,7 @@ A pattern that worked well:
 4. **Convergence test before the bracket guard**: accept when |Δv| is below the tolerance (for example 1 nV), so a converged step is never rejected by the guard.
 5. **Fixed cap** on evaluations per solve, then a deterministic fallback (the bracket midpoint). Count cap hits: in normal operation there should be none.
 
-Keep the solver per channel, allocation-free, and in double precision.
+Keep the solver per channel and allocation-free. Start and qualify it in double precision; single precision is acceptable only if parity, convergence margin and the stress corpora establish it.
 
 ## Solver Memory And Statistics
 
@@ -95,7 +100,7 @@ A table replaces an expensive law in the callback. The table is then the model, 
 | C¹ continuity | Derivative jump at knots near rounding level |
 | Value and derivative error | Dense comparison against the analytic law (many points per interval); report both relative current error and the resulting **voltage** error, which is what circuit gates see |
 | Kinks | Intervals containing a law branch point: check their derivative ratio and error separately |
-| Outside the range | Linear extrapolation from the edge value and slope (monotone and C¹); never fall back to an analytic law that is not monotone at extreme arguments |
+| Outside the range | The outside-range policy must preserve the solver invariants (monotonicity, finiteness, C¹ where the solver needs it). Linear extrapolation from the edge value and slope is one safe option; an analytic law that is not monotone or finite at extreme arguments is not |
 | Reachability | Count evaluations outside the table range in the stress corpora; normally zero |
 
 Evaluate exactly the stored coefficients in the proof, the same ones the solver uses.
@@ -113,3 +118,9 @@ For genuinely coupled nonlinearities, use a small vector Newton with the same sa
 - [ ] Solver memory re-evaluated at the returned root.
 - [ ] Synthetic and time-series fuzzing: zero cap hits, zero non-finite.
 - [ ] Device law verified against the simulator; table proven monotone on the shipped interpolant.
+
+## Sources
+
+- F. N. Fritsch and R. E. Carlson, "Monotone Piecewise Cubic Interpolation," *SIAM J. Numer. Anal.* 17(2), 1980, pp. 238–246: the monotonicity region for cubic Hermite data used in the table checks.
+- L. W. Nagel, *SPICE2*, UC Berkeley ERL Memo M520, 1975: logarithmic junction-voltage limiting (the origin of SPICE-style step limiting).
+- The pinned simulator's device source (see the `spice-circuit-modeling` skill's device-model-qualification reference) for the law being tabulated.

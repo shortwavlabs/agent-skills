@@ -93,7 +93,7 @@ Use oversampling when it solves a measured and audible problem.
 2. **Improve the transfer and filtering first** when the shaper is a placeholder or pre/post bandwidth is obviously wrong.
 3. **Use a local 2x island** for moderate clipping where 5 to 7 kHz probes fail at 44.1/48 kHz.
 4. **Use a local 4x island** for high-gain drives and fuzzes where 2x still leaves obvious aliases.
-5. **Use 8x only for research or extreme cases** when CPU, latency, and listening justify it.
+5. **Use 8x or higher only when measured evidence justifies the cost**: aliasing that 4x does not remove, stiff states, discretisation error or solver accuracy in a circuit model (see below), weighed against CPU, latency and listening.
 6. **Avoid full-chain oversampling by default** because it wastes CPU on clean filters, utility blocks, cabinet convolution, delay/reverb, and routing.
 
 This ladder is driven by aliasing. For circuit-accurate models the internal rate can instead be set by stiff analog poles (op-amp gain-bandwidth, small capacitances), frequency warping, solver accuracy or explicit coupling lags; such a requirement does not relax at high host rates and may justify an island rate well above what aliasing alone needs. Choose it from decomposed discretisation error across dense rate sweeps, and derive the factor with an algorithm that covers unusual host rates. See the `circuit-to-dsp` skill's `references/integrators-and-rates.md`.

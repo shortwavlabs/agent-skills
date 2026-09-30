@@ -57,7 +57,7 @@ Isolated fidelity is necessary, not sufficient. In the full circuit, with each c
 2. Start-up: transient start in every state and at control endpoints.
 3. Operating point before AC: in the intended state (see `numerical-qualification.md`).
 4. Statement-order stress in stages: a small screening corpus first, then larger corpora only for survivors; same orders in every engine.
-5. Settled behaviour differences versus the incumbent model, attributed to specific model properties (for example "input bias current 140 → 57 nA shifts the idle offset across the clipping diodes, raising small-signal gain 0.8 dB").
+5. Settled behaviour differences versus the incumbent model, attributed to specific model properties (case-study example: "input bias current 140 → 57 nA shifts the idle offset across the clipping diodes, raising small-signal gain 0.8 dB").
 6. Downstream consequences: validator windows or expected values that were tuned to the old model's behaviour (supply current, sag) must be recentred **with evidence**, not widened.
 
 Reject a candidate at the first stage it fails and report where. A vendor model that fails start-up or order stress is not rescued by its part number.
@@ -66,13 +66,13 @@ Reject a candidate at the first stage it fails and report where. A vendor model 
 
 Decide with an explicit, ordered criteria list written before the results are known, for example:
 
-1. Parses and converges in every required engine.
-2. Zero order-stress failures and zero wrong states in the declared corpus.
-3. Circuit behaviour checks pass.
-4. Datasheet fidelity for the properties that matter.
-5. Provenance quality (exact > substitute), licence and maintainability.
+- parses and converges in every required engine;
+- zero order-stress failures and zero wrong states in the declared corpus;
+- the circuit's behaviour checks pass;
+- datasheet fidelity for the properties that matter;
+- provenance quality (exact > substitute), licence and maintainability.
 
-Robustness outranks provenance for an oracle: an oracle that fails for some statement orders is not an oracle. Document the rejected candidates and why.
+These are joint requirements, not a ranking to trade away. Exact-part provenance is valuable evidence, but it does not override demonstrated numerical fragility or wrong in-circuit behaviour: an oracle that fails for some statement orders cannot serve as an oracle whatever its part number. Conversely, a robust model with the wrong behaviour for this circuit is not acceptable either. Document every rejected candidate and the requirement it failed.
 
 ## Project-Authored Calibrated Models
 
@@ -86,10 +86,12 @@ Writing a model can be the right answer when vendor macros are solver-fragile or
 - target-circuit parity against the previous accepted model is measured and explained;
 - the file is labelled "datasheet-calibrated project model", never "manufacturer model".
 
+A project-authored model is calibrated to published typical figures; it is not hardware truth, and it does not reproduce part-to-part spread or behaviours it was not calibrated for.
+
 Design notes that generalise:
 
-- Prefer physical, monotone device-level structures (transistor-level stages with ratio-trimmed mirrors) over high-gain controlled-source loops and clamps. Very high-gain polynomial output stages, clamps referenced a fixed distance inside the rails (they cross when the supply is low) and resistor-programmed supply currents all create regions where Newton or its fallbacks fail.
-- Local feedback helpers inside the model (for example a beta-helper mirror) can hurt Newton convergence from `.nodeset` starts; test operating-point selection after every structural edit.
+- Physical, monotone device-level structures (transistor-level stages with ratio-trimmed mirrors) are a reasonable starting point. Treat very high-gain polynomial output stages, clamps referenced a fixed distance inside the rails (they can cross when the supply is low) and resistor-programmed supply currents as **suspects** when a macro is fragile, and test them; they are not proven causes in general.
+- Local feedback helpers inside a model (for example a beta-helper mirror) were observed in one project to break Newton convergence from `.nodeset` starts; test operating-point selection after every structural edit.
 - Calibrate with the same benchmark decks used to evaluate vendor candidates so the comparison is apples to apples.
 
 ## Device-Law Details That Matter At Millivolt Parity
@@ -115,8 +117,8 @@ Procedure:
 
 *Case study (SD-1 overdrive, one project; values are specific to it):*
 
-- The only exact-part vendor macro failed the circuit's first transient step. Four substitute macros failed start-up, operating-point selection or order stress; one failed 311 of 2000 randomised orders because its output clamps crossed below about 5 V of supply and its polynomial output stage had a gain near 6e6. A transistor-level datasheet-calibrated project model had 0 failures in 35,500 runs across two engines.
-- The project model moved results in explainable ways: pedal supply current 2.35 → 4.13 mA (the pedal's published figure is 4 mA), input bias current 140 → 57 nA (datasheet 60 nA), which raised small-signal gain 0.8 dB through the diode idle offset.
+- The only exact-part vendor macro failed the circuit's first transient step. Four substitute macros failed start-up, operating-point selection or order stress; one failed 311 of 2000 randomised orders. Inspection of that macro found output clamps that cross below about 5 V of supply and a polynomial output stage with gain near 6e6; these were suspected contributors, but no single root cause was proven. A transistor-level datasheet-calibrated project model had 0 failures in 35,500 runs across two engines.
+- The project model moved results in explainable ways: pedal supply current 2.35 → 4.13 mA (the pedal's published figure is 4 mA), input bias current 140 → 57 nA (datasheet 60 nA); the project's evaluation attributed a 0.8 dB rise in small-signal gain to the resulting change in the diode idle offset.
 - The realtime diode law initially continued the forward recombination term into reverse bias. The simulator freezes it below −3·N·Vt. A coarse branch sweep reported 0.81 mV worst error; a 1 nA-resolution sweep found 1.27 mV. With the freeze implemented the error was 0.68 mV.
 
 ## Checklist
@@ -125,6 +127,12 @@ Procedure:
 - [ ] A diagnostic control model is included.
 - [ ] Isolated benchmark covers the properties this circuit exercises, under datasheet and circuit conditions.
 - [ ] In-circuit: regression, start-up, pre-AC operating point, staged order stress, settled differences attributed.
-- [ ] Selection criteria written before results; robustness outranks part-number provenance.
+- [ ] Selection criteria written before results; provenance, fidelity, compatibility and robustness satisfied jointly.
 - [ ] Project-authored models carry a calibration table, simplifications, exclusions and the correct label.
 - [ ] Realtime device laws verified against the simulator source and a sufficiently fine DC sweep.
+
+## Sources
+
+- ngspice source tree for the pinned version (https://sourceforge.net/projects/ngspice/, `src/spicelib/devices/<device>/`, e.g. `dio/dioload.c` for the junction diode): the authority for what a device card computes, including branch thresholds and frozen terms.
+- The ngspice User's Manual for the pinned version (https://ngspice.sourceforge.io/docs.html): device model parameters and their defaults.
+- The part's datasheet (with its revision) for every calibration target; record the table entry or curve used.
