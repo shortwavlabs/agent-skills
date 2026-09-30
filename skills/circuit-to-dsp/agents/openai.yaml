@@ -1,0 +1,4 @@
+interface:
+  display_name: "Circuit To DSP"
+  short_description: "Circuit/SPICE references to proven realtime DSP"
+  default_prompt: "Use $circuit-to-dsp to turn a validated SPICE circuit into a realtime DSP model with evidence-based solvers, rates and validation gates."

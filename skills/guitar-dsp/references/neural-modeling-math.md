@@ -19,7 +19,7 @@
 This reference distills the mathematical model and evaluation theory from:
 
 ```text
-/Users/shortwavlabs/Workspace/shortwavlabs/rtneural-trainer/paper/arxiv/main.tex
+rtneural-trainer project: paper/arxiv/main.tex
 ```
 
 The paper is an applied research report on aliasing-aware, RTNeural-compatible WaveNet modeling of guitar amplifier and pedal captures. Treat the formulas here as engineering tools for implementing and evaluating neural guitar DSP, not as proof that one architecture dominates all amp-modeling problems.

@@ -59,7 +59,7 @@ Work from audible symptom to a measurable check. Avoid changing several tone var
 
 ## Circuit-Reference Mismatches
 
-Use the [mismatch triage table](circuit-reference-validation.md#isolate-the-mismatch) when DSP and a schematic-derived executable reference disagree. Locate the first divergent equivalent stage, then classify gain, response, control, nonlinear, dynamic or numerical error before changing coefficients. Check reference/harness validity and intentional approximation as well as DSP; do not compensate an upstream defect with downstream EQ or output normalization.
+Use the [mismatch triage table](../../circuit-to-dsp/references/circuit-reference-validation.md#isolate-the-mismatch) when DSP and a schematic-derived executable reference disagree. Locate the first divergent equivalent stage, then classify gain, response, control, nonlinear, dynamic or numerical error before changing coefficients. Check reference/harness validity and intentional approximation as well as DSP; do not compensate an upstream defect with downstream EQ or output normalization.
 
 ## Host And Product Integration Failures
 

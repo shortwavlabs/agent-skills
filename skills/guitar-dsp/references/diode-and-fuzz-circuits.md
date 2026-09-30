@@ -139,7 +139,7 @@ Keep full-chain oversampling as a last resort.
 
 ## Measurement And Tests
 
-Use [circuit-reference-validation.md](circuit-reference-validation.md) for nonlinear SPICE/reference checks: align source/load and bias, compare control/level grids at equivalent stages, then isolate clipping onset, feedback and charge/recovery differences before retuning.
+Use [circuit-reference-validation.md](../../circuit-to-dsp/references/circuit-reference-validation.md) for nonlinear SPICE/reference checks: align source/load and bias, compare control/level grids at equivalent stages, then isolate clipping onset, feedback and charge/recovery differences before retuning.
 
 Measure:
 

@@ -52,7 +52,7 @@ Rules:
 
 ## Circuit-To-DSP Translation
 
-For a schematic fidelity target, use [circuit-reference-validation.md](circuit-reference-validation.md) to verify topology and measurable stage behavior before musical calibration. Reuse the production processing path in an offline harness; do not replace it with a second implementation that can conceal runtime errors.
+For a schematic fidelity target, use [circuit-reference-validation.md](../../circuit-to-dsp/references/circuit-reference-validation.md) to verify topology and measurable stage behavior before musical calibration. Reuse the production processing path in an offline harness; do not replace it with a second implementation that can conceal runtime errors.
 
 Translate analog references into audible DSP constraints:
 
