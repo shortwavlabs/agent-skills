@@ -59,7 +59,7 @@ if no factor reaches it: use max and flag "degraded accuracy" (unvalidated)
 internal rate = hostRate * factor, in [minimum, 2 * minimum) for supported host rates
 ```
 
-Test the policy at many host rates, including unusual ones (22.05, 32, 50, 176.4, 200, 352.8 kHz and above), and state which internal rates the gates must cover (every rate the policy can produce, or its extremes and the rates of the common host rates).
+Test the policy at many host rates: the common ones; unusual ones; rates just below, at and just above each policy boundary (where the chosen factor changes); rates that make gated test tones exactly commensurate with the internal rate; and the lowest and highest supported host rates. State which internal rates the gates must cover (every rate the policy can produce, or its extremes plus the rates of the common host rates).
 
 ## Measure The Production Resampling Filters
 

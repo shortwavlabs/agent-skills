@@ -2,8 +2,9 @@
 """Statement-order stress for a SPICE deck: same circuit, different element order, same answer?
 
 Reorders only top-level element statements (a statement keeps its '+' continuation lines). The title,
-dot-directives, comments, .subckt...ends and .control...endc blocks stay exactly where they are, so every
-variant is the identical circuit; the script proves that before running anything.
+dot-directives, comments, .subckt...ends, .control...endc and conditional .if/.elseif/.else/.endif blocks
+(nested ones included) stay exactly where they are, with their contents, so elements never move across
+conditional branches and every variant is the identical circuit; the script proves that before running.
 
 Orders are keyed, not streamed: order `id` of stream `name` is always random.Random(f"{seed}:{name}:{id}"),
 duplicates and the original order are skipped, and the number of UNIQUE orders is reported. Reseeding one
@@ -42,23 +43,35 @@ class StressError(RuntimeError):
 
 
 def statements(lines: list[str]) -> tuple[list[list[str]], list[int]]:
-    """Group lines into statements; return them and the indexes of reorderable top-level element statements."""
+    """Group lines into statements; return them and the indexes of reorderable top-level element statements.
+    Everything inside .subckt/.control blocks and inside (possibly nested) .if ... .endif blocks is fixed."""
     st: list[list[str]] = []
     fixed: set[int] = set()
-    block = None                      # closing keyword while inside .subckt or .control: nothing there moves
+    block = None                      # closing keyword while inside .subckt or .control
+    depth = 0                         # .if nesting depth
     for line in lines:
         low = line.strip().lower()
         if line.lstrip().startswith("+") and st:
             st[-1].append(line)
             continue
         st.append([line])
+        here = len(st) - 1
         if block:
-            fixed.add(len(st) - 1)
+            fixed.add(here)
             if low.startswith(block):
                 block = None
+        elif re.match(r"\.if\b", low):
+            depth += 1
+            fixed.add(here)
+        elif depth:
+            fixed.add(here)
+            if re.match(r"\.endif\b", low):
+                depth -= 1
         elif low.startswith((".subckt", ".control")):
             block = ".ends" if low.startswith(".subckt") else ".endc"
-            fixed.add(len(st) - 1)
+            fixed.add(here)
+    if block or depth:
+        raise StressError(f"unterminated {block or '.if'} block")
     slots = [i for i, s in enumerate(st)
              if i > 0 and i not in fixed and s[0].strip() and s[0].lstrip()[0] not in ".*"]
     return st, slots
@@ -235,6 +248,29 @@ def self_test() -> int:
         got = Counter(r["status"] for r in rows)
         if got != expected or not got["failed"] or not got["wrong-state"]:
             problems.append(f"classification mismatch: got {dict(got)}, expected {dict(expected)}")
+        # Conditional blocks: elements must never move across (or out of) .if/.else branches.
+        cond = ["title", "R0 x 0 1", ".if (A == 1)", "R1 a b 1k", ".if (B == 1)", "R3 a b 3k", ".endif",
+                ".else", "R2 a b 2k", ".endif", "C0 x 0 1n", "V0 x 0 1", ".end"]
+        cst, cslots = statements(cond)
+        if [cst[i][0].split()[0] for i in cslots] != ["R0", "C0", "V0"]:
+            problems.append(f"conditional-block contents treated as reorderable: {[cst[i][0] for i in cslots]}")
+        for _, order in permutation_ids(5, len(cslots), 3, "cond"):
+            try:
+                require_same_circuit(cond, reordered(cond, order))
+            except StressError as exc:
+                problems.append(f"valid permutation outside a conditional block rejected: {exc}")
+        across = list(cond)
+        across[3], across[8] = across[8], across[3]      # R1 moved into the .else branch, R2 into the .if branch
+        try:
+            require_same_circuit(cond, across)
+            problems.append("element moved across conditional branches was not rejected")
+        except StressError:
+            pass
+        try:
+            statements(["title", ".if (A == 1)", "R1 a b 1k", ".end"])
+            problems.append("unterminated .if block was not rejected")
+        except StressError:
+            pass
     for p in problems:
         print("SELF-TEST FAILURE:", p)
     print(f"self-test: {'PASS' if not problems else 'FAIL'}")

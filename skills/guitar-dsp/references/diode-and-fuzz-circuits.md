@@ -68,7 +68,7 @@ Implementation rules:
 
 - Bound Newton iterations.
 - Clamp exponent inputs.
-- Use `double` internally.
+- Start and qualify the solver in `double`; `float` is acceptable only if parity, convergence margin and stress tests establish it.
 - Provide a fallback if the solve diverges.
 - Add tiny floors to resistances.
 - Smooth drive and topology changes.

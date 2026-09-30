@@ -123,10 +123,12 @@ Neither "model every datasheet parameter" nor "op-amps are ideal" is a default. 
 
 ## Exact Reset To The DC Fixed Point
 
-Circuits with slow coupling capacitors or bias states produce long false transients if states start at zero or at an approximate bias. Those transients corrupt small-signal validation windows and create audible thumps.
+Circuits with slow coupling capacitors or bias states produce long false transients if states start at zero or at an approximate bias. Those transients corrupt small-signal validation windows and create audible thumps. Choose the initialization policy by the circuit's equilibria:
 
-- Compute the exact fixed point of the **discrete** model for zero input: analytically, or with one linear solve of the linearised discrete step at prepare time (exact at the bias point).
-- Use it for `reset()`, for un-bypass, and before every measurement.
+- **One intended quiescent state:** compute the exact fixed point of the **discrete** model for zero input, analytically or with one linear solve of the linearised discrete step at prepare time (exact at the bias point).
+- **Bistable or multistable circuits** (latches, flip-flop switching): reset to the declared intended state, or implement a documented state-selection policy, and assert the resulting state in tests.
+- **Oscillators and circuits without a DC equilibrium:** define and validate a different deterministic initialization (a stated start state and phase, or a settled start), and compare against a reference started the same way.
+- Use the chosen policy for `reset()`, for un-bypass and before every measurement.
 - Test: fresh reset, used-then-reset, drift over long silence (it should stay at numerical noise), and parity of the first analysis window at the smallest input level.
 
 *Case study: an approximate analytic start left a 0.5 mV output step decaying with a 92 ms time constant; for a 5 mV input that alone degraded one fixture from −42.9 dB to −4.5 dB.*

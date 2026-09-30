@@ -21,12 +21,18 @@ error (exit 2, "NOT QUALIFIED"), never a silent pass.
     (bodies, compared structurally with ports bound in order); analyses (.tran .ac .dc .op .noise .tf .four
     .sens .pz .disto) only with --analyses. Ignored as output-only: .end .title .save .print .plot .probe
     .meas/.measure .width .csparam. Reported but NOT followed: .include/.inc/.lib FILE (hash those files with
-    spice_manifest.py). .control blocks: output/analysis commands are ignored; circuit-altering commands
-    (alter, altermod, option(s), reset, source, shell) are rejected. Any other directive is rejected.
+    spice_manifest.py); `.lib FILE SECTION` and any extra include argument are rejected. .control blocks:
+    only a small read-only allowlist (run op ac tran dc noise print plot write wrdata save show echo let
+    meas/measure setplot display quit exit) is accepted and ignored; every other command, including
+    alter, altermod, alterparam, option, reset, source, shell and set, is rejected. Any other directive
+    is rejected.
 Limits: behavioural expressions are compared as normalised text after remapping v(net)/v(a,b) through the
 net map and i(name) through the element pairing; controlled-source poly controls given as bare node lists
 are not remapped (they are reported as differences when names differ). Adapters are flattened ONE level;
-an adapter that calls another adapter is rejected. Include files and model libraries are not read.
+an adapter that calls another adapter is rejected. Inline .subckt bodies are compared element by element
+with the same checks as top-level elements, plus their default parameters; an inline body that itself
+calls a subcircuit is rejected (nested inline subcircuits are not supported). Include files and model
+libraries are not read.
 Exit status: 0 equivalent, 1 differences found, 2 unsupported syntax or usage error.
 """
 
@@ -51,7 +57,10 @@ GROUND = {"0", "gnd", "gnd!"}
 ANALYSES = {".tran", ".ac", ".dc", ".op", ".noise", ".tf", ".four", ".sens", ".pz", ".disto"}
 OUTPUT_ONLY = {".end", ".title", ".save", ".print", ".plot", ".probe", ".meas", ".measure", ".width", ".csparam"}
 INCLUDES = {".include", ".inc", ".lib"}
-CONTROL_ALTERING = {"alter", "altermod", "option", "options", "reset", "source", "shell"}
+# Read-only .control commands: they run analyses or read, format and write results; none alters an element,
+# model, parameter or option. Everything else inside .control is rejected (fail closed).
+CONTROL_SAFE = {"run", "op", "ac", "tran", "dc", "noise", "print", "plot", "write", "wrdata", "save", "show",
+                "echo", "let", "meas", "measure", "setplot", "display", "quit", "exit"}
 BEHAVIOURAL_KEYS = ("value", "vol", "cur")
 
 
@@ -113,7 +122,7 @@ def logical_lines(text: str, has_title: bool) -> list[str]:
     return out
 
 
-def tokens(line: str) -> list[str]:
+def tokens(line: str, lower: bool = True) -> list[str]:
     line = re.sub(r"\s*=\s*", "=", line)
     out, cur, depth, quote = [], "", 0, False
     for ch in line:
@@ -131,7 +140,7 @@ def tokens(line: str) -> list[str]:
             cur += ch
     if cur:
         out.append(cur)
-    return [t.lower() for t in out]
+    return [t.lower() for t in out] if lower else out
 
 
 def is_number(tok: str) -> bool:
@@ -295,8 +304,9 @@ def parse(text: str, has_title: bool = True) -> Deck:
         if control:
             if head == ".endc":
                 control = False
-            elif head in CONTROL_ALTERING:
-                raise NetlistError(f".control command '{line}' can alter the circuit; not supported")
+            elif head not in CONTROL_SAFE:
+                raise NetlistError(f".control command '{line}' is not in the supported read-only set; "
+                                   "structural equivalence not established")
             else:
                 deck.control_commands.append(head)
             continue
@@ -343,9 +353,11 @@ def parse(text: str, has_title: bool = True) -> Deck:
         elif head in ANALYSES:
             deck.analyses.append(" ".join(toks))
         elif head in INCLUDES:
-            if len(toks) < 2:
-                raise NetlistError(f"{head} without a file (library sections are not supported)")
-            deck.includes.append(line.split(None, 1)[1].split()[0].strip('"'))   # original case
+            raw = tokens(line, lower=False)
+            if len(raw) != 2:
+                raise NetlistError(f"unsupported {head} form '{line}': only '{head} FILE' is supported "
+                                   "(library sections and extra arguments are not)")
+            deck.includes.append(raw[1].strip('"'))   # original case
         elif head in OUTPUT_ONLY:
             continue
         elif head.startswith("."):
@@ -481,42 +493,77 @@ def compare_elements(ref: dict[str, Element], der: dict[str, Element], alias: di
     return errors, notes, fmap, pairs
 
 
-def compare_model(ref: Deck, der: Deck, re_: Element, de: Element, errors: list[str], notes: list[str]) -> None:
+def compare_pair(ref: Deck, der: Deck, re_: Element, de: Element, fmap: dict[str, str], names: dict[str, str],
+                 rel: float, errors: list[str], notes: list[str], context: str = "") -> None:
+    """Every per-element check, shared by top-level elements and elements inside inline subcircuits."""
+    if re_.kind != de.kind:
+        return       # already reported by compare_elements
+    tag = f"{context}{re_.name}"
+    if not same_value(re_.value, de.value, rel):
+        errors.append(f"{tag}: value {re_.value} vs derived {de.value}")
+    for key in sorted(set(re_.params) | set(de.params)):
+        if not same_value(re_.params.get(key), de.params.get(key), rel):
+            errors.append(f"{tag}: parameter {key}={re_.params.get(key)} vs derived {de.params.get(key)}")
+    if [names.get(c, "?" + c) for c in re_.ctrl] != de.ctrl:
+        errors.append(f"{tag}: controlling element(s) {re_.ctrl} vs derived {de.ctrl}")
+    if re_.kind in "vi":
+        if source_spec(re_.spec) != source_spec(de.spec):
+            errors.append(f"{tag}: source '{re_.spec}' vs derived '{de.spec}'")
+    elif canonical_numbers(remap_refs(re_.spec, fmap, names).replace(" ", "")) != \
+            canonical_numbers(de.spec.replace(" ", "")):
+        errors.append(f"{tag}: specification '{re_.spec}' vs derived '{de.spec}'")
+    if re_.model or de.model:
+        compare_model(ref, der, re_, de, rel, errors, notes, context)
+
+
+def compare_model(ref: Deck, der: Deck, re_: Element, de: Element, rel: float, errors: list[str], notes: list[str],
+                  context: str = "") -> None:
     rn, dn = re_.model or "", de.model or ""
+    tag = f"{context}{re_.name}"
     if re_.kind == "x":
         rs, ds = ref.subckts.get(rn), der.subckts.get(dn)
         if rs is None and ds is None:
             if rn != dn:
-                errors.append(f"{re_.name}: subckt {rn} vs derived {dn}")
+                errors.append(f"{tag}: subckt {rn} vs derived {dn}")
             return
         if rs is None or ds is None:
-            errors.append(f"{re_.name}: subckt {rn if rs else dn} is defined inline on only one side; "
+            errors.append(f"{tag}: subckt {rn if rs else dn} is defined inline on only one side; "
                           "the other definition cannot be verified")
             return
+        for body in (rs, ds):
+            nested = [e.name for e in body.elems.values() if e.kind == "x"]
+            if nested:
+                raise NetlistError(f"inline .subckt {body.name} calls a subcircuit ({', '.join(nested)}); nested inline "
+                                   "subcircuits are not supported; structural equivalence not established")
         if len(rs.ports) != len(ds.ports):
-            errors.append(f"{re_.name}: subckt {rn} has {len(rs.ports)} ports vs derived {dn} {len(ds.ports)}")
+            errors.append(f"{tag}: subckt {rn} has {len(rs.ports)} ports vs derived {dn} {len(ds.ports)}")
             return
+        inner = f"subckt {rn}: "
+        errs: list[str] = []
+        for key in sorted(set(rs.params) | set(ds.params)):
+            if not same_value(rs.params.get(key), ds.params.get(key), rel):
+                errs.append(f"{inner}default parameter {key}={rs.params.get(key)} vs derived {ds.params.get(key)}")
         seed = {"0": "0", **dict(zip(rs.ports, ds.ports))}
-        errs = compare_elements(rs.elems, ds.elems, {}, set(), seed, context=f"subckt {rn}: ")[0]
-        for r_el in rs.elems.values():   # values and models inside the body
-            d_el = ds.elems.get(r_el.name)
-            if d_el and (not same_value(r_el.value, d_el.value, 1e-9) or r_el.model != d_el.model):
-                errs.append(f"subckt {rn}: {r_el.name} value/model {r_el.value}/{r_el.model} vs {d_el.value}/{d_el.model}")
+        body_errs, _, bmap, bpairs = compare_elements(rs.elems, ds.elems, {}, set(), seed, context=inner)
+        errs += body_errs
+        bnames = {r.name: d.name for r, d in bpairs}
+        for r_el, d_el in bpairs:
+            compare_pair(ref, der, r_el, d_el, bmap, bnames, rel, errs, notes, inner)
         errors += errs
         if not errs and rn != dn:
-            notes.append(f"{re_.name}: subckt renamed {rn} -> {dn} with an identical body")
+            notes.append(f"{tag}: subckt renamed {rn} -> {dn} with an identical body")
         return
     ra, da = ref.models.get(rn), der.models.get(dn)
     if ra is None and da is None:
         if rn != dn:
-            errors.append(f"{re_.name}: model {rn} vs derived {dn}")
+            errors.append(f"{tag}: model {rn} vs derived {dn}")
     elif ra is None or da is None:
-        errors.append(f"{re_.name}: model {rn if ra else dn} is defined inline on only one side; "
+        errors.append(f"{tag}: model {rn if ra else dn} is defined inline on only one side; "
                       "the other definition cannot be verified")
     elif ra != da:
-        errors.append(f"{re_.name}: model {rn} body differs from derived {dn}")
+        errors.append(f"{tag}: model {rn} body differs from derived {dn}")
     elif rn != dn:
-        notes.append(f"{re_.name}: model renamed {rn} -> {dn} with an identical definition")
+        notes.append(f"{tag}: model renamed {rn} -> {dn} with an identical definition")
 
 
 def compare(ref: Deck, der: Deck, adapters: dict[str, Subckt], alias: dict[str, str], inert: set[str],
@@ -526,23 +573,7 @@ def compare(ref: Deck, der: Deck, adapters: dict[str, Subckt], alias: dict[str, 
     names = {r.name: d.name for r, d in pairs}   # reference element name -> derived element name
 
     for re_, de in pairs:
-        if re_.kind != de.kind:
-            continue
-        if not same_value(re_.value, de.value, rel):
-            errors.append(f"{re_.name}: value {re_.value} vs derived {de.value}")
-        for key in sorted(set(re_.params) | set(de.params)):
-            if not same_value(re_.params.get(key), de.params.get(key), rel):
-                errors.append(f"{re_.name}: parameter {key}={re_.params.get(key)} vs derived {de.params.get(key)}")
-        if [names.get(c, "?" + c) for c in re_.ctrl] != de.ctrl:
-            errors.append(f"{re_.name}: controlling element(s) {re_.ctrl} vs derived {de.ctrl}")
-        if re_.kind in "vi":
-            if source_spec(re_.spec) != source_spec(de.spec):
-                errors.append(f"{re_.name}: source '{re_.spec}' vs derived '{de.spec}'")
-        elif canonical_numbers(remap_refs(re_.spec, fmap, names).replace(" ", "")) != \
-                canonical_numbers(de.spec.replace(" ", "")):
-            errors.append(f"{re_.name}: specification '{re_.spec}' vs derived '{de.spec}'")
-        if re_.model or de.model:
-            compare_model(ref, der, re_, de, errors, notes)
+        compare_pair(ref, der, re_, de, fmap, names, rel, errors, notes)
 
     for what, a, b in ((".param", ref.params, der.params), (".func", ref.funcs, der.funcs)):
         for key in sorted(set(a) | set(b)):
@@ -663,6 +694,17 @@ RSW sw vcc 1k
 .subckt OPAMP p n vp vn o
 E1 o 0 p n 1e5
 .ends OPAMP
+XST1 in sout STAGE gain=3
+RSOUT sout 0 10k
+.subckt STAGE in out params: gain=1
+RIN in mid 1k
+MS mid gate 0 0 NMOS1 W=5u L=1u
+RGATE gate 0 1meg
+BS out 0 V={gain*V(mid)}
+VSENSE mid msense 0
+FS 0 out VSENSE 0.1
+RMS msense 0 1k
+.ends STAGE
 .end
 """
 SELF_DER = """derived (net names and order changed, pot as an adapter, a switch model renamed)
@@ -701,6 +743,17 @@ RSW /SW /VCC 1k
 .subckt OPAMP a b c d e
 E1 e 0 a b 1e5
 .ends OPAMP
+XST1 /IN /SOUT STAGE gain=3
+RSOUT /SOUT 0 10k
+.subckt STAGE a b params: gain=1
+RIN a n1 1k
+MS n1 g 0 0 NMOS1 W=5u L=1u
+RGATE g 0 1meg
+BS b 0 V={gain*V(n1)}
+VSENSE n1 ms 0
+FS 0 b VSENSE 0.1
+RMS ms 0 1k
+.ends STAGE
 .end
 """
 SELF_ADAPTERS = """.subckt POT p1 w p3 params: rtot=1k pos=0.5
@@ -739,6 +792,14 @@ SELF_FAULTS = [   # (label, text in SELF_DER, replacement): each must be reporte
     (".param default changed", "DRIVE=0.5", "DRIVE=0.6"),
     (".options dropped", ".options klu\n", ""),
     ("extra element", ".model DMOD", "C9 /OUT 0 1n\n.model DMOD"),
+    ("inline subckt default parameter changed", "STAGE a b params: gain=1", "STAGE a b params: gain=2"),
+    ("inline subckt instance parameter changed", "STAGE gain=3", "STAGE gain=4"),
+    ("inline subckt resistor value changed", "RIN a n1 1k", "RIN a n1 2k"),
+    ("inline subckt MOSFET W changed", "MS n1 g 0 0 NMOS1 W=5u", "MS n1 g 0 0 NMOS1 W=6u"),
+    ("inline subckt behavioural expression changed", "V={gain*V(n1)}", "V={2*gain*V(n1)}"),
+    ("inline subckt behavioural source reads the wrong net", "V={gain*V(n1)}", "V={gain*V(g)}"),
+    ("inline subckt controlling source changed", "FS 0 b VSENSE 0.1", "FS 0 b VOTHER 0.1"),
+    ("inline subckt source value changed", "VSENSE n1 ms 0", "VSENSE n1 ms 1"),
 ]
 SELF_REJECT = [   # (label, text in SELF_DER, replacement): each must be a parse error, never "equivalent"
     ("XSPICE A device", ".end\n", "A1 /IN /OUT gain1\n.end\n"),
@@ -747,6 +808,12 @@ SELF_REJECT = [   # (label, text in SELF_DER, replacement): each must be a parse
     ("circuit-altering control command", ".end\n", ".control\nalter R1 20k\nrun\n.endc\n.end\n"),
     ("MOSFET with too few terminals", "M1 /OUT /G1 Net-_Q1-E_ 0 NMOS1", "M1 /OUT /G1 NMOS1"),
     ("nested adapter", "XRV1 /OUT /W 0 POT", "XRV1 /OUT /W 0 POT2"),
+    ("nested inline subckt call", "RMS ms 0 1k\n", "RMS ms 0 1k\nXIN ms 0 INNER\n"),
+    (".lib FILE SECTION", ".end\n", ".lib models.lib TT\n.end\n"),
+    (".include with an extra argument", ".end\n", ".include models.lib extra\n.end\n"),
+    *[(f".control {cmd}", ".end\n", f".control\n{cmd}\nrun\n.endc\n.end\n")
+      for cmd in ("alter R1 20k", "altermod NMOS1 VTO=2", "alterparam gain=2", "option klu", "reset",
+                  "source other.cir", "shell ls", "set noaskquit", "frobnicate")],
 ]
 
 

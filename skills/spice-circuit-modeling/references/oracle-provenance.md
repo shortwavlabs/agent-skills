@@ -91,13 +91,13 @@ Record:
 | Policy | Hard requirement | Use for |
 | --- | --- | --- |
 | `strict_file` (default) | Whole-file SHA-256 and size. Used-card hashes are checked too and name the card that changed. **Any** edit anywhere in the file fails. | The netlist, project libraries, and any external file small enough, or stable enough, to pin exactly |
-| `used_cards` | Used-card hashes only. The whole-file hash and size are still recorded and reported as advisories when they differ. | Large external collections where unrelated edits elsewhere must not block, provided every card the deck uses is listed |
+| `used_cards` | Used-card hashes only. The whole-file hash and size are still recorded; when they differ while every pinned card's canonical text still matches, the difference is reported as an advisory (the changed bytes may be anywhere, including a comment inside a used card). | Large external collections where unrelated edits elsewhere must not block, provided every card the deck uses is listed |
 
 Choose `used_cards` deliberately and per file; never for the netlist or project libraries. Under `used_cards` a change to a card the deck uses but the manifest does not list goes undetected, so list every used card from that file.
 
 On mismatch, print kind, name, path, expected and actual values for **every** mismatch (not just the first), and exit non-zero before simulating. Prove the failure path with deliberate corruptions (wrong card hash, renamed or missing card, wrong file hash, wrong project hash, wrong simulator version, missing feature, missing required text, missing file), under both policies, and make sure the fixture generator also refuses to write anything when the check fails.
 
-`scripts/spice_manifest.py` implements this: `make` records files (`--file`), used cards (`--card PATH=NAME`), the per-file policy (`--used-cards PATH`), the simulator command with its detected or given version, required features, required deck text (`--require-text PATH=REGEX`) and the external root; `check` verifies all of it; `--self-test` exercises both policies. Its card rule reproduces the common "`.model` line plus `+` continuations, each stripped, joined with `\n`" convention.
+`scripts/spice_manifest.py` implements this: `make` records files (`--file`), used cards (`--card PATH=NAME`), the per-file policy (`--used-cards PATH`), the simulator command with its detected or given version, required features, required deck text (`--require-text PATH=REGEX`) and the external root; `check` first rejects any manifest whose `manifest_version` or `card_hash_rule` it does not support, then verifies all of it; `--self-test` exercises both policies. Its card rule reproduces the common "`.model` line plus `+` continuations, each stripped, joined with `\n`" convention.
 
 Keep external model roots configurable (a manifest root plus an environment-variable or CLI override) so another machine can point at its own copy of the same collection without editing the deck.
 

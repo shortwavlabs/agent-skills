@@ -27,7 +27,7 @@ This skill also owns [references/circuit-reference-validation.md](references/cir
 4. **Prove the shipped numerics.** Monotonicity of the table actually shipped, solver bounds by fuzzing, solver memory at the returned root.
 5. **Choose integrator and rate from decomposed error**, not tradition: discretisation versus the same model at high rate, total versus the oracle.
 6. **Rate can be set by stiffness, not only aliasing.** Measure the actual production filters.
-7. **Reset to the exact DC fixed point** of the discrete model.
+7. **Reset deterministically and exactly:** to the discrete model's DC fixed point when there is one intended quiescent state, to the declared state for multistable circuits, and by a validated start policy for oscillators.
 8. **Validate controls in motion** against a time-varying reference.
 9. **Gates must mean something**: hard gates for required bounds, visible quality targets for preferred margins, NOT EVALUATED when the data cannot establish a gate, completeness checked by content.
 10. **Never loosen a gate to get green.** Revise a criterion only as a documented, evidenced revision.
@@ -87,7 +87,7 @@ Rates, integrators, state counts, coupling choices, tolerance values, margin siz
 | Storing the last evaluated point as solver memory | Re-evaluate at the returned root |
 | Picking trapezoidal "because it's standard" | Compare integrators on decomposed error across dense rates |
 | Choosing oversampling from aliasing alone | Check stiffness, warping, solver and coupling drivers |
-| Zero or approximate initial states | Exact discrete DC fixed point |
+| Zero or approximate initial states | Exact discrete DC fixed point (or the declared state / validated start policy for multistable and oscillating circuits) |
 | Validating only static responses | Time-varying reference for automation |
 | Comparing a discretisation error with a total error | Decompose: reduction, discretisation, resampling, total |
 | Detuning test tones to avoid coherent failures | Absolute gate at every phase; phase-averaged budget |

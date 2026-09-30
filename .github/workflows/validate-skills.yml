@@ -1,0 +1,20 @@
+name: validate-skills
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+      - name: Validate skills (self-tests, links, frontmatter, agent YAML, leak scans)
+        run: python3 scripts/validate_skills.py

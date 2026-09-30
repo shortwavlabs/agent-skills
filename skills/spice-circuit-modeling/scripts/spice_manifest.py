@@ -13,8 +13,12 @@ Per-file hash policy (manifest field "hash_policy"):
   strict_file (default)  the whole-file SHA-256 and size are hard requirements; any edit anywhere in the
                          file fails. Used-card hashes are checked as well and name the card that changed.
   used_cards             the used-card hashes are the hard requirement; the whole-file hash and size are
-                         recorded for provenance and reported as ADVISORY when they differ, so an edit
-                         elsewhere in a large external library does not block. Needs at least one card.
+                         recorded for provenance and reported as ADVISORY when they differ while every
+                         pinned card's canonical text still matches (the changed bytes may be elsewhere in
+                         the file or, for example, a comment inside a used card). Needs at least one card.
+
+`check` first requires manifest_version 2 and the exact card_hash_rule text below, and refuses any other
+manifest before looking at files.
 
 Card-text rule: for `.model NAME`, the .model line plus its '+' continuation lines; for `.subckt NAME`,
 every line from .subckt to its matching .ends. Each line is stripped of surrounding whitespace (CR
@@ -47,6 +51,7 @@ CARD_RULE = (
     "each line stripped, blank and full-line '*' comments dropped, joined with '\\n', no trailing newline, UTF-8"
 )
 MIN_PREFIX = 12
+SUPPORTED_VERSIONS = {2}
 
 
 class ManifestError(RuntimeError):
@@ -163,6 +168,15 @@ def check(manifest: dict, manifest_dir: Path, root_override: str | None = None) 
     def fail(kind: str, name: str, where: str, expected: str, actual: str) -> None:
         fails.append(dict(kind=kind, name=name, path=where, expected=expected, actual=actual))
 
+    # Schema first: never interpret a manifest written for another version or card-hash rule.
+    if manifest.get("manifest_version") not in SUPPORTED_VERSIONS:
+        fail("configuration", "manifest_version", "manifest", f"one of {sorted(SUPPORTED_VERSIONS)}",
+             str(manifest.get("manifest_version", "absent")))
+    if manifest.get("card_hash_rule") != CARD_RULE:
+        fail("configuration", "card_hash_rule", "manifest", CARD_RULE, str(manifest.get("card_hash_rule", "absent")))
+    if fails:
+        return fails, advisories
+
     sim = manifest.get("simulator")
     if sim:
         version, text = simulator_report(sim)
@@ -196,8 +210,8 @@ def check(manifest: dict, manifest_dir: Path, root_override: str | None = None) 
                 if policy == "strict_file":
                     fail(kind, name, str(path), str(entry[key]), str(actual))
                 else:
-                    advisories.append(f"{name}: {kind} changed outside the used cards ({entry[key]} -> {actual}); "
-                                      "allowed by hash_policy used_cards")
+                    advisories.append(f"{name}: whole-file {kind} changed ({entry[key]} -> {actual}) while all pinned "
+                                      "used-card canonical texts still match; allowed by hash_policy used_cards")
         for card in entry.get("cards", []):
             try:
                 text = card_text(path, card["name"])
@@ -430,7 +444,11 @@ def self_test() -> int:
         deck.unlink()
         expect("oracle missing", "strict.json", {"file", "required text"})
         reset()
-        for label, mutate in (("wrong simulator version", lambda m: m["simulator"].update(expected="fakesim-8")),
+        for label, mutate in (("missing manifest_version", lambda m: m.pop("manifest_version")),
+                              ("manifest_version 999", lambda m: m.update(manifest_version=999)),
+                              ("missing card_hash_rule", lambda m: m.pop("card_hash_rule")),
+                              ("altered card_hash_rule", lambda m: m.update(card_hash_rule=m["card_hash_rule"] + " ")),
+                              ("wrong simulator version", lambda m: m["simulator"].update(expected="fakesim-8")),
                               ("missing simulator feature", lambda m: m["simulator"].update(require=["OpenMP"])),
                               ("unknown hash policy", lambda m: m["files"][1].update(hash_policy="loose")),
                               ("used_cards without cards", lambda m: m["files"][1].update(hash_policy="used_cards", cards=[])),

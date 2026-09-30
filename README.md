@@ -14,7 +14,7 @@ npx skills add shortwavlabs/agent-skills
 python3 scripts/validate_skills.py
 ```
 
-Runs every skill script's `--self-test` (normally and under `python -O`), checks every relative Markdown link and anchor, validates SKILL.md frontmatter and `agents/openai.yaml`, and scans for leaked absolute user paths and embedded vendor model text. Standard library only; exits non-zero on any problem.
+Runs every skill script's `--self-test` (normally and under `python -O`), checks every relative Markdown link and anchor, validates SKILL.md frontmatter and `agents/openai.yaml`, and scans for leaked absolute user paths and embedded vendor model text. Standard library only; exits non-zero on any problem. The same command runs in GitHub Actions ([`.github/workflows/validate-skills.yml`](.github/workflows/validate-skills.yml)) on every pull request and on pushes to `main`.
 
 ## Skills
 
