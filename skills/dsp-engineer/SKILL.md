@@ -36,7 +36,7 @@ Read only the files needed for the current task:
 | --- | --- |
 | `references/thinkdsp-concepts.md` | Need the Think DSP chapter map, concept summaries, equations, or task routing. |
 | `references/cpp-patterns.md` | Need C++ translations of the book's Python/NumPy examples. |
-| `references/engineering-checks.md` | Need implementation checks, scaling conventions, test cases, or common DSP failure modes. |
+| `references/engineering-checks.md` | Need implementation checks, scaling conventions, test cases, common DSP failure modes, or coherent-tone/sub-sample-phase error measurement. |
 | `assets/thinkdsp.hpp` | Need a compact educational C++ header to copy into a prototype or use as a reference implementation. |
 
 ## C++ Defaults

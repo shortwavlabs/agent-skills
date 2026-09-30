@@ -9,6 +9,7 @@
 - Asset and model loading
 - Realtime callback rules
 - Tests and measurement targets
+- Oversampled circuit-model plugins
 - Host validation and release gates
 
 ## When To Use This Reference
@@ -147,6 +148,18 @@ Measurement target:
 - Benchmark per-stage and full-chain timing at target sample rates and buffer sizes.
 - Include expensive stages such as neural inference, convolution, tuner analysis, pitch shifting, reverb, and full chain.
 - Capture automation stress metrics where abrupt changes can cause clicks or instability.
+
+## Oversampled Circuit-Model Plugins
+
+JUCE-specific practices for plugins whose DSP runs an oversampled circuit model (the modelling method itself is in the `circuit-to-dsp` skill):
+
+- Choose the oversampling factor in `prepareToPlay()` from the host rate with an algorithm (smallest power of two reaching the model's minimum validated internal rate, with a flagged fallback), and build `juce::dsp::Oversampling` there with the maximum block size. Pass `useIntegerLatency = true` when the host must compensate an exact integer latency.
+- Call `setLatencySamples()` in the constructor as well as in `prepareToPlay()`: some hosts and validators query latency before the first prepare.
+- Expose bypass through `getBypassParameter()`. In current JUCE wrappers the host bypass then arrives as that parameter and `processBlockBypassed()` is used only when no bypass parameter exists; verify this on your JUCE version. Implement a dry path delayed by exactly the reported latency plus a crossfade, and test that the bypassed output equals the delayed input bit for bit after the crossfade.
+- Non-parameter state such as an interface calibration reference: a user edit notifies the host (`updateHostDisplay (ChangeDetails().withNonParameterStateChanged (true))`); `setStateInformation()` stores the value **without** notifying, so restoring a session does not mark it dirty.
+- Store a **model revision** string (changes only when the audio changes) separately from the **state schema version** (changes only when serialization changes). Test that a session saved by an older model revision restores every parameter unchanged and re-saves with the new revision.
+- Publish engine facts the editor shows (factor, latency, degraded flag) through atomics written in `prepareToPlay()`, not by reading engine members from the message thread.
+- Guard the product formats in CMake: fail configuration if a target you do not ship (for example `<Plugin>_Standalone`) appears.
 
 ## Host Validation And Release Gates
 

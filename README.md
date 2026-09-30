@@ -135,7 +135,7 @@ skills/juce-plugin/
 | **AudioProcessorGraph** | Processor chaining, graph nodes, dynamic rebuild, node bypass |
 | **Build system** | CMake: juce_add_plugin, SDK paths, binary data, cross-platform, GitHub Actions CI/CD |
 | **Plugin formats** | VST3, AU, AUv3, AAX, LV2, Standalone — format-specific categories and properties |
-| **Production practices** | Separate plugin/test/measurement builds, asset/model loading, state restore, host validation, release gates |
+| **Production practices** | Separate plugin/test/measurement builds, asset/model loading, state restore, oversampled circuit-model plugins (rate policy, integer latency, bypass parameter, model revision), host validation, release gates |
 
 #### Source documentation
 
@@ -188,6 +188,7 @@ skills/guitar-dsp/
 │   └── receptive_field.py            Conv1D receptive-field calculator
 └── references/
     ├── aliasing-oversampling.md      Aliasing diagnosis, oversampling islands, ADAA, alias probes
+    ├── circuit-reference-validation.md  Schematic/SPICE reference comparison: provenance, measurement contracts, stage comparison, golden captures, release integrity
     ├── cpp-juce-dsp-modeling.md      C++/JUCE block modeling lessons for guitar effects
     ├── diode-and-fuzz-circuits.md    Diode clipping, feedback solvers, fuzz bias/loading behavior
     ├── example-prompts.md            Realistic prompts for testing and demonstrating skill use
@@ -218,6 +219,67 @@ skills/guitar-dsp/
 | **Nonlinear DSP** | Waveshaping families, diode/fuzz circuits, tube-stage approximation, aliasing analysis, local oversampling islands, ADAA tradeoffs |
 | **Tone and speaker modeling** | Passive/active tone stacks, insertion loss, speaker compression, resonance, breakup, dynamic cabinet behavior |
 | **Diagnosis and validation** | Failure matrix, Python/native parity, native benchmarks, aliasing reports, DSP unit tests, measurement harnesses, auval/pluginval, DAW smoke |
+
+### Circuit modeling skills (SPICE → KiCad → realtime DSP → JUCE)
+
+Two skills cover circuit-accurate modeling end to end, and route to the existing skills rather than duplicating them. Each area has exactly one owner:
+
+| Area | Owner |
+|------|-------|
+| Simulator setup and netlist mechanics, model provenance and hashing, numerical convergence, statement-order stress, device-model qualification, KiCad ↔ SPICE parity, golden-data generation | [spice-circuit-modeling](skills/spice-circuit-modeling/SKILL.md) |
+| Circuit reduction, state inventory, reduced op-amps, nonlinear solvers and table proofs, integrator/rate/oversampling evidence, exact reset, automation, validation-gate design, end-to-end playbook | [circuit-to-dsp](skills/circuit-to-dsp/SKILL.md) |
+| Reference-circuit verification checklist and comparing DSP against a circuit reference: source hierarchy, evidence axes, measurement contract, stage comparison, golden captures, drift, release integrity (instrument-agnostic despite living in `guitar-dsp`); guitar-specific tone and calibration | [guitar-dsp](skills/guitar-dsp/SKILL.md) ([circuit-reference-validation.md](skills/guitar-dsp/references/circuit-reference-validation.md)) |
+| Measurement methodology: spectra, windows, coherent tones, sub-sample phase ensembles, error metrics | [dsp-engineer](skills/dsp-engineer/SKILL.md) |
+| Realtime filter and numerical building blocks | [dsp](skills/dsp/SKILL.md) |
+| AudioProcessor/APVTS, lifecycle, latency/bypass APIs, CMake, formats, host validation | [juce-plugin](skills/juce-plugin/SKILL.md) |
+
+### spice-circuit-modeling
+
+Build, qualify and freeze trustworthy SPICE/ngspice circuit references ("oracles") and KiCad schematic simulations. Covers artifact roles and device-model labelling (exact manufacturer, substitute, datasheet-calibrated project model...), hash manifests with used-card hashing and licensing of external model files, numerical qualification (`.ic` vs `.nodeset`, iteration limits and stepping fallbacks, solver choice, per-metric timestep studies), statement-order stress with unique keyed permutations, operating-state assertions for bistable circuits, op-amp and diode model qualification (isolated and in-circuit), matching simulator device laws, KiCad netlist mapping, adapter subcircuits, structural and numerical parity with mutation self-tests, and golden fixtures for DSP tests.
+
+**Triggers on:** SPICE, ngspice, `.cir`/`.lib`/`.subckt` decks, model cards, op-amp/diode/transistor model selection, convergence failures ("timestep too small", first-step failure), wrong operating points, results that change with statement order, KiCad schematic simulation or SPICE export, ERC vs netlist parity, pinning simulator/model versions, generating SPICE reference data for DSP tests.
+
+#### Structure
+
+```
+skills/spice-circuit-modeling/
+├── SKILL.md                         Principles, workflow, reference routing, scripts
+├── scripts/
+│   ├── spice_manifest.py            Hash-pin netlists, libraries, used .model/.subckt cards, simulator version; fail before simulating
+│   ├── netlist_compare.py           Structural equivalence of a derived netlist (e.g. KiCad export) vs the oracle, with mutation self-check
+│   └── spice_order_stress.py        Unique keyed statement-order permutations; failures and wrong states counted per engine
+└── references/
+    ├── oracle-provenance.md         Artifact roles, source priority, model labels, freeze rules, manifests, licensing, reproducibility gates
+    ├── numerical-qualification.md   Analyses, initial conditions, solver/tolerance settings, convergence studies, order stress, bistable states
+    ├── device-model-qualification.md  Candidate search, op-amp benches, in-circuit qualification, project-authored models, device laws
+    ├── kicad-spice-parity.md        Direction of truth, mapping, adapters, structural validation, mutation tests, numerical parity, KiCad pitfalls
+    └── golden-fixtures.md           Independent SPICE golden data: pipeline, stimulus/boundary design, metadata, determinism, tiers
+```
+
+All scripts are standard-library Python with `--self-test`.
+
+**Relationship:** hands its frozen oracle and fixtures to `circuit-to-dsp`; uses `guitar-dsp`'s circuit-reference validation for evidence taxonomies and release integrity; uses `dsp-engineer` for measurement methodology.
+
+### circuit-to-dsp
+
+Turn a validated analog circuit reference into a bounded realtime DSP model and prove it matches. Covers the offline-oracle principle, choosing the realtime formulation (shapers, nodal/state-space, DK, WDF), partitioning by physics with measured simplifications, omission registers, authoritative state inventories (continuous states vs nonlinear dimension), shared-node coupling, reduced op-amps, exact DC reset, time-varying controls, monotone scalar solvers, lookup-table proofs, integrator comparison and internal-rate selection, oversampling-factor policy and production-filter measurement, error decomposition, phase ensembles, population-level gates, hard gates versus quality targets, and a 20-step SPICE → KiCad → C++ → JUCE playbook. Includes a clearly labelled case study.
+
+**Triggers on:** virtual analog, circuit-accurate emulation of pedals, preamps, filters, compressors or synth circuits, SPICE-to-realtime translation, diode/transistor/op-amp stage solvers, Newton solver robustness, integrator choice (trapezoidal, BDF, TR-BDF2), oversampling for stiff circuits, exact reset/initial state, automation fidelity, SPICE-referenced regression gates.
+
+#### Structure
+
+```
+skills/circuit-to-dsp/
+├── SKILL.md                         Principles, end-to-end playbook with owners, reference routing
+└── references/
+    ├── circuit-reduction.md         Formulation choice, physics partition, simplification tests, state inventory, reduced op-amps, reset, automation, envelope
+    ├── nonlinear-solvers.md         KCL residuals, feedback clipping, monotone scalar solvers, solver memory, fuzzing, device laws, table proofs
+    ├── integrators-and-rates.md     Integrator comparison, internal rate, oversampling policy, production filters, latency/bypass, coefficient cadence, performance
+    ├── validation-gates.md          Error decomposition, stage isolation, hard gates vs targets, phase ensembles, population gates, tiers, criteria changes
+    └── case-study-sd1-overdrive.md  Labelled case study: decisions and surprises from an op-amp diode-clipper overdrive plugin
+```
+
+**Relationship:** consumes the oracle and fixtures from `spice-circuit-modeling`; defers comparison contracts and release integrity to `guitar-dsp`'s circuit-reference validation, measurement methodology to `dsp-engineer`, building blocks to `dsp`, and plugin integration and host validation to `juce-plugin`.
 
 ### dsp
 
@@ -280,7 +342,7 @@ skills/dsp-engineer/
 | **C++ translations** | Sine/cosine synthesis, triangle/square/sawtooth waves, chirps, windows, direct DFT, DCT-IV, convolution, filters, noise, autocorrelation, AM, sampling |
 | **Signal phenomena** | Leakage, aliasing, Nyquist/folding frequency, Gabor limit, pink/Brownian noise slopes, spectral differentiation/integration |
 | **Systems view** | Convolution theorem, LTI systems, impulse responses, transfer functions, linear versus circular convolution |
-| **Engineering validation** | Round-trip tests, amplitude scaling checks, alias fold tests, pitch-lag tests, FFT replacement guidance, real-time safety notes |
+| **Engineering validation** | Round-trip tests, amplitude scaling checks, alias fold tests, pitch-lag tests, coherent-tone and sub-sample-phase error measurement, FFT replacement guidance, real-time safety notes |
 
 #### Source documentation
 

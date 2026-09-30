@@ -74,6 +74,8 @@ Implementation rules:
 - Smooth drive and topology changes.
 - Keep the solver inside a local nonlinear island when oversampling is used.
 
+For circuit-accurate targets, aim for a residual of the form `G*v + I_D(v) - p` with `G > 0` and a non-decreasing diode law: it has exactly one root, so a bracketed, capped Newton solve is always safe. Match the simulator's actual diode equations (reverse-bias branches, recombination, high injection), prove any lookup table monotone as shipped, store solver memory at the returned root, and fuzz the solver. Details: the `circuit-to-dsp` skill's `references/nonlinear-solvers.md`.
+
 Do not expose diode type, count, or mismatch as public controls unless they are part of the product. Hidden voicing constants are easier to tune and safer for presets.
 
 ## Fuzz-Specific Behavior

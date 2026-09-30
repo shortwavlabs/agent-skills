@@ -151,6 +151,8 @@ Check numerical sensitivity where it could change the conclusion:
 - Verify initialization, capacitor charge, settling, temperature and device defaults. An ideal source can remove real pickup/interstage loading.
 - Reject missing/nonfinite data, incomplete time windows, singular-node failures and failed analyses even if the process exits successfully.
 
+Simulator mechanics that decide whether a SPICE deck can be trusted at all (`.ic` versus `.nodeset`, iteration limits and stepping fallbacks, solver choice, statement-order stress, operating-state assertions for bistable circuits, device-model qualification, KiCad export parity and hash manifests) are covered by the `spice-circuit-modeling` skill.
+
 A bounded overload run establishes behavior only over that interval. Do not label long-term stability, settling or recovery as verified when a longer simulation timed out. Do not loosen tolerances merely to obtain a passing match.
 
 ### Numerical Convergence And Threshold Searches
@@ -339,7 +341,7 @@ Declare drift limits for small-signal fundamental dB, nonlinear Vpp %, critical 
 
 ## Handoff To Realtime DSP
 
-Once the reference is frozen, translate it to production DSP as a separate implementation problem. Before assembling the full circuit:
+Once the reference is frozen, translate it to production DSP as a separate implementation problem. The methods behind the steps below (subsystem classification, state inventory, reduced op-amps, monotone solvers and table proofs, integrator and internal-rate selection, exact reset, automation references) are in the `circuit-to-dsp` skill. Before assembling the full circuit:
 
 1. Inventory the required component behaviors and circuit primitives: linear impedance/storage, nonlinear conduction, active-device limits and control/switch behavior as applicable.
 2. Reuse existing tested primitives or solver elements; implement missing behaviors once, with checks of their operating range, state and limits. Keep generic component behavior separate from schematic values/topology.
@@ -400,7 +402,7 @@ Scale execution with tiers such as:
 | RESEARCH | Explicit hypothesis/sensitivity ensembles |
 | RELEASE | Required freeze/publication checks, provenance, raw-capture audits, corruption and artifact verification; reuse qualified results when justified |
 
-Run affected checks first and expand around failures. Tier names do not justify skipping a declared acceptance gate or claiming retained results as fresh simulations.
+Run affected checks first and expand around failures. Tier names do not justify skipping a declared acceptance gate or claiming retained results as fresh simulations. A gate defined over a population (for example a worst case over all in-envelope cases) can only be evaluated by a tier that contains the complete population; smaller tiers report it as NOT EVALUATED with a labelled subset diagnostic, and completeness is checked from the fixture content. Separate hard gates from reported quality targets. See the `circuit-to-dsp` skill's `references/validation-gates.md`.
 
 A useful report has these fields:
 

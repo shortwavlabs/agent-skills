@@ -96,6 +96,8 @@ Use oversampling when it solves a measured and audible problem.
 5. **Use 8x only for research or extreme cases** when CPU, latency, and listening justify it.
 6. **Avoid full-chain oversampling by default** because it wastes CPU on clean filters, utility blocks, cabinet convolution, delay/reverb, and routing.
 
+This ladder is driven by aliasing. For circuit-accurate models the internal rate can instead be set by stiff analog poles (op-amp gain-bandwidth, small capacitances), frequency warping, solver accuracy or explicit coupling lags; such a requirement does not relax at high host rates and may justify an island rate well above what aliasing alone needs. Choose it from decomposed discretisation error across dense rate sweeps, and derive the factor with an algorithm that covers unusual host rates. See the `circuit-to-dsp` skill's `references/integrators-and-rates.md`.
+
 ## Oversampling Island Design
 
 Use a narrow boundary:
