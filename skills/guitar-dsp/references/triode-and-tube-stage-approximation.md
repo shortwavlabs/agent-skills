@@ -131,7 +131,7 @@ Do not report latency for these stages unless an actual lookahead or linear-phas
 
 ## Measurement And Tests
 
-For circuit parity, use [circuit-reference-validation.md](circuit-reference-validation.md): verify operating point and loading before comparing small-signal gain, stepped-level harmonics and transient recovery. A generic device curve or estimated magnetic model does not establish measured hardware fidelity.
+For circuit parity, use [circuit-reference-validation.md](../../circuit-to-dsp/references/circuit-reference-validation.md): verify operating point and loading before comparing small-signal gain, stepped-level harmonics and transient recovery. A generic device curve or estimated magnetic model does not establish measured hardware fidelity.
 
 Measure:
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "SPICE Circuit Modeling"
+  short_description: "Trustworthy SPICE/ngspice and KiCad circuit references"
+  default_prompt: "Use $spice-circuit-modeling to qualify, hash-pin and validate a SPICE netlist and its KiCad view as a frozen circuit oracle."

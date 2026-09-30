@@ -52,7 +52,7 @@ Rules:
 
 ## Circuit-To-DSP Translation
 
-For a schematic fidelity target, use [circuit-reference-validation.md](circuit-reference-validation.md) to verify topology and measurable stage behavior before musical calibration. Reuse the production processing path in an offline harness; do not replace it with a second implementation that can conceal runtime errors.
+For a schematic fidelity target, use [circuit-reference-validation.md](../../circuit-to-dsp/references/circuit-reference-validation.md) to verify topology and measurable stage behavior before musical calibration. Reuse the production processing path in an offline harness; do not replace it with a second implementation that can conceal runtime errors.
 
 Translate analog references into audible DSP constraints:
 
@@ -80,6 +80,8 @@ input conditioning
   -> tone network
   -> output level compensation
 ```
+
+This chain is a musical block structure. When the target is circuit-accurate feedback clipping, the gain cell and clipper are one solved network (clean path included), not a pre-filter/shaper/post-filter chain; see `diode-and-fuzz-circuits.md` and the `circuit-to-dsp` skill.
 
 Useful techniques:
 

@@ -17,7 +17,7 @@
 Start with the playbook that matches the user's request, then load deeper references only when needed:
 
 - Conventional pedal/effect code: read `guitar-signal-chain.md` and `cpp-juce-dsp-modeling.md`.
-- Schematic/SPICE comparison: read [circuit-reference-validation.md](circuit-reference-validation.md).
+- Schematic/SPICE comparison: read [circuit-reference-validation.md](../../circuit-to-dsp/references/circuit-reference-validation.md) in the `circuit-to-dsp` skill.
 - Generic waveshaping work: read `nonlinear-waveshaping.md`.
 - Diode or fuzz work: read `diode-and-fuzz-circuits.md`.
 - Aliasing or oversampling work: read `aliasing-oversampling.md`.
@@ -51,7 +51,7 @@ Do not treat a component schematic as a literal implementation mandate. Translat
 
 ## Validate DSP Against A Circuit Reference
 
-Use [circuit-reference-validation.md](circuit-reference-validation.md) as the canonical procedure:
+Use [circuit-reference-validation.md](../../circuit-to-dsp/references/circuit-reference-validation.md) as the canonical procedure:
 
 1. Identify source revision, provenance, uncertainty and intended fidelity; verify the executable circuit before treating its results as reference data.
 2. Define equivalent units, source/load, controls, bias, runtime rates and measurement windows.
