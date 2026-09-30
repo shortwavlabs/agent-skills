@@ -16,6 +16,8 @@ A comprehensive reference for implementing real-time audio DSP algorithms in C/C
 - Generating bandlimited waveforms, noise, or envelopes
 - Optimizing audio code with fast math approximations or denormal prevention
 
+For circuit-accurate emulation of a specific analog circuit (matching a schematic or SPICE reference), load `circuit-to-dsp` as well: it decides structure, solver, integrator and rate from measured error; this skill supplies the building blocks.
+
 ## Architecture
 
 The skill is organized into domain-specific references. Read the relevant file(s) for the task at hand:

@@ -282,7 +282,7 @@ public:
 
 ### Nonlinear Moog Ladder (Antti's Model)
 
-More accurate model using `tanh()` to simulate transistor differential pairs. Requires 2x oversampling for best results.
+More accurate model using `tanh()` to simulate transistor differential pairs. The original archive implementation recommends 2x oversampling for this approximation. A circuit-accurate emulation matched to a schematic or SPICE reference should choose structure and rate from measured error instead (see the `circuit-to-dsp` skill).
 
 ```cpp
 class NonlinearMoog {

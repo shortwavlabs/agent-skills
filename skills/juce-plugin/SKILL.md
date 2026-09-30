@@ -334,7 +334,7 @@ Read these as needed based on what you're implementing:
 - **`references/threejs-webview-ui.md`** — Interactive guitar-gear GLBs, mock/JUCE bindings, physical controls, derived visual state, render-on-demand and staged host validation
 - **`references/audio-thread-safety.md`** — Real-time safety rules: what you can/cannot do in processBlock, lock-free patterns, atomics, debugging audio glitches
 - **`references/cmake-reference.md`** — Full CMake API: all juce_add_plugin properties, SDK paths, binary data, CI/CD, platform specifics
-- **`references/production-plugin-practices.md`** — Product-shaped plugin practices: CMake presets, test/measurement targets, asset/model loading, state restore, latency/tail updates, host validation, and release gates
+- **`references/production-plugin-practices.md`** — Product-shaped plugin practices: CMake presets, test/measurement targets, asset/model loading, state restore, latency/tail updates, oversampled circuit-model plugins (rate policy, integer latency, bypass parameter, model revision), host validation, and release gates
 
 ## Common Patterns
 

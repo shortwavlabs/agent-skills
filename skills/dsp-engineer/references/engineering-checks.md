@@ -9,8 +9,9 @@
 5. [Window And Spectrogram Checks](#window-and-spectrogram-checks)
 6. [Convolution Checks](#convolution-checks)
 7. [Noise Checks](#noise-checks)
-8. [Test Cases](#test-cases)
-9. [Production Notes](#production-notes)
+8. [Coherent Tones And Sub-Sample Phase](#coherent-tones-and-sub-sample-phase)
+9. [Test Cases](#test-cases)
+10. [Production Notes](#production-notes)
 
 ## Before Coding
 
@@ -96,6 +97,22 @@ Check these cases:
   - White noise should be near 0 at lag 1.
   - Brownian noise should be close to 1 at lag 1.
   - Pink noise should sit between them depending on `beta`.
+
+## Coherent Tones And Sub-Sample Phase
+
+Two different "coherence" effects matter when measuring a numerical method's error with test tones:
+
+- **Window coherence** (an integer number of cycles in the analysis window) removes leakage. Prefer it, or use a continuous-time window evaluated at exact bins `k/T` on each signal's own sample grid.
+- **Rate coherence** (an integer number of samples per period at the processing rate, `f = fs / n`) makes a discrete system sample the same points of every cycle. Its discretisation error then depends on the stimulus's sub-sample phase, and can swing by tens of dB with that phase or with a detuning of a fraction of a hertz.
+
+When measuring discretisation error (model at `fs` versus the same model at a much higher rate):
+
+- Compare each run with a reference driven at the **same** phase.
+- For typical or budget figures, use a deterministic phase ensemble `phi_m = phi_0 + 2*pi*f*(m/M)/fs`, `m = 0..M-1`, and average error **power**: `E_avg = 10*log10(mean(10^(E_m/10)))`. Report `E_avg` and the minimum/maximum over `m`.
+- For worst-case checks, keep exact-period tones and require every phase to pass. Never detune tones to make a coherent failure disappear.
+- A harmonic-vector error, `sum_k |X_model(k) - X_ref(k)|^2 / sum_k |X_ref(k)|^2` over the harmonic bins in the band, keeps phase errors visible where magnitude-only metrics hide them.
+
+Gate design built on these measurements (absolute versus budget gates, population-level gates) is in the `circuit-to-dsp` skill's `references/validation-gates.md`.
 
 ## Test Cases
 

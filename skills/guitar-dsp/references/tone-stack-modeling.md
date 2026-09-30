@@ -55,7 +55,7 @@ A passive solver can be small and robust:
 ```text
 known source voltage
   -> conductance matrix for resistors/pot segments
-  -> trapezoidal companion conductances for capacitors
+  -> companion conductances for capacitors (trapezoidal, or an integrator chosen by measurement for stiff networks)
   -> solve node voltages
   -> update capacitor histories
 ```
@@ -117,7 +117,7 @@ Automation is the most common failure mode.
 - Smooth visible controls.
 - Smooth hidden derived controls.
 - Crossfade mode switches and bypass branches.
-- Avoid per-sample coefficient rebuilds unless the algorithm is designed for it.
+- Avoid per-sample coefficient rebuilds unless the algorithm is designed for it. For circuit-accurate tone networks, choose the update cadence by measuring automation against a time-varying circuit reference: holding coefficients for a whole host sample can fail such a test, and realisations that are equivalent for static settings can differ badly under modulation (see the `circuit-to-dsp` skill's `references/circuit-reduction.md`).
 - Reset filter state only when exact bypass or sample-rate changes require it.
 
 ## Measurement And Tests

@@ -81,6 +81,8 @@ input conditioning
   -> output level compensation
 ```
 
+This chain is a musical block structure. When the target is circuit-accurate feedback clipping, the gain cell and clipper are one solved network (clean path included), not a pre-filter/shaper/post-filter chain; see `diode-and-fuzz-circuits.md` and the `circuit-to-dsp` skill.
+
 Useful techniques:
 
 - Shape drive controls so low and mid knob ranges are playable.

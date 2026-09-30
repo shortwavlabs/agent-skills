@@ -1,6 +1,6 @@
 ---
 name: guitar-dsp
-description: Design, implement, debug, train, and validate guitar amp/effects DSP systems, especially realtime C++/JUCE plugins, C++ DSP block modeling, schematic/SPICE reference comparison, nonlinear waveshaping, aliasing and oversampling strategy, tone stack modeling, diode/fuzz circuits, triode and tube stage approximation, speaker cabinet dynamics, RTNeural/neural amp models, cabinet IRs, pedal chains, capture/training/export workflows, neural modeling math theory, plugin validation, and DAW-safe release checks. Use when building guitar amp modelers, pedal emulations, neural audio model training/export, RTNeural loaders, cabinet simulators, tone stacks, guitar-focused realtime DSP, DSP measurement harnesses, or troubleshooting guitar plugin tone quality, latency, CPU, aliasing, oversampling, metrics, losses, or host behavior.
+description: Design, implement, debug, train, and validate guitar amp/effects DSP systems, especially realtime C++/JUCE plugins, C++ DSP block modeling, guitar-specific decisions around schematic/SPICE comparison (the instrument-agnostic method lives in circuit-to-dsp), nonlinear waveshaping, aliasing and oversampling strategy, tone stack modeling, diode/fuzz circuits, triode and tube stage approximation, speaker cabinet dynamics, RTNeural/neural amp models, cabinet IRs, pedal chains, capture/training/export workflows, neural modeling math theory, plugin validation, and DAW-safe release checks. Use when building guitar amp modelers, pedal emulations, neural audio model training/export, RTNeural loaders, cabinet simulators, tone stacks, guitar-focused realtime DSP, DSP measurement harnesses, or troubleshooting guitar plugin tone quality, latency, CPU, aliasing, oversampling, metrics, losses, or host behavior.
 ---
 
 # Guitar DSP
@@ -12,6 +12,8 @@ Use this skill for guitar-centric DSP work that spans tone, realtime safety, C++
 - Load `juce-plugin` as well for JUCE API usage, AudioProcessor/APVTS structure, CMake/plugin formats, UI, assets, signing, validation, or host lifecycle.
 - Load `dsp` as well for low-level filter/effect cookbook implementations.
 - Load `dsp-engineer` as well for spectral analysis, measurements, aliasing experiments, FFT workflows, or prototype reasoning.
+- Load `spice-circuit-modeling` as well for building, qualifying or freezing a SPICE/ngspice or KiCad circuit reference (model provenance, convergence, statement-order stress, netlist parity, golden-data generation).
+- Load `circuit-to-dsp` as well for turning a circuit reference into a realtime model (reduction, state inventory, nonlinear solvers, integrator/rate choice, SPICE-referenced validation gates).
 
 ## Workflow
 
@@ -20,7 +22,7 @@ Use this skill for guitar-centric DSP work that spans tone, realtime safety, C++
    - Nonlinear DSP: waveshaping, clipping, diode/fuzz circuits, tube-like stages, aliasing, DC, harmonic measurement, oversampling.
    - Tone and cabinet modeling: tone stacks, presence/depth, cabinet IR, speaker dynamics, cabinet compression.
    - C++/JUCE DSP modeling: block class shape, parameter snapshots, smoothing, circuit-to-DSP translation, tests, measurement fixtures.
-   - Circuit-reference validation: schematic interpretation, verified SPICE/reference circuits, equivalent stage/control/level measurements, mismatch isolation, and regression tests.
+   - Circuit-reference validation: schematic interpretation, verified SPICE/reference circuits, equivalent stage/control/level measurements, mismatch isolation, and regression tests. Oracle construction belongs to `spice-circuit-modeling`; realtime model construction and gate design to `circuit-to-dsp`.
    - Neural modeling: capture, alignment, training preset selection, export package validation.
    - Runtime integration: RTNeural model loading, inference, sample-rate policy, model metadata, state restore.
    - Product validation: tests, measurement harnesses, plugin validation, DAW smoke, release gates.
