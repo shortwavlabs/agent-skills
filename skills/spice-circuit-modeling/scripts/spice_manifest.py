@@ -205,13 +205,13 @@ def check(manifest: dict, manifest_dir: Path, root_override: str | None = None) 
             fail("file", name, str(path), entry.get("sha256", "present"), "MISSING")
             continue
         digest, size = sha256_file(path), path.stat().st_size
-        for key, actual, kind in (("sha256", digest, "file"), ("size", size, "file size")):
-            if key in entry and actual != entry[key]:
-                if policy == "strict_file":
-                    fail(kind, name, str(path), str(entry[key]), str(actual))
-                else:
-                    advisories.append(f"{name}: whole-file {kind} changed ({entry[key]} -> {actual}) while all pinned "
-                                      "used-card canonical texts still match; allowed by hash_policy used_cards")
+        whole_file_changes = [(kind, entry[key], actual)
+                              for key, actual, kind in (("sha256", digest, "file"), ("size", size, "file size"))
+                              if key in entry and actual != entry[key]]
+        if policy == "strict_file":
+            for kind, expected, actual in whole_file_changes:
+                fail(kind, name, str(path), str(expected), str(actual))
+        fails_before_cards = len(fails)
         for card in entry.get("cards", []):
             try:
                 text = card_text(path, card["name"])
@@ -222,6 +222,12 @@ def check(manifest: dict, manifest_dir: Path, root_override: str | None = None) 
             want = card["sha256"].lower()
             if len(want) < MIN_PREFIX or not actual.startswith(want):
                 fail("card", card["name"], str(path), want, actual)
+        # The used_cards advisory is only true once every pinned card has been checked and matched.
+        cards_ok = len(fails) == fails_before_cards
+        if policy == "used_cards" and whole_file_changes and cards_ok:
+            for kind, expected, actual in whole_file_changes:
+                advisories.append(f"{name}: whole-file {kind} changed ({expected} -> {actual}) while all pinned "
+                                  "used-card canonical texts still match; allowed by hash_policy used_cards")
     for rule in manifest.get("required_text", []):
         try:
             path = resolve(rule["path"], manifest_dir, root)
@@ -421,14 +427,16 @@ def self_test() -> int:
 
         edits = [
             ("unrelated card edited", lambda: lib.write_text(LIB.replace("BF=100", "BF=120")), {"file"}, set(), True),
-            ("used .model edited", lambda: lib.write_text(LIB.replace("RS=0.5", "RS=0.6")), {"file", "card"}, {"card"}, True),
-            ("used .subckt edited", lambda: lib.write_text(LIB.replace("1e5", "2e5")), {"file", "card"}, {"card"}, True),
+            ("used .model edited", lambda: lib.write_text(LIB.replace("RS=0.5", "RS=0.6")), {"file", "card"}, {"card"}, False),
+            ("used .subckt edited", lambda: lib.write_text(LIB.replace("1e5", "2e5")), {"file", "card"}, {"card"}, False),
             ("comment inside used subckt edited", lambda: lib.write_text(LIB.replace("* comment", "* longer comment")),
              {"file", "file size"}, set(), True),
-            ("used card renamed", lambda: lib.write_text(LIB.replace(".model DX", ".model DY")), {"file", "card"}, {"card"}, True),
+            ("used card renamed", lambda: lib.write_text(LIB.replace(".model DX", ".model DY")), {"file", "card"}, {"card"}, False),
             ("used card missing", lambda: lib.write_text(LIB.replace(".model DX D(IS=2e-15 N=1.9\n+ RS=0.5)\n", "")),
-             {"file", "file size", "card"}, {"card"}, True),
+             {"file", "file size", "card"}, {"card"}, False),
         ]
+        # (label, edit, strict_file mismatches, used_cards mismatches, used_cards advisory expected):
+        # the reassuring advisory may appear only when every pinned card still matches.
         for label, edit, want_strict, want_used, used_advisory in edits:
             reset()
             edit()

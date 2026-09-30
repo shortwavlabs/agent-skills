@@ -29,7 +29,8 @@ error (exit 2, "NOT QUALIFIED"), never a silent pass.
 Limits: behavioural expressions are compared as normalised text after remapping v(net)/v(a,b) through the
 net map and i(name) through the element pairing; controlled-source poly controls given as bare node lists
 are not remapped (they are reported as differences when names differ). Adapters are flattened ONE level;
-an adapter that calls another adapter is rejected. Inline .subckt bodies are compared element by element
+an adapter that calls another adapter is rejected. Inside a .subckt only elements are accepted: a local .model,
+a nested .subckt definition or any other directive there is rejected. Inline .subckt bodies are compared element by element
 with the same checks as top-level elements, plus their default parameters; an inline body that itself
 calls a subcircuit is rejected (nested inline subcircuits are not supported). Include files and model
 libraries are not read.
@@ -42,7 +43,9 @@ import argparse
 import copy
 import json
 import re
+import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -310,6 +313,16 @@ def parse(text: str, has_title: bool = True) -> Deck:
             else:
                 deck.control_commands.append(head)
             continue
+        if stack and head.startswith(".") and head != ".ends":
+            # Inside a .subckt only elements and .ends are supported: scoped models, nested definitions and any
+            # other directive would change meaning if treated as deck-level, so fail closed before handling them.
+            if head == ".model":
+                raise NetlistError(f"local .model inside .subckt {stack[-1].name} is not supported; "
+                                   "structural equivalence not established")
+            if head == ".subckt":
+                raise NetlistError(f"nested .subckt definitions are not supported (inside .subckt {stack[-1].name}); "
+                                   "structural equivalence not established")
+            raise NetlistError(f"directive {head} inside .subckt {stack[-1].name} is not supported")
         if head == ".control":
             control = True
             continue
@@ -328,8 +341,6 @@ def parse(text: str, has_title: bool = True) -> Deck:
             body = " ".join(toks[2:]).replace("(", " ").replace(")", " ")
             kind_tok, *rest = tokens(body) or [""]
             deck.models[toks[1]] = kind_tok + " " + " ".join(sorted(canonical_numbers(x) for x in rest))
-        elif head.startswith(".") and stack:
-            raise NetlistError(f"directive {head} inside .subckt {stack[-1].name} is not supported")
         elif head == ".param":
             for t in toks[1:]:
                 if "=" not in t:
@@ -848,6 +859,17 @@ def self_test() -> int:
             problems.append(f"unsupported syntax accepted: {label}")
         except NetlistError:
             pass
+    scoped = [("local .model inside .subckt", "scoped\n.subckt OUTER a b\n.model LOCAL D(IS=1e-14)\nD1 a b LOCAL\n"
+               ".ends OUTER\nX1 n1 0 OUTER\n.end\n"),
+              ("nested .subckt definition", "nested\n.subckt OUTER a b\n.subckt INNER x y\nR1 x y 1k\n.ends INNER\n"
+               "X1 a b INNER\n.ends OUTER\nX2 n1 0 OUTER\n.end\n")]
+    with tempfile.TemporaryDirectory() as tmp:
+        for label, deck_text in scoped:
+            path = Path(tmp) / "deck.cir"
+            path.write_text(deck_text)
+            run = subprocess.run([sys.executable, __file__, str(path), str(path)], capture_output=True, text=True)
+            if run.returncode != 2 or "NOT QUALIFIED" not in run.stderr:
+                problems.append(f"{label}: expected exit 2 NOT QUALIFIED, got {run.returncode} {run.stdout.strip()[-80:]}")
     dup = dict(SELF_ALIAS, rf="r1")        # two derived elements mapped onto one reference element
     if not any("matched twice" in e for e in compare(ref, parse(SELF_DER), adapters, dup, set())[0]):
         problems.append("duplicate mapping not reported")
@@ -858,7 +880,7 @@ def self_test() -> int:
     problems += [f"generic mutation not detected: {m}" for m in missed]
     for p in problems:
         print("SELF-TEST FAILURE:", p)
-    print(f"self-test: {len(SELF_FAULTS)} planted faults, {len(SELF_REJECT)} rejected constructs, "
+    print(f"self-test: {len(SELF_FAULTS)} planted faults, {len(SELF_REJECT) + len(scoped)} rejected constructs, "
           f"{len(mutations(parse(SELF_DER)))} generic mutations: {'PASS' if not problems else 'FAIL'}")
     return 1 if problems else 0
 
