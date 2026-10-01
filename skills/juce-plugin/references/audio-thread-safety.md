@@ -177,7 +177,7 @@ Walk `processBlock()` and everything it calls for:
 - meter work beyond a peak or sum and one atomic publish per block;
 - dry and bypass paths doing wet-path work.
 
-The audit finds **risks**; a profile sets **priority**. Fix an item at once when it is a correctness or realtime-safety risk. Otherwise measure first: next to a nonlinear core these items are often under a percent of the callback, and a clean audit does not mean the callback is cheap. The method (audio-thread versus editor attribution, headless versus live-callback measurement, stage breakdown, null tests) is in [performance-investigation.md](performance-investigation.md).
+The audit finds **risks**; a profile sets **priority**. Fix an item at once when it is a correctness or realtime-safety risk. Otherwise measure first: next to a nonlinear core these items can be a negligible share of the callback, and a clean audit does not mean the callback is cheap. The method (audio-thread versus editor attribution, headless versus live-callback measurement, stage breakdown, null tests) is in [performance-investigation.md](performance-investigation.md).
 
 ## Debugging Audio Glitches
 

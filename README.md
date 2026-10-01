@@ -125,7 +125,7 @@ skills/juce-plugin/
     ├── audio-thread-safety.md  Real-time safety: processBlock rules, lock-free patterns, debugging
     ├── cmake-reference.md      Full CMake API: juce_add_plugin, SDK paths, CI/CD, platform specifics
     ├── production-plugin-practices.md  Product plugin practices: validation, assets, state restore
-    └── performance-investigation.md    CPU attribution (audio thread vs editor), headless vs live callback, matrix, tooling, gates, report
+    └── performance-investigation.md    CPU attribution, headless vs live callback, matrix, tooling, equivalence classes, gates, report
 ```
 
 #### What it covers
@@ -145,7 +145,7 @@ skills/juce-plugin/
 | **Build system** | CMake: juce_add_plugin, SDK paths, binary data, cross-platform, GitHub Actions CI/CD |
 | **Plugin formats** | VST3, AU, AUv3, AAX, LV2, Standalone — format-specific categories and properties |
 | **Production practices** | Separate plugin/test/measurement builds, asset/model loading, state restore, oversampled circuit-model plugins (rate policy, integer latency, bypass parameter, model revision), host validation, release gates |
-| **Performance investigation** | Attributing DSP, message-thread and WebView cost before optimizing; editor-closed vs open, bypass and silence isolations; headless vs live-callback measurement; test matrix; stage breakdown and profile interpretation; harness and live-host tooling; null tests; WebView meter/repaint cost, change-driven shadow maps and redraw cadence; multi-instance scaling; gate hierarchy; report with rejected candidates |
+| **Performance investigation** | Where a plugin's CPU goes and how to prove a fix: attribution before optimization, headless versus live-callback measurement, equivalence classes, performance gates, and a report that keeps rejected candidates |
 
 #### Source documentation
 
@@ -175,7 +175,7 @@ Use these existing skills together for Blender-authored amps, pedals and rack ge
 - [Project layout](skills/juce-plugin/references/threejs-webview-ui.md#minimal-project-layout) connects the Blender derivative, frontend assets and JUCE BinaryData.
 - [Independent validation manifest](skills/guitar-gear-modeling/references/runtime-export.md#validation-manifest-example) specifies semantic nodes, unique names, hit targets and choice indices. The runtime camera file is separate from the QA-only `expected_camera_presets` snapshot.
 - [Runtime QA](skills/guitar-gear-qa/references/runtime-qa.md) distinguishes static asset totals from frame metrics and covers legal state combinations, automation, restoration, accessibility, instance profiling and matched visual evidence for performance candidates.
-- [Performance investigation](skills/juce-plugin/references/performance-investigation.md) separates audio-thread cost from editor cost before anything is optimized.
+- [Performance investigation](skills/juce-plugin/references/performance-investigation.md) attributes cost between DSP and editor before anything is optimized.
 - [WebView compatibility and packaging](skills/juce-plugin/references/webview-ui.md) covers version checks, offline resources, production CSP and resource-copy costs.
 - [Native gesture regression check](skills/juce-plugin/scripts/webview_gesture_check.cpp) covers normal completion, cancellation-equivalent completion, active teardown and idle teardown. Its guard is a JUCE 9.0.1-specific workaround; see [build instructions and scope](skills/juce-plugin/references/webview-ui.md#gesture-cleanup-on-editor-destruction) before adapting it to another version.
 
@@ -229,7 +229,7 @@ skills/guitar-dsp/
 | **Nonlinear DSP** | Waveshaping families, diode/fuzz circuits, tube-stage approximation, aliasing analysis, local oversampling islands, ADAA tradeoffs |
 | **Tone and speaker modeling** | Passive/active tone stacks, insertion loss, speaker compression, resonance, breakup, dynamic cabinet behavior |
 | **Diagnosis and validation** | Failure matrix, Python/native parity, native benchmarks, aliasing reports, DSP unit tests, measurement harnesses, auval/pluginval, DAW smoke |
-| **Performance** | High-CPU playbook and guitar-specific cases (mono source on a stereo track, silence, exact channel sharing versus mono processing); routes to `juce-plugin` for the investigation method and to `circuit-to-dsp` for model shortcuts |
+| **Performance** | Guitar-specific cases (mono source on a stereo track, silence) and routing to `juce-plugin` for the investigation method and `circuit-to-dsp` for model shortcuts |
 
 ### Circuit modeling skills (SPICE → KiCad → realtime DSP → JUCE)
 

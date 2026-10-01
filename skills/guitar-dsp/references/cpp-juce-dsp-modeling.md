@@ -182,10 +182,8 @@ Attribute the cost before optimizing, then fix the dominant stage, not the most 
 
 The fastest wins usually came from removing work from the hot path:
 
-- Find duplicated stereo work. A host runs most effects stereo even for a mono guitar, so a dual-mono chain computes identical channels twice. There are two different remedies, and they must not be confused:
-  - collapse a core that is mono **by design** (a mono amp capture, a deliberate fold). This is a product decision: it changes what a true stereo input sounds like;
-  - share one expensive stateful stage while both channels' inputs **and** states are bit-identical. This is exact and leaves stereo behaviour untouched ([model-performance.md](../../circuit-to-dsp/references/model-performance.md#identical-channel-sharing)).
-- Benchmark digital silence as its own signal. A stateful nonlinear stage can cost nearly as much on zeros as on a guitar; a safe way to stop that work is a [settled-state hold](../../circuit-to-dsp/references/model-performance.md#settled-state-hold), not a gate.
+- Find duplicated stereo work: a mono guitar often reaches the plugin as two identical channels. Collapsing a core that is mono by design and sharing an expensive stage between equivalent channels are different remedies; see the [mono and stereo policy](guitar-signal-chain.md#mono-and-stereo-policy).
+- Benchmark digital silence as its own signal; a stateful nonlinear stage is not automatically cheap on zeros. Stopping that work safely is a [settled-state hold](../../circuit-to-dsp/references/model-performance.md#settled-state-hold), not a gate.
 - Hoist repeated buffer pointer lookups out of inner loops.
 - Cache coefficient sets and mode-dependent constants.
 - Skip per-sample conversions and control interpolation while smoothers are at rest; measure the gain before claiming one.

@@ -215,19 +215,25 @@ Choose the rate by measurement and by looking at the result; 30 Hz is a common s
 
 ### What a meter costs in a WebView
 
-The cost is per repaint, not per pixel. A small element is not a cheap repaint: each one runs style, layout, paint and a compositor commit across the content and GPU processes, and that can exceed everything else the editor does while audio plays. None of it appears in a DAW's audio CPU meter. Measure the host main thread, the content process and the GPU process with the meter hidden (`display: none`), then with each part shown, before choosing a remedy.
+A small element does not guarantee a small cost. Repaint and compositor overhead can dominate even for a visually tiny meter, and it may not scale with the dirty area or linearly with the update rate. Find out which part pays (bridge traffic, script, layout, paint or compositing) before choosing a remedy: measure the host main thread, the content process and the GPU process with the meter hidden (`display: none`), then with each piece shown.
 
-- Move bars and needles with `transform` on an element that has its own compositor layer (`will-change: transform`). A transform change on a composited layer needs no layout and no repaint. Measure that it helped: promoting a layer while something else still repaints on every event saves nothing.
-- Give text its own, slower cadence. A numeric reading can update a few times a second while the bar follows every event. Add a trailing write so the last value is never left stale.
-- Write each DOM value only when it changed. A status event must not rewrite calibration text, tooltips, ARIA attributes or marker positions that did not move.
-- Read layout once per frame, compute, then write. Interleaved read/write pairs force a layout at every read. Profile before and after; the saving may be small.
-- A meter update must not redraw a WebGL scene.
+Patterns that helped, each to be confirmed by measurement on the target WebView:
 
-*Case study: a 4-pixel bar and a numeric reading at about 28 events per second cost 14.6 % of a core across the main thread, content process and GPU process, with zero WebGL frames. A composited bar with the reading at two writes per second cost 6.3 %. Putting the bar, or the whole meter, on its own layer while the text still repainted every event saved nothing; the repaint cost also did not scale linearly with rate. The rates were chosen from those measurements for that product.*
+- Move bars and needles with `transform` on an element that has its own compositor layer (`will-change: transform`), which can avoid layout and repaint for that element. Promoting a layer while something else still repaints on every event may save nothing.
+- Give text its own, slower cadence, independent of the bar, with a trailing write so the last value is not left stale.
+- Write each DOM value only when it changed. A status event should not rewrite calibration text, tooltips, ARIA attributes or marker positions that did not move.
+- Read layout once per frame, compute, then write; interleaved read/write pairs can force a layout at every read. Profile before and after: the saving may be small.
+- A meter update should not redraw a WebGL scene.
+
+*Case study (one WebView, one machine): a few-pixel bar and a numeric reading updated on every status event cost a double-digit percentage of a core across the main thread, content process and GPU process, with zero WebGL frames. Hidden, the same traffic cost a fraction of that; a composited bar added almost nothing beyond the bridge traffic; the text repaint was the cost, and it did not scale linearly with rate. The rates finally chosen came from those measurements and are that product's, not defaults.*
 
 ### Idle acceptance
 
-With nothing changing, an embedded page draws zero frames, exchanges zero bridge messages in either direction, receives zero resize callbacks and polls neither parameters nor presets; only deliberately active telemetry is exempt. Verify with counters (wrap `requestAnimationFrame` and the bridge entry points from a test host), not by reading the code. The full method, including measuring the WebView's helper processes, is in [performance-investigation.md](performance-investigation.md).
+For a **static** editor, one with no intentionally continuous visual behaviour, the target when nothing changes is approximately zero frames, zero unnecessary bridge traffic in either direction, zero resize callbacks and zero parameter or preset polling. Verify with counters (wrap `requestAnimationFrame` and the bridge entry points from a test host), not by reading the code.
+
+Intentional activity is not a failure: a meter while audio flows, a tuner, a scope or spectrum, an animated visualization. Each should have an explicit rate, a measured cost, throttling when not visible and no unnecessary 3D redraws. "Zero frames at all times" is not a universal gate.
+
+Whether this activity shows in a host's own performance meter depends on the host; attribute it by thread and process as described in [performance-investigation.md](performance-investigation.md).
 
 ## Sources and verification
 

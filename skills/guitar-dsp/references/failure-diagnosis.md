@@ -57,7 +57,7 @@ Work from audible symptom to a measurable check. Avoid changing several tone var
 | Filter sounds different by sample rate | Frequency clamps wrong, bilinear math using stale sample rate, coefficient update missed | Sweep at 44.1/48/96 kHz; recompute on prepare/sample-rate change; clamp below Nyquist |
 | Silence produces CPU spikes | Denormals in filters/envelopes/reverbs | Use `juce::ScopedNoDenormals`; snap tiny state to zero; add silence benchmark |
 | CPU stays high on an idle track | A stateful nonlinear or circuit model keeps integrating on zeros; nothing stops it | Benchmark silence against signal; read `circuit-to-dsp` [model-performance.md](../../circuit-to-dsp/references/model-performance.md#settled-state-hold) before adding any silence path |
-| Stereo costs twice mono for a mono guitar | The host instantiates stereo and both channels carry identical samples | Benchmark stereo with identical L/R; consider exact [identical-channel sharing](../../circuit-to-dsp/references/model-performance.md#identical-channel-sharing); forcing mono is a product decision |
+| Stereo costs twice mono for a mono guitar | The host instantiates stereo and both channels carry identical samples | Benchmark stereo with identical L/R; consider [identical-channel sharing](../../circuit-to-dsp/references/model-performance.md#identical-channel-sharing); forcing mono is a product decision |
 
 ## Circuit-Reference Mismatches
 
@@ -71,7 +71,7 @@ Use the [mismatch triage table](../../circuit-to-dsp/references/circuit-referenc
 | DAW reopen changes tone | Default parameter mismatch, prepare/reset order, model/IR async restore race | Save/reopen smoke in at least one DAW; compare rendered fixture before/after reopen |
 | AU/VST3 validation fails | Bus layout mismatch, tail/latency reporting, parameter range issue, thread misuse | Run `auval`/pluginval; inspect bus layout support; check latency/tail updates |
 | Meter/UI update causes clicks | Audio callback posts messages, allocates strings, or locks UI data | Publish atomics/ring snapshots; move formatting to message thread |
-| CPU only fails in host | Debug build, live callback clocked lower than a back-to-back benchmark, host buffer size, offline render path differs, editor cost mistaken for DSP cost | Measure the built plugin in a live audio callback with the editor closed and open; a host's audio meter excludes the editor's processes. See `juce-plugin` [performance-investigation.md](../../juce-plugin/references/performance-investigation.md) |
+| CPU only fails in host | Debug build, live callback scheduled or clocked differently from a back-to-back benchmark, host buffer size, offline render path differs, editor cost mistaken for DSP cost (or the reverse) | Establish what the host's meter measures; measure the built plugin in a live audio callback with the editor closed and open. See `juce-plugin` [performance-investigation.md](../../juce-plugin/references/performance-investigation.md) |
 
 ## First Reports To Collect
 

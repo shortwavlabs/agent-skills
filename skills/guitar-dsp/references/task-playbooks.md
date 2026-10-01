@@ -166,8 +166,8 @@ The method has one owner; this playbook only adds the guitar-specific inputs.
 
 1. Record the complaint exactly: which meter, which host, buffer size, rate, mono or stereo source, editor open or closed, transport state.
 2. Follow the `juce-plugin` skill's [performance-investigation.md](../../juce-plugin/references/performance-investigation.md) for attribution, the control baseline, measurement, gates and the report.
-3. Use guitar inputs in the matrix: digital silence, a guitar-like fixture, and a mono source presented as identical stereo channels, because that is how a guitar track usually reaches an effect.
-4. For a circuit model, take the exact shortcuts in the `circuit-to-dsp` skill's [model-performance.md](../../circuit-to-dsp/references/model-performance.md) before anything that changes the model; for oversampling decisions see `aliasing-oversampling.md`.
+3. Use guitar inputs in the matrix: digital silence, a guitar-like fixture, and a mono source presented as identical stereo channels, because that is how a guitar track often reaches an effect.
+4. For a circuit model, follow the order of work in the `circuit-to-dsp` skill's [model-performance.md](../../circuit-to-dsp/references/model-performance.md) before anything that changes the model; for oversampling decisions see `aliasing-oversampling.md`.
 5. Keep product decisions (mono processing, lower fidelity) out of the pass unless the owner decides them on measured evidence.
 
 ## Design A Release Validation Plan

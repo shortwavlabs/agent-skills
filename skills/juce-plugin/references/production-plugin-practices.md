@@ -149,7 +149,7 @@ Measurement target:
 - Include expensive stages such as neural inference, convolution, tuner analysis, pitch shifting, reverb, and full chain.
 - Capture automation stress metrics where abrupt changes can cause clicks or instability.
 - Benchmark digital silence and stereo with identical channels as their own cases; neither is automatically cheap.
-- Allocate the engine as the plugin does (inside a heap-allocated processor) and keep one harness for before/after comparisons.
+- Construct and own the engine as the product does, and keep one harness for before/after comparisons.
 - Dump reference renders so a performance change can be null-tested against the previous build.
 
 A headless target measures work; a live audio-device callback measures deadline behaviour and editor cost. For a CPU investigation or a performance pass, follow [performance-investigation.md](performance-investigation.md).

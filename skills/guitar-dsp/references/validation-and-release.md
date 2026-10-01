@@ -123,7 +123,7 @@ Build offline measurement tools for Repeatable Release data:
 
 Run measurement harnesses in Release. Debug timing is useful for correctness but not for product headroom.
 
-A back-to-back harness measures work; it does not reproduce a host's callback scheduling or clock scaling, and it cannot see the editor. For a CPU complaint or a performance pass, follow the `juce-plugin` skill's [performance-investigation.md](../../juce-plugin/references/performance-investigation.md): attribution, live-callback measurement, multi-instance scaling, performance gates and the report. A performance change ships only with a null test against the previous build and every existing gate passing unchanged, including the circuit-reference tiers above when fidelity is a requirement.
+A back-to-back harness measures work; it does not reproduce a host's callback scheduling and cannot see the editor. For a CPU complaint or a performance pass, follow the `juce-plugin` skill's [performance-investigation.md](../../juce-plugin/references/performance-investigation.md). A performance change ships only with a null test against the previous build and every existing gate passing unchanged, including the circuit-reference tiers above when fidelity is a requirement.
 
 ## Plugin Host Validation
 

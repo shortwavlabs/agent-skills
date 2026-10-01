@@ -94,9 +94,9 @@ Cache coefficients per control value and stage kind so static controls cost noth
 
 - **Back-to-back** benchmarks (process blocks as fast as possible on one thread) measure kernel cost. **Live callback** duty cycle (time per callback divided by the block period, inside a real audio device callback) includes clock scaling and scheduling; it is often much higher. Sleep-paced synthetic loops can mislead in both directions because of CPU frequency scaling. Report which one you measured.
 - Report mean, p95, p99, p99.9, worst block, block-period percentage, overruns, and solver statistics (evaluations per solve, re-seeds, cap hits) across host rates, block sizes, mono, stereo with different channels and stereo with identical channels, static and continuously automated controls, and silence, normal and stress signals. Silence and identical-channel stereo are separate rows because a host often presents both and neither is automatically cheap.
-- Time the stages separately (resampling filters, islands, host-rate work) before optimizing; the filters are rarely the cost of an implicit island.
+- Time the stages separately (resampling filters, islands, host-rate work) before optimizing; do not assume the filters are the cost of an implicit island.
 - Re-run a single outlier before calling it a regression; call it a regression only when it repeats.
-- Keep correctness gates (machine-independent) separate from performance gates (machine-specific, with the machine named).
+- Keep correctness criteria separate from performance thresholds. Correctness does not depend on a performance machine, but it is still run on each supported target configuration where implementation differences can matter; performance thresholds name the platform and build they were measured on.
 - Reducing the measured cost without changing the model is in [model-performance.md](model-performance.md). Attribution between audio thread and editor, harness construction and the live-host tooling are in the `juce-plugin` skill's `references/performance-investigation.md`.
 
 ## Checklist

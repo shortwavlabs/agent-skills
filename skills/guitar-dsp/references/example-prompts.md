@@ -33,7 +33,7 @@
 - "Use $guitar-dsp to debug why my dry/wet compressor blend sounds hollow."
 - "Use $guitar-dsp to explain why this plugin reports latency even though the RTNeural model is causal."
 - "Use $guitar-dsp to inspect this preset reload bug where the cabinet IR path disappears after reopening the DAW."
-- "Use $guitar-dsp to find out why one instance of this pedal plugin shows 11 % CPU on an idle track, and reduce it without changing the sound."
+- "Use $guitar-dsp to find out why one instance of this pedal plugin shows high CPU on an idle track, and reduce it without changing the sound."
 
 ## Validation Prompts
 

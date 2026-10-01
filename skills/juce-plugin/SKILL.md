@@ -330,8 +330,8 @@ Read these as needed based on what you're implementing:
 - **`references/parameter-management.md`** — APVTS patterns: parameter layout, attachments, raw pointers, non-parameter state, parameter groups
 - **`references/dsp-patterns.md`** — DSP cookbook: ProcessorChain, filters, oscillators, waveshapers, convolution reverb, delay lines, wavetable synthesis, LFO at control rate, two-level chain architecture, per-sample vs block processing
 - **`references/ui-patterns.md`** — Editor patterns: component layout, custom widgets, LookAndFeel, meters, FFT spectrum analyser, responsive resize, binary data for assets
-- **`references/webview-ui.md`** — JUCE 9 WebBrowserComponent, WebView2, local resources, native functions, parameter bindings, frontend frameworks and explicit development mode
-- **`references/threejs-webview-ui.md`** — Interactive guitar-gear GLBs, mock/JUCE bindings, physical controls, derived visual state, render-on-demand and staged host validation
+- **`references/webview-ui.md`** — JUCE 9 WebBrowserComponent, WebView2, local resources, native functions, parameter bindings, frontend frameworks, explicit development mode, and streaming visual data (meter and repaint cost, idle acceptance)
+- **`references/threejs-webview-ui.md`** — Interactive guitar-gear GLBs, mock/JUCE bindings, physical controls, derived visual state, render-on-demand, shadow-map invalidation, redraw cadence, pixel ratio, draw calls and staged host validation
 - **`references/audio-thread-safety.md`** — Real-time safety rules: what you can/cannot do in processBlock, lock-free patterns, atomics, debugging audio glitches
 - **`references/cmake-reference.md`** — Full CMake API: all juce_add_plugin properties, SDK paths, binary data, CI/CD, platform specifics
 - **`references/performance-investigation.md`** — A plugin "uses too much CPU": attributing audio-thread, message-thread and WebView cost before optimizing, headless versus live-callback measurement, the test matrix, stage breakdown, harness and live-host tooling, null tests, multi-instance scaling, performance gates, and the report
@@ -369,6 +369,6 @@ Store presets as XML files loaded via `juce::File` or embedded as binary data. U
 - **Cache `getRawParameterValue()` pointers** as members — never call it inside `processBlock()`.
 - **Pre-allocate all buffers** in `prepareToPlay()`, never in `processBlock()`.
 - **Use `juce::ScopedNoDenormals`** at the top of `processBlock()` to avoid performance penalties from denormal floats.
-- **Attribute CPU before optimizing** — a DAW's own CPU meter shows audio-engine load, not the editor. Compare the callback with the editor closed and open, and bypassed, before deciding whether the DSP or the UI is the problem (`references/performance-investigation.md`).
+- **Attribute CPU before optimizing** — what a host's performance meter measures is host-specific. Compare the audio callback with the editor closed and open, and bypassed, before deciding whether the DSP or the UI is the problem (`references/performance-investigation.md`).
 - **Set `COPY_PLUGIN_AFTER_BUILD TRUE`** in CMake for rapid iteration — plugins auto-install after each build.
 - **Close your DAW before rebuilding** — DAWs lock plugin files while loaded.

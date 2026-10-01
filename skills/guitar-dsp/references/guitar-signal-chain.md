@@ -68,9 +68,9 @@ Many guitar amp captures and RTNeural exports are mono. Be explicit:
 
 For stereo neural package playback, prefer one independent model instance per channel. Stateful models should not share a single RTNeural object across channels.
 
-A mono guitar on a stereo track usually reaches the plugin as two identical channels, so an independent-per-channel design pays twice for one signal. Keep two responses apart:
+A mono guitar on a stereo track often reaches the plugin as two identical channels, so an independent-per-channel design pays twice for one signal. Keep two responses apart:
 
-- **Exact sharing**: run one stateful stage while both channels' inputs and states are bit-identical and copy the result, returning to two instances on the first differing sample. Stereo behaviour is unchanged. See the `circuit-to-dsp` skill's [model-performance.md](../../circuit-to-dsp/references/model-performance.md#identical-channel-sharing).
+- **Sharing between equivalent channels**: an engineering optimization that leaves stereo behaviour unchanged when its conditions hold. The conditions, limits and tests are in the `circuit-to-dsp` skill's [model-performance.md](../../circuit-to-dsp/references/model-performance.md#identical-channel-sharing).
 - **Mono processing**: fold and process once. This changes what a true stereo input sounds like and is a product decision, to be exposed or documented, not introduced as an optimization.
 
 ## Amp Model And Tone Stack
