@@ -1,6 +1,6 @@
 ---
 name: circuit-to-dsp
-description: Turn a validated analog circuit reference (SPICE netlist, schematic) into a bounded realtime DSP model and prove it matches. Covers circuit reduction and physical state design, reduced op-amp and device models, monotone nonlinear solvers and lookup-table proofs, integrator and internal-rate selection, oversampling evidence, exact DC reset, time-varying controls, error decomposition, phase-ensemble and population-level validation gates, hard gates versus quality targets, and the end-to-end SPICE → KiCad → C++ → JUCE workflow. Use when building virtual-analog or circuit-accurate emulations (pedals, preamps, filters, compressors, synth circuits), choosing between waveshapers, nodal/state-space, DK or WDF models, designing Newton solvers for diode or transistor stages, choosing an integrator or oversampling rate for stiff circuits, or designing SPICE-referenced regression gates for a realtime model.
+description: Turn a validated analog circuit reference (SPICE netlist, schematic) into a bounded realtime DSP model and prove it matches. Covers circuit reduction and physical state design, reduced op-amp and device models, monotone nonlinear solvers and lookup-table proofs, integrator and internal-rate selection, oversampling evidence, exact DC reset, time-varying controls, error decomposition, phase-ensemble and population-level validation gates, hard gates versus quality targets, and the end-to-end SPICE → KiCad → C++ → JUCE workflow. Use when building virtual-analog or circuit-accurate emulations (pedals, preamps, filters, compressors, synth circuits), choosing between waveshapers, nodal/state-space, DK or WDF models, designing Newton solvers for diode or transistor stages, choosing an integrator or oversampling rate for stiff circuits, designing SPICE-referenced regression gates for a realtime model, or reducing the CPU cost of a circuit model that already passes its gates.
 ---
 
 # Circuit To DSP
@@ -31,6 +31,7 @@ This skill also owns [references/circuit-reference-validation.md](references/cir
 8. **Validate controls in motion** against a time-varying reference.
 9. **Gates must mean something**: hard gates for required bounds, visible quality targets for preferred margins, NOT EVALUATED when the data cannot establish a gate, completeness checked by content.
 10. **Never loosen a gate to get green.** Revise a criterion only as a documented, evidenced revision.
+11. **Speed up a validated model without changing it.** Remove duplicated and already-known computation first; any change to the arithmetic, rate or tolerance is a new revision that re-runs every gate.
 
 ## End-To-End Playbook
 
@@ -56,7 +57,7 @@ A reusable checklist; each step names the skill/reference that owns the details.
 | 16 | Validate oracle → reduced model → production path, with decomposed errors | [validation-gates.md](references/validation-gates.md) |
 | 17 | Integrate into JUCE: rate policy, latency, bypass, state | `juce-plugin`; [integrators-and-rates.md](references/integrators-and-rates.md) |
 | 18 | Validate hosts (pluginval, auval, DAW smoke) | `juce-plugin` production-plugin-practices; `guitar-dsp` validation-and-release for guitar products |
-| 19 | Benchmark realtime performance (back-to-back and live callback) | [integrators-and-rates.md](references/integrators-and-rates.md) |
+| 19 | Benchmark realtime performance (back-to-back and live callback); take exact shortcuts before any numerical change | [integrators-and-rates.md](references/integrators-and-rates.md); [model-performance.md](references/model-performance.md); `juce-plugin` performance-investigation for attribution and tooling |
 | 20 | Preserve evidence, known limitations, omission register and model/document identities | [validation-gates.md](references/validation-gates.md); [circuit-reference-validation.md](references/circuit-reference-validation.md) (release integrity) |
 
 Iterate: a failed gate at step 16 usually sends you back to 9–13, not to a wider tolerance.
@@ -70,6 +71,7 @@ Iterate: a failed gate at step 16 usually sends you back to 9–13, not to a wid
 | [references/nonlinear-solvers.md](references/nonlinear-solvers.md) | Deriving the nonlinear residual, feedback clipping, monotone scalar solvers, solver memory, fuzzing, device laws, table proofs |
 | [references/integrators-and-rates.md](references/integrators-and-rates.md) | Comparing integrators, choosing the internal rate and oversampling policy, measuring production filters, latency/bypass, coefficient cadence, performance measurement |
 | [references/validation-gates.md](references/validation-gates.md) | Error decomposition, stage isolation, hard gates versus quality targets, phase ensembles, population-level gates, tiers, criteria changes, reporting |
+| [references/model-performance.md](references/model-performance.md) | Reducing the cost of a model that already passes its gates: what is contract and what is not, order of work, identical-channel sharing, settled-state hold and how to derive its tolerance, constants while controls rest, the evidence required |
 | [references/case-study-sd1-overdrive.md](references/case-study-sd1-overdrive.md) | A worked example (clearly labelled case study) when a concrete precedent helps; never a source of defaults |
 
 ## Project-Specific Outcomes Are Not Rules
@@ -94,3 +96,7 @@ Rates, integrators, state counts, coupling choices, tolerance values, margin siz
 | A smoke tier recomputing a population gate from its subset | NOT EVALUATED plus a subset diagnostic; release tiers must be complete |
 | Hiding a missed margin, or failing the build on a preference | Hard gates for requirements; reported targets for margins |
 | Widening a gate to get a green build | Keep it red and report, or revise it with documented evidence |
+| Lowering the oversampling factor, solver accuracy or integrator to save CPU | Those are the validated contract; time the stages and take exact shortcuts first |
+| Assuming silence is cheap | A stateful model integrates on zeros; benchmark silence and hold only after verified convergence |
+| Forcing mono to halve stereo cost | Share one island only while inputs and states are bit-identical; mono processing is a product decision |
+| Picking a convergence tolerance as a round number, or waiting for bit-stationary state | Derive it from the settled model's measured rounding-noise floor over the corners |

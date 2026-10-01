@@ -45,6 +45,21 @@ Start around 2K primary surfaces and 1K–2K grille, with shared hardware textur
 
 Record unique image count, dimensions, formats and estimated decoded memory. An uncompressed RGBA8 image costs width × height × 4 bytes, about 4/3 of that with a full mip chain: a 2048² image is about 21.3 MiB with mips, even if its PNG is small. Actual formats, render targets and environment maps alter the total; multiple independent WebViews may duplicate it.
 
-First ship a correct baseline GLB. Consider KTX2/Basis texture compression or Draco/mesh compression only after profiling shows the relevant bottleneck. Include any decoder/transcoder JS/WASM locally, test backend support and decode latency, and compare quality at the same view. Compression is not a substitute for removing invisible construction geometry.
+Texture memory and frame time are different problems. With mip-mapping, a larger map costs memory while its editor is open and little or no frame time, so a smaller map is a memory decision: weigh it against how long editors stay open and how many are open at once, and do not expect it to fix CPU.
+
+Judge resolution from density, not from source dimensions:
+
+```text
+texel density  = texture pixels across a surface / its physical width          (texels per mm)
+screen density = drawing-buffer pixels across the view / physical width in view (pixels per mm)
+```
+
+Evaluate screen density at the closest supported zoom for every editor-size tier, using the renderer's actual pixel ratio. Where texel density is well above the largest tier's screen density, a smaller map is a candidate; where it is at or below it, the map is already the limit. Then confirm with matched views in the target WebView ([performance candidates](../../guitar-gear-qa/references/runtime-qa.md#performance-candidates-that-can-change-appearance)): the signature surfaces (relief, engraving, wear, fine grain) fail first, and they fail on the largest tier.
+
+*Case study: half-resolution normal, hardware and enclosure maps were indistinguishable at the default tier and visibly softer at the largest tier's closest zoom, where the screen put about 30 pixels on a millimetre against 20 for the halved relief map. They saved memory only, so the maps stayed.*
+
+When a plugin has fixed size tiers, lower-resolution texture sets for the small tiers are an option. Pursue it only when the memory matters, switching and loading between tiers is robust, equivalence is proven per tier, and the pipeline cost is justified.
+
+First ship a correct baseline GLB. Consider KTX2/Basis texture compression or Draco/mesh compression only after profiling shows the relevant bottleneck. Compressed-texture support is architectural, not only an asset format: check that the transcoder ships locally, whether it needs WebAssembly and a worker, whether the page's Content Security Policy permits both, and how each target WebView behaves, then test decode latency and compare quality at the same view. Do not recommend it for a page whose policy forbids its worker. Compression is not a substitute for removing invisible construction geometry.
 
 If grille/labels vanish only inside JUCE, inspect resource responses, MIME types and CSP before rebaking. GLB embedded images can decode through `blob:` URLs; the policy must allow the required image scheme. See [offline resources](../../juce-plugin/references/webview-ui.md#local-resources-and-development-mode).

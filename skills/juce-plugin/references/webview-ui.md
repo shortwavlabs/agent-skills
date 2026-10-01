@@ -209,7 +209,25 @@ The sample `bytes()` helper allocates/copies the entire resource on each request
 
 ## Streaming visual data
 
-Never access WebView from `processBlock()`. Publish reduced meter/spectrum state through atomics or a lock-free queue. A message-thread timer snapshots it, builds a payload and sends only while visible at an appropriate rate (for example 30 Hz for meters); stop with editor destruction. See [audio-thread safety](audio-thread-safety.md). Attachments remain authoritative for controls; custom events carry non-parameter visual data. Do not serialize every audio block or continuously render a static panel.
+Never access WebView from `processBlock()`. Publish reduced meter/spectrum state through atomics or a lock-free queue. A message-thread timer snapshots it, builds a payload and sends it only while visible and only when it changed; stop with editor destruction. See [audio-thread safety](audio-thread-safety.md). Attachments remain authoritative for controls; custom events carry non-parameter visual data. Do not serialize every audio block or continuously render a static panel.
+
+Choose the rate by measurement and by looking at the result; 30 Hz is a common starting point, not a rule. When the rate changes, keep the display's timing: scale per-tick decay and hold counts so the ballistics stay the same per second.
+
+### What a meter costs in a WebView
+
+The cost is per repaint, not per pixel. A small element is not a cheap repaint: each one runs style, layout, paint and a compositor commit across the content and GPU processes, and that can exceed everything else the editor does while audio plays. None of it appears in a DAW's audio CPU meter. Measure the host main thread, the content process and the GPU process with the meter hidden (`display: none`), then with each part shown, before choosing a remedy.
+
+- Move bars and needles with `transform` on an element that has its own compositor layer (`will-change: transform`). A transform change on a composited layer needs no layout and no repaint. Measure that it helped: promoting a layer while something else still repaints on every event saves nothing.
+- Give text its own, slower cadence. A numeric reading can update a few times a second while the bar follows every event. Add a trailing write so the last value is never left stale.
+- Write each DOM value only when it changed. A status event must not rewrite calibration text, tooltips, ARIA attributes or marker positions that did not move.
+- Read layout once per frame, compute, then write. Interleaved read/write pairs force a layout at every read. Profile before and after; the saving may be small.
+- A meter update must not redraw a WebGL scene.
+
+*Case study: a 4-pixel bar and a numeric reading at about 28 events per second cost 14.6 % of a core across the main thread, content process and GPU process, with zero WebGL frames. A composited bar with the reading at two writes per second cost 6.3 %. Putting the bar, or the whole meter, on its own layer while the text still repainted every event saved nothing; the repaint cost also did not scale linearly with rate. The rates were chosen from those measurements for that product.*
+
+### Idle acceptance
+
+With nothing changing, an embedded page draws zero frames, exchanges zero bridge messages in either direction, receives zero resize callbacks and polls neither parameters nor presets; only deliberately active telemetry is exempt. Verify with counters (wrap `requestAnimationFrame` and the bridge entry points from a test host), not by reading the code. The full method, including measuring the WebView's helper processes, is in [performance-investigation.md](performance-investigation.md).
 
 ## Sources and verification
 

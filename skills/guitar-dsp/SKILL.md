@@ -26,6 +26,7 @@ Use this skill for guitar-centric DSP work that spans tone, realtime safety, C++
    - Neural modeling: capture, alignment, training preset selection, export package validation.
    - Runtime integration: RTNeural model loading, inference, sample-rate policy, model metadata, state restore.
    - Product validation: tests, measurement harnesses, plugin validation, DAW smoke, release gates.
+   - Performance: high CPU in a host, benchmark and profiling passes, making an accepted model cheaper without changing its sound. Attribute the cost first; the method belongs to `juce-plugin`, model shortcuts to `circuit-to-dsp`.
 2. Read only the reference files needed for that task.
 3. Keep the audio callback hard-realtime: no file I/O, JSON parsing, model construction, IR loading, allocations, locks, UI calls, logging, or object destruction that could touch data read by the audio thread.
 4. Validate tone and behavior with measurable checks before polishing UI: bypass identity, finite output, reset determinism, automation safety, latency, tail reporting, CPU headroom, aliasing, and DAW state restore.
@@ -36,8 +37,8 @@ Use this skill for guitar-centric DSP work that spans tone, realtime safety, C++
 | --- | --- |
 | `references/task-playbooks.md` | Need step-by-step workflows for common guitar DSP tasks: conventional blocks, RTNeural loaders, training/export review, latency diagnosis, aliasing investigation, cabinet support, or release validation. |
 | `references/failure-diagnosis.md` | Debugging audible or host failures: bad tone despite metrics, clicks, zipper noise, aliasing, gate chatter, stereo image shift, preset/model/IR restore bugs, or validation failures. |
-| `references/guitar-signal-chain.md` | Designing amp/effects order, mono/stereo routing, gain staging, cabinet IR, pedal/tone-stack behavior, or DSP block tests. |
-| `references/cpp-juce-dsp-modeling.md` | Implementing or reviewing C++/JUCE DSP blocks for gates, compressors, drives, fuzzes, tone/EQ, cabinet, modulation, delay, reverb, tuner/metronome, or post color. |
+| `references/guitar-signal-chain.md` | Designing amp/effects order, mono/stereo routing (including a mono source on a stereo track), gain staging, cabinet IR, pedal/tone-stack behavior, or DSP block tests. |
+| `references/cpp-juce-dsp-modeling.md` | Implementing or reviewing C++/JUCE DSP blocks for gates, compressors, drives, fuzzes, tone/EQ, cabinet, modulation, delay, reverb, tuner/metronome, or post color; guitar-specific performance lessons. |
 | `circuit-to-dsp` → [circuit-reference-validation.md](../circuit-to-dsp/references/circuit-reference-validation.md) | Building or checking a schematic-derived executable reference, comparing it with actual DSP across stages and operating points, or attributing mismatches before corrections. The instrument-agnostic authority, including the digital ↔ volts calibration contract and electrical versus panel pot position, lives in the `circuit-to-dsp` skill; this skill adds guitar-specific drive feel, tone and product decisions. |
 | `references/nonlinear-waveshaping.md` | Designing or reviewing memoryless/dynamic waveshapers, transfer curves, asymmetry, output compensation, nonlinear control mapping, or harmonic-growth tests. |
 | `references/aliasing-oversampling.md` | Diagnosing aliasing, choosing local oversampling islands, using ADAA, measuring harmonic/non-harmonic energy, or handling nonlinear CPU/latency tradeoffs. |
@@ -50,6 +51,8 @@ Use this skill for guitar-centric DSP work that spans tone, realtime safety, C++
 | `references/rtneural-runtime.md` | Loading embedded or user-selected RTNeural JSON, choosing dynamic vs static models, handling stereo state, metadata warnings, sample-rate mismatch, and plugin latency semantics. |
 | `references/runtime-code-patterns.md` | Need compact C++ runtime patterns for parameter snapshots, model/IR handoff, per-channel model state, smoothing, latency/tail updates, or test target shape. |
 | `references/validation-and-release.md` | Building test plans, measurement harnesses, native validator runs, aliasing reports, DAW smoke tests, pluginval/auval gates, and release checklists. |
+| `juce-plugin` → [performance-investigation.md](../juce-plugin/references/performance-investigation.md) | A plugin uses too much CPU, or a performance pass is planned: separating audio-thread DSP from editor cost, headless versus live-callback measurement, the test matrix, stage breakdown, null tests, multi-instance scaling and the report. |
+| `circuit-to-dsp` → [model-performance.md](../circuit-to-dsp/references/model-performance.md) | Making a validated circuit model cheaper without changing it: identical-channel sharing, settled-state hold, what forces re-validation. |
 | `references/example-prompts.md` | Need realistic prompts to test or demonstrate this skill's intended use cases. |
 
 ## Helper Scripts
@@ -100,6 +103,7 @@ Before calling guitar DSP work done:
 
 - Run unit tests for every changed DSP block and processor-level routing path.
 - Include bypass, finite output, reset determinism, channel routing, and automation stress checks.
-- Benchmark Release builds at small buffers and the target sample rates.
+- Benchmark Release builds at small buffers and the target sample rates, with digital silence and identical-channel stereo as their own cases.
+- For a performance change, null-test against the previous build and re-run every existing gate unchanged.
 - Validate exported RTNeural models with Python parity, native RTNeural parity, runtime benchmark, and aliasing report when neural models are involved.
 - Run host validation for plugins: AU validation on macOS when building AU, pluginval for AU/VST3 when available, and at least one DAW session save/reopen smoke.

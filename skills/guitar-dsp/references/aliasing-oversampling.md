@@ -98,6 +98,8 @@ Use oversampling when it solves a measured and audible problem.
 
 This ladder is driven by aliasing. For circuit-accurate models the internal rate can instead be set by stiff analog poles (op-amp gain-bandwidth, small capacitances), frequency warping, solver accuracy or explicit coupling lags; such a requirement does not relax at high host rates and may justify an island rate well above what aliasing alone needs. Choose it from decomposed discretisation error across dense rate sweeps, and derive the factor with an algorithm that covers unusual host rates. See the `circuit-to-dsp` skill's `references/integrators-and-rates.md`.
 
+Do not lower a factor to save CPU by instinct. Time the up/down filters and the work done inside the island separately: when the nonlinear model dominates, the filters are not the saving, and a lower internal rate changes every rate-dependent error of the model. A factor established by alias or reference validation is a release gate until the product deliberately revisits fidelity.
+
 ## Oversampling Island Design
 
 Use a narrow boundary:

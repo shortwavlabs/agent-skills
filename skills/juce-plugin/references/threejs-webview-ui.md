@@ -51,9 +51,9 @@ Follow this order, reusing accepted artifacts and existing implementations at ea
 13. Verify DAW recording, playback and state restoration for it.
 14. Generalize to all controls using metadata and the same bindings.
 15. Add the product's physical semantic controls: discrete switches, pull knobs, input jacks and any derived mechanical/LED/plug state.
-16. Profile 1, 5 and 10 instances, idle rendering and editor cleanup.
+16. Profile an instance ladder (such as 1, 2, 4, 8), idle rendering, the active cases (audio playing, manipulation, host automation) and editor cleanup.
 
-Do not repeatedly optimize the asset after its browser gate passes. Profile the actual host before pursuing compression, more atlases or geometry reduction.
+Do not repeatedly optimize the asset after its browser gate passes. Profile the actual host before pursuing compression, more atlases or geometry reduction, and attribute the cost first: a host's audio CPU meter does not include the editor ([performance investigation](performance-investigation.md)).
 
 ## State ownership and runtime structure
 
@@ -154,9 +154,20 @@ Acceptance includes keyboard-only access to every intended control, visible focu
 
 Coalesce invalidations into a pending requestAnimationFrame. Invalidate after GLB/texture load, visible parameter/LED changes, camera changes, active animation, resize and visibility restoration. With no damping, render once per change. With orbit damping/animated transitions, schedule only until settled. An unconditional 60 FPS loop is inappropriate for an idle amp panel.
 
+**Shadow maps are change-driven too.** With static shadow-casting lights, a shadow map changes only when a caster moves. Turn off automatic shadow updates and mark the maps dirty after model load and whenever a caster's transform changes (a knob turns, a switch travels). Reuse them for orbit, zoom, view changes, resize and emissive-only changes. A frame then costs the visible pass alone instead of the visible pass plus one pass per shadow light, with identical pixels. Route "a caster moved" separately from "something visible changed", so an LED change does not redraw shadows, and check the shadows still follow every moving part.
+
+**Direct manipulation and host-driven change can use different cadences.** Orbit, zoom and drags get every display frame. Host automation and preset loads still apply every value to the model, so the latest value always lands, but the scene need not be drawn once per event; a lower redraw rate is valid when the motion still reads as smooth. Choose the rate by looking at it, and test that the final value is drawn and the scheduler then goes idle.
+
+**Renderer cost settings are hypotheses, not defaults.** Each needs a measured benefit and a matched visual comparison ([performance candidates](../../guitar-gear-qa/references/runtime-qa.md#performance-candidates-that-can-change-appearance)):
+
+- *Pixel ratio.* Cap it instead of taking the display's ratio blindly, but do not assume a lower cap is faster. Find out whether the frame is fill-rate, geometry, presentation or CPU bound: time frames with the GPU forced to finish, across ratios and editor size tiers, at the closest zoom. Keep the lowest ratio that is visually acceptable **and** measurably useful. If a lower ratio buys nothing, do not degrade the image.
+- *Shadow-map and texture resolution.* The same rule. Lower values can soften contact shadows or relief, or show shadow acne with a bias tuned for the larger map, and may save only memory.
+- *Draw calls.* Classify them before merging anything: visible primitives (bounded by materials and by semantic moving nodes), shadow passes (casters × shadow lights), transparent or unique materials. When change-driven shadows remove the repeated passes, static merging may have nothing left to give. Never merge across semantic controls, material boundaries or hit targets.
+- *`matrixAutoUpdate`, object pooling, vector reuse.* Measure first. A full matrix update of a small scene can take microseconds, and a few allocations per event at tens of events per second is not GC pressure. Small cleanups are fine; they are not the optimization.
+
 Stop scheduling while hidden; on reopen/requested visibility resync state and redraw. Cancel active gestures and pending frames on teardown; unsubscribe binding, DOM and orbit listeners. Dispose owned geometries, cloned materials, textures, environment/render targets and renderer; close owned ImageBitmaps where applicable. Track shared ownership so one viewer cannot dispose a resource still used by another. Do not assume separate WebViews share GPU textures.
 
-Never call WebBrowserComponent, JS, Three.js, filesystem access, GLB parsing, JSON serialization or UI locks from `processBlock()`. Keep [audio-thread rules](audio-thread-safety.md): audio → reduced atomic/lock-free state → message-thread timer → WebView. Throttle future meters only while visible; APVTS attachments handle parameter UI synchronization. No WebView is required for audio processing or host automation.
+Never call WebBrowserComponent, JS, Three.js, filesystem access, GLB parsing, JSON serialization or UI locks from `processBlock()`. Keep [audio-thread rules](audio-thread-safety.md): audio → reduced atomic/lock-free state → message-thread timer → WebView. Send meters only while visible and build them as described in [streaming visual data](webview-ui.md#streaming-visual-data): a meter must never redraw the 3D scene, and its repaint cost needs measuring. APVTS attachments handle parameter UI synchronization. No WebView is required for audio processing or host automation.
 
 ## Failure diagnosis
 
@@ -169,6 +180,10 @@ Never call WebBrowserComponent, JS, Three.js, filesystem access, GLB parsing, JS
 | Hundreds of runtime nodes | Grip ribs, ticks and source construction leaked into export |
 | Slow editor opening | GLB parse time, decoded textures, resource copies and frontend startup measured separately |
 | GPU busy while idle | Unconditional loop, damping never settles, redundant invalidations |
+| Host CPU meter high and the 3D editor is suspected | Measure the audio callback with the editor closed and open before touching the frontend |
+| CPU while audio plays and nothing moves | Meter repaints; count frames and bridge messages, then see streaming visual data |
+| Orbit costs as much as a moving knob | Shadow maps on automatic update with static lights |
+| Automation playback keeps the scene at display rate | Host-driven changes drawn once per event |
 | DAW disagrees with visuals | Frontend defaults overwrite host state or initial properties/state never synchronized |
 | Strange automation | Nested/missing begin/end gestures or unsnapped choices |
 | Impossible power/channel state | Separate authorities for one physical three-state switch |
@@ -183,6 +198,6 @@ Never call WebBrowserComponent, JS, Three.js, filesystem access, GLB parsing, JS
 
 ## Acceptance and sources
 
-Use the [runtime QA checklist/report](../../guitar-gear-qa/references/runtime-qa.md) for before/after asset metrics, every discrete state, visual automation playback, editor/plugin/DAW restore and 1/5/10-instance measurements. Preserve existing knob bindings, camera presets, mock mode and embedded mode. Do not claim visual restore from a C++ serialization test alone.
+Use the [runtime QA checklist/report](../../guitar-gear-qa/references/runtime-qa.md) for before/after asset metrics, every discrete state, visual automation playback, editor/plugin/DAW restore and instance-ladder measurements. Preserve existing knob bindings, camera presets, mock mode and embedded mode. Do not claim visual restore from a C++ serialization test alone.
 
 API guidance checked against JUCE 9.0.1 and Three.js documentation; inspect pinned project versions before copying APIs. References: [JUCE WebSliderRelay](https://docs.juce.com/master/classjuce_1_1WebSliderRelay.html), [Three.js rendering on demand](https://threejs.org/manual/en/rendering-on-demand.html), [resource disposal](https://threejs.org/manual/en/how-to-dispose-of-objects.html), [GLTFLoader](https://threejs.org/docs/#GLTFLoader). Three-position selection, physical jack choice, pull/rotate controls and multiple mechanical subscribers have been exercised across real plugin implementations; adapt the pattern to the target product rather than treating any one state table as universal. Cable dragging and optional tube-heater glow remain recommendations until the target product implements and validates them.

@@ -29,7 +29,7 @@ Work from audible symptom to a measurable check. Avoid changing several tone var
 | Model clicks after preset/model swap | Audio thread sees partially built state, old object destroyed in callback, no bypass/model crossfade | Audit model handoff; hold retired objects off-thread; add short crossfade or ramped mute during swap |
 | Stereo model image shifts | Shared recurrent/causal state, independent dynamics when linked behavior is expected, accidental left-only fold | Verify one model instance per channel; inspect mono fold/fanout; render stereo correlation fixtures |
 | Model loudness jumps between channels/presets | Per-model RMS compensation missing or overactive, capture output levels inconsistent | Print metadata RMS; clamp compensation; compare clean/dirty model RMS on the same fixture |
-| High CPU or dropouts | Dynamic model too large, denormals, JSON parse/allocation in process, cabinet swap destruction, debug build | Benchmark Release build; search callback for allocation/logging/locks; measure RTF and stage timings |
+| High CPU or dropouts | Dynamic model too large, denormals, JSON parse/allocation in process, cabinet swap destruction, debug build | Attribute first (editor closed vs open, bypassed vs active, silence vs signal); benchmark Release build; search callback for allocation/logging/locks; measure RTF and stage timings |
 | Host latency feels wrong | Confused export alignment, receptive field, and true processing delay | Render impulse; check `setLatencySamples`; report only actual delayed output |
 | Validation passes but palm mutes fail | Training material lacks transient/low-note coverage, receptive field too short, data alignment too forgiving | Add low-tuned palm mute fixtures; compute receptive field; review residual around transients |
 | Aliasing report fails | Nonlinear model learned out-of-band artifacts, export sample rate mismatch, insufficient anti-alias loss/checks | Review ASR; add high-frequency sine tests; train/export at intended sample rate |
@@ -56,6 +56,8 @@ Work from audible symptom to a measurable check. Avoid changing several tone var
 | Cabinet swap crashes or glitches | Convolution engine destroyed on callback, IR load/resample in process, latency update race | Publish immutable engine pointer; retire old engines off-thread; move file work outside callback |
 | Filter sounds different by sample rate | Frequency clamps wrong, bilinear math using stale sample rate, coefficient update missed | Sweep at 44.1/48/96 kHz; recompute on prepare/sample-rate change; clamp below Nyquist |
 | Silence produces CPU spikes | Denormals in filters/envelopes/reverbs | Use `juce::ScopedNoDenormals`; snap tiny state to zero; add silence benchmark |
+| CPU stays high on an idle track | A stateful nonlinear or circuit model keeps integrating on zeros; nothing stops it | Benchmark silence against signal; read `circuit-to-dsp` [model-performance.md](../../circuit-to-dsp/references/model-performance.md#settled-state-hold) before adding any silence path |
+| Stereo costs twice mono for a mono guitar | The host instantiates stereo and both channels carry identical samples | Benchmark stereo with identical L/R; consider exact [identical-channel sharing](../../circuit-to-dsp/references/model-performance.md#identical-channel-sharing); forcing mono is a product decision |
 
 ## Circuit-Reference Mismatches
 
@@ -69,7 +71,7 @@ Use the [mismatch triage table](../../circuit-to-dsp/references/circuit-referenc
 | DAW reopen changes tone | Default parameter mismatch, prepare/reset order, model/IR async restore race | Save/reopen smoke in at least one DAW; compare rendered fixture before/after reopen |
 | AU/VST3 validation fails | Bus layout mismatch, tail/latency reporting, parameter range issue, thread misuse | Run `auval`/pluginval; inspect bus layout support; check latency/tail updates |
 | Meter/UI update causes clicks | Audio callback posts messages, allocates strings, or locks UI data | Publish atomics/ring snapshots; move formatting to message thread |
-| CPU only fails in host | Debug build, UI repaint pressure, host buffer size, offline render path differs | Benchmark Standalone and plugin Release builds at small buffers; profile in host |
+| CPU only fails in host | Debug build, live callback clocked lower than a back-to-back benchmark, host buffer size, offline render path differs, editor cost mistaken for DSP cost | Measure the built plugin in a live audio callback with the editor closed and open; a host's audio meter excludes the editor's processes. See `juce-plugin` [performance-investigation.md](../../juce-plugin/references/performance-investigation.md) |
 
 ## First Reports To Collect
 
@@ -81,5 +83,5 @@ Ask for or produce these artifacts before guessing:
 - `model_package_summary.py` output for model issues.
 - `compare_audio_metrics.py` output for alignment/null issues.
 - Unit test or pluginval/auval failure text.
-- CPU benchmark matrix for performance complaints.
+- For performance complaints: which meter showed the figure, editor open or closed, transport state, mono or stereo source, and a CPU benchmark matrix.
 - A level-matched previous-build render when the issue is subjective tone regression.
