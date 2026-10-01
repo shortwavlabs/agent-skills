@@ -33,6 +33,7 @@
 - "Use $guitar-dsp to debug why my dry/wet compressor blend sounds hollow."
 - "Use $guitar-dsp to explain why this plugin reports latency even though the RTNeural model is causal."
 - "Use $guitar-dsp to inspect this preset reload bug where the cabinet IR path disappears after reopening the DAW."
+- "Use $guitar-dsp to find out why one instance of this pedal plugin shows high CPU on an idle track, and reduce it without changing the sound."
 
 ## Validation Prompts
 
@@ -42,6 +43,7 @@
 - "Use $guitar-dsp to design unit tests for bypass identity, reset determinism, automation safety, stereo routing, and finite output."
 - "Use $guitar-dsp to define an offline render matrix for gate, compressor, drive, cabinet, delay, and reverb behavior."
 - "Use $guitar-dsp to decide which pluginval, auval, DAW smoke, and benchmark gates should block release."
+- "Use $guitar-dsp to define the benchmark matrix, null tests and live-callback checks for a performance pass on this amp plugin."
 
 ## Review Prompts
 

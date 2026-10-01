@@ -124,7 +124,8 @@ skills/juce-plugin/
     ├── threejs-webview-ui.md   Interactive guitar-gear GLBs, physical controls, APVTS, idle rendering
     ├── audio-thread-safety.md  Real-time safety: processBlock rules, lock-free patterns, debugging
     ├── cmake-reference.md      Full CMake API: juce_add_plugin, SDK paths, CI/CD, platform specifics
-    └── production-plugin-practices.md  Product plugin practices: validation, assets, state restore
+    ├── production-plugin-practices.md  Product plugin practices: validation, assets, state restore
+    └── performance-investigation.md    CPU attribution, headless vs live callback, matrix, tooling, equivalence classes, gates, report
 ```
 
 #### What it covers
@@ -144,6 +145,7 @@ skills/juce-plugin/
 | **Build system** | CMake: juce_add_plugin, SDK paths, binary data, cross-platform, GitHub Actions CI/CD |
 | **Plugin formats** | VST3, AU, AUv3, AAX, LV2, Standalone — format-specific categories and properties |
 | **Production practices** | Separate plugin/test/measurement builds, asset/model loading, state restore, oversampled circuit-model plugins (rate policy, integer latency, bypass parameter, model revision), host validation, release gates |
+| **Performance investigation** | Where a plugin's CPU goes and how to prove a fix: attribution before optimization, headless versus live-callback measurement, equivalence classes, performance gates, and a report that keeps rejected candidates |
 
 #### Source documentation
 
@@ -161,8 +163,8 @@ Use these existing skills together for Blender-authored amps, pedals and rack ge
 | Skill | Responsibility | Runtime reference |
 |---|---|---|
 | [guitar-gear-modeling](skills/guitar-gear-modeling/SKILL.md) | Real dimensions, reusable construction; runtime collections, semantic nodes, pivots and hit proxies | [Runtime export](skills/guitar-gear-modeling/references/runtime-export.md) |
-| [guitar-gear-materials](skills/guitar-gear-materials/SKILL.md) | Material identity and graphics; glTF-safe PBR baking, cloth and texture budgets | [Runtime PBR](skills/guitar-gear-materials/references/runtime-pbr.md) |
-| [guitar-gear-qa](skills/guitar-gear-qa/SKILL.md) | Blender audits; GLB/WebGL parity, runtime metrics and host acceptance | [Runtime QA/report](skills/guitar-gear-qa/references/runtime-qa.md) |
+| [guitar-gear-materials](skills/guitar-gear-materials/SKILL.md) | Material identity and graphics; glTF-safe PBR baking, cloth and texture budgets from texel versus screen density | [Runtime PBR](skills/guitar-gear-materials/references/runtime-pbr.md) |
+| [guitar-gear-qa](skills/guitar-gear-qa/SKILL.md) | Blender audits; GLB/WebGL parity, runtime metrics, host acceptance and accept/reject studies for performance candidates that can change the picture | [Runtime QA/report](skills/guitar-gear-qa/references/runtime-qa.md) |
 | [guitar-product-render](skills/guitar-product-render/SKILL.md) | Product photography; runtime camera presets, framing and lighting intent | [Runtime presentation](skills/guitar-product-render/references/runtime-presentation.md) |
 | [juce-plugin](skills/juce-plugin/SKILL.md) | Three.js bindings, offline WebView2, APVTS/gestures, physical switch/jack semantics and instance performance | [Three.js/WebView UI](skills/juce-plugin/references/threejs-webview-ui.md) |
 
@@ -172,7 +174,8 @@ Use these existing skills together for Blender-authored amps, pedals and rack ge
 
 - [Project layout](skills/juce-plugin/references/threejs-webview-ui.md#minimal-project-layout) connects the Blender derivative, frontend assets and JUCE BinaryData.
 - [Independent validation manifest](skills/guitar-gear-modeling/references/runtime-export.md#validation-manifest-example) specifies semantic nodes, unique names, hit targets and choice indices. The runtime camera file is separate from the QA-only `expected_camera_presets` snapshot.
-- [Runtime QA](skills/guitar-gear-qa/references/runtime-qa.md) distinguishes static asset totals from frame metrics and covers legal state combinations, automation, restoration, accessibility and instance profiling.
+- [Runtime QA](skills/guitar-gear-qa/references/runtime-qa.md) distinguishes static asset totals from frame metrics and covers legal state combinations, automation, restoration, accessibility, instance profiling and matched visual evidence for performance candidates.
+- [Performance investigation](skills/juce-plugin/references/performance-investigation.md) attributes cost between DSP and editor before anything is optimized.
 - [WebView compatibility and packaging](skills/juce-plugin/references/webview-ui.md) covers version checks, offline resources, production CSP and resource-copy costs.
 - [Native gesture regression check](skills/juce-plugin/scripts/webview_gesture_check.cpp) covers normal completion, cancellation-equivalent completion, active teardown and idle teardown. Its guard is a JUCE 9.0.1-specific workaround; see [build instructions and scope](skills/juce-plugin/references/webview-ui.md#gesture-cleanup-on-editor-destruction) before adapting it to another version.
 
@@ -226,6 +229,7 @@ skills/guitar-dsp/
 | **Nonlinear DSP** | Waveshaping families, diode/fuzz circuits, tube-stage approximation, aliasing analysis, local oversampling islands, ADAA tradeoffs |
 | **Tone and speaker modeling** | Passive/active tone stacks, insertion loss, speaker compression, resonance, breakup, dynamic cabinet behavior |
 | **Diagnosis and validation** | Failure matrix, Python/native parity, native benchmarks, aliasing reports, DSP unit tests, measurement harnesses, auval/pluginval, DAW smoke |
+| **Performance** | Guitar-specific cases (mono source on a stereo track, silence) and routing to `juce-plugin` for the investigation method and `circuit-to-dsp` for model shortcuts |
 
 ### Circuit modeling skills (SPICE → KiCad → realtime DSP → JUCE)
 
@@ -240,6 +244,8 @@ Two skills cover circuit-accurate modeling end to end, and route to the existing
 | Measurement methodology: spectra, windows, coherent tones, sub-sample phase ensembles, error metrics | [dsp-engineer](skills/dsp-engineer/SKILL.md) |
 | Realtime filter and numerical building blocks | [dsp](skills/dsp/SKILL.md) |
 | AudioProcessor/APVTS, lifecycle, latency/bypass APIs, CMake, formats, host validation | [juce-plugin](skills/juce-plugin/SKILL.md) |
+| Making a validated circuit model cheaper without changing it: identical-channel sharing, settled-state hold, what forces re-validation | [circuit-to-dsp](skills/circuit-to-dsp/SKILL.md) ([model-performance.md](skills/circuit-to-dsp/references/model-performance.md)) |
+| Plugin CPU investigation: audio-thread versus editor attribution, headless versus live-callback measurement, tooling, performance gates, reporting | [juce-plugin](skills/juce-plugin/SKILL.md) ([performance-investigation.md](skills/juce-plugin/references/performance-investigation.md)) |
 
 ### spice-circuit-modeling
 
@@ -270,9 +276,9 @@ All scripts are standard-library Python with `--self-test`.
 
 ### circuit-to-dsp
 
-Turn a validated analog circuit reference into a bounded realtime DSP model and prove it matches. Covers the offline-oracle principle, choosing the realtime formulation (shapers, nodal/state-space, DK, WDF), partitioning by physics with measured simplifications, omission registers, authoritative state inventories (continuous states vs nonlinear dimension), shared-node coupling, reduced op-amps, exact DC reset, time-varying controls, monotone scalar solvers, lookup-table proofs, integrator comparison and internal-rate selection, oversampling-factor policy and production-filter measurement, error decomposition, phase ensembles, population-level gates, hard gates versus quality targets, and a 20-step SPICE → KiCad → C++ → JUCE playbook. Includes a clearly labelled case study.
+Turn a validated analog circuit reference into a bounded realtime DSP model and prove it matches. Covers the offline-oracle principle, choosing the realtime formulation (shapers, nodal/state-space, DK, WDF), partitioning by physics with measured simplifications, omission registers, authoritative state inventories (continuous states vs nonlinear dimension), shared-node coupling, reduced op-amps, exact DC reset, time-varying controls, monotone scalar solvers, lookup-table proofs, integrator comparison and internal-rate selection, oversampling-factor policy and production-filter measurement, error decomposition, phase ensembles, population-level gates, hard gates versus quality targets, reducing the cost of a validated model without changing it, and a 20-step SPICE → KiCad → C++ → JUCE playbook. Includes a clearly labelled case study.
 
-**Triggers on:** virtual analog, circuit-accurate emulation of pedals, preamps, filters, compressors or synth circuits, SPICE-to-realtime translation, diode/transistor/op-amp stage solvers, Newton solver robustness, integrator choice (trapezoidal, BDF, TR-BDF2), oversampling for stiff circuits, exact reset/initial state, automation fidelity, SPICE-referenced regression gates.
+**Triggers on:** virtual analog, circuit-accurate emulation of pedals, preamps, filters, compressors or synth circuits, SPICE-to-realtime translation, diode/transistor/op-amp stage solvers, Newton solver robustness, integrator choice (trapezoidal, BDF, TR-BDF2), oversampling for stiff circuits, exact reset/initial state, automation fidelity, SPICE-referenced regression gates, CPU cost of a circuit model that already passes its gates.
 
 #### Structure
 
@@ -285,6 +291,7 @@ skills/circuit-to-dsp/
     ├── nonlinear-solvers.md         KCL residuals, feedback clipping, monotone scalar solvers, solver memory, fuzzing, device laws, table proofs
     ├── integrators-and-rates.md     Integrator comparison, internal rate, oversampling policy, production filters, latency/bypass, coefficient cadence, performance
     ├── validation-gates.md          Error decomposition, stage isolation, hard gates vs targets, phase ensembles, population gates, tiers, criteria changes
+    ├── model-performance.md         Cheaper without changing the model: contract, order of work, identical-channel sharing, settled-state hold, evidence
     └── case-study-sd1-overdrive.md  Labelled case study: decisions and surprises from an op-amp diode-clipper overdrive plugin
 ```
 

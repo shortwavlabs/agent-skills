@@ -43,8 +43,23 @@ Set AO distance from the physical relationship being represented. Millimetre-sca
 
 Start around 2K primary surfaces and 1K–2K grille, with shared hardware textures and atlases where they reduce cost without sacrificing close-up labels. These are experiments, not mandatory caps. Do not carry 8K source textures into a plugin without evidence.
 
-Record unique image count, dimensions, formats and estimated decoded memory. An uncompressed RGBA8 image costs width × height × 4 bytes, about 4/3 of that with a full mip chain: a 2048² image is about 21.3 MiB with mips, even if its PNG is small. Actual formats, render targets and environment maps alter the total; multiple independent WebViews may duplicate it.
+Record unique image count, dimensions, formats and estimated decoded memory. As an RGBA8-equivalent decoded estimate, an image costs width × height × 4 bytes, about 4/3 of that with a full mip chain: a 2048² image is about 21.3 MiB with mips, even if its PNG is small. Actual storage differs with RGB versus RGBA, the GPU's internal format, compression, alignment and the backend's upload format; render targets and environment maps add to the total, and multiple independent WebViews may duplicate it. The estimate is for comparing budgets; it does not replace a memory profiler.
 
-First ship a correct baseline GLB. Consider KTX2/Basis texture compression or Draco/mesh compression only after profiling shows the relevant bottleneck. Include any decoder/transcoder JS/WASM locally, test backend support and decode latency, and compare quality at the same view. Compression is not a substitute for removing invisible construction geometry.
+Texture memory and frame time are different questions. Once loaded, a larger source texture is often mainly a memory cost, provided the same effective mip levels are sampled, texture-cache and bandwidth pressure is not the bottleneck, and decode and upload fall outside the steady-state frame. It can still cost load and decode time, upload time, GPU residency, cache behaviour and memory bandwidth, and it matters more on weak or integrated GPUs, with several editors open, and where close zoom selects the top mip. Measure memory, load time and steady-state rendering on the target hardware before deciding either way.
+
+Judge resolution from density, not from source dimensions:
+
+```text
+texel density  = texture pixels across a surface / its physical width             (texels per mm)
+screen density = drawing-buffer pixels covering that surface / its physical width (pixels per mm)
+```
+
+Screen density is the **projected** extent of the actual surface in the target camera: with perspective it varies across one surface. Use the highest relevant value, at the closest supported zoom, the largest editor-size tier and the hero and grazing angles that matter, with the renderer's actual pixel ratio. Where texel density is well above that, a smaller map is a candidate; where it is at or below it, the map is already the limit. Then confirm with matched views in the target WebView ([performance candidates](../../guitar-gear-qa/references/runtime-qa.md#performance-candidates-that-can-change-appearance)): signature surfaces (relief, engraving, wear, fine grain) tend to fail first, and on the largest tier.
+
+*Case study (one product, one high-end GPU): half-resolution maps were indistinguishable at the default tier and visibly softer at the largest tier's closest zoom. They would have saved memory; frame time on that machine did not respond even to a fourfold change in drawn pixels, so no frame-time gain was expected, and the maps stayed. Another GPU may answer differently.*
+
+When a plugin has fixed size tiers, lower-resolution texture sets for the small tiers are an option, not a requirement. Pursue it only when the memory matters, switching and loading between tiers is robust, equivalence is proven per tier, and the pipeline cost is justified.
+
+First ship a correct baseline GLB. Consider KTX2/Basis texture compression or Draco/mesh compression only after profiling shows the relevant bottleneck. Compressed textures are an architectural choice, not only an asset conversion: verify the decoder or transcoder's requirements (local packaging, WebAssembly, workers) against the actual embedded runtime and its security policy before choosing the format. Stacks differ: one may permit workers, use a worker-free path or package the transcoder differently. Then test decode latency and compare quality at the same view. Compression is not a substitute for removing invisible construction geometry.
 
 If grille/labels vanish only inside JUCE, inspect resource responses, MIME types and CSP before rebaking. GLB embedded images can decode through `blob:` URLs; the policy must allow the required image scheme. See [offline resources](../../juce-plugin/references/webview-ui.md#local-resources-and-development-mode).

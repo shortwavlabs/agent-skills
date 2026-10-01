@@ -160,6 +160,25 @@ Also call `snapToZero()` on filters after processing:
 filter.snapToZero();
 ```
 
+## Hot-Path Audit
+
+Walk `processBlock()` and everything it calls for:
+
+- allocation, container growth, `String` construction, logging;
+- locks and blocking calls;
+- state serialization or file access;
+- virtual dispatch or `std::function` inside per-sample loops;
+- APVTS or value-tree lookups inside loops, and atomic reads per sample (read once per block, then smooth);
+- coefficient rebuilds when the control has not changed;
+- repeated transcendentals (`pow`, `exp`, `log`, `tan`) and avoidable divisions in inner loops;
+- buffers copied or cleared more than once;
+- oversampler or scratch-buffer construction outside `prepareToPlay()`;
+- denormals on silence;
+- meter work beyond a peak or sum and one atomic publish per block;
+- dry and bypass paths doing wet-path work.
+
+The audit finds **risks**; a profile sets **priority**. Fix an item at once when it is a correctness or realtime-safety risk. Otherwise measure first: next to a nonlinear core these items can be a negligible share of the callback, and a clean audit does not mean the callback is cheap. The method (audio-thread versus editor attribution, headless versus live-callback measurement, stage breakdown, null tests) is in [performance-investigation.md](performance-investigation.md).
+
 ## Debugging Audio Glitches
 
 1. **Use `pluginval`** — the standard JUCE plugin validator. Catches threading, state, and parameter bugs.

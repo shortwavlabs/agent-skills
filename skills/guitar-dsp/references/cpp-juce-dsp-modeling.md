@@ -178,11 +178,15 @@ Utility blocks still need audio-engine discipline:
 
 ## Performance Lessons
 
+Attribute the cost before optimizing, then fix the dominant stage, not the most obvious code. The method is the `juce-plugin` skill's [performance-investigation.md](../../juce-plugin/references/performance-investigation.md).
+
 The fastest wins usually came from removing work from the hot path:
 
-- Collapse mono amp/pre-amp cores deliberately instead of processing duplicated stereo work.
+- Find duplicated stereo work: a mono guitar often reaches the plugin as two identical channels. Collapsing a core that is mono by design and sharing an expensive stage between equivalent channels are different remedies; see the [mono and stereo policy](guitar-signal-chain.md#mono-and-stereo-policy).
+- Benchmark digital silence as its own signal; a stateful nonlinear stage is not automatically cheap on zeros. Stopping that work safely is a [settled-state hold](../../circuit-to-dsp/references/model-performance.md#settled-state-hold), not a gate.
 - Hoist repeated buffer pointer lookups out of inner loops.
 - Cache coefficient sets and mode-dependent constants.
+- Skip per-sample conversions and control interpolation while smoothers are at rest; measure the gain before claiming one.
 - Add fast paths for disabled blocks, zero mix, zero level, and blend endpoints.
 - Avoid clearing large buffers on every bypass transition.
 - Keep old model/IR/convolution object destruction off the audio thread.

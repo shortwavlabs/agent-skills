@@ -209,7 +209,35 @@ The sample `bytes()` helper allocates/copies the entire resource on each request
 
 ## Streaming visual data
 
-Never access WebView from `processBlock()`. Publish reduced meter/spectrum state through atomics or a lock-free queue. A message-thread timer snapshots it, builds a payload and sends only while visible at an appropriate rate (for example 30 Hz for meters); stop with editor destruction. See [audio-thread safety](audio-thread-safety.md). Attachments remain authoritative for controls; custom events carry non-parameter visual data. Do not serialize every audio block or continuously render a static panel.
+Never access WebView from `processBlock()`. Publish reduced meter/spectrum state through atomics or a lock-free queue. A message-thread timer snapshots it, builds a payload and sends it only while visible and only when it changed; stop with editor destruction. See [audio-thread safety](audio-thread-safety.md). Attachments remain authoritative for controls; custom events carry non-parameter visual data. Do not serialize every audio block or continuously render a static panel.
+
+Choose the rate by measurement and by looking at the result; 30 Hz is a common starting point, not a rule. When the rate changes, keep the display's timing: scale per-tick decay and hold counts so the ballistics stay the same per second.
+
+Change-only sending is preferred when the receiver needs no heartbeat. If a heartbeat is part of the product protocol, make it explicit and low-rate.
+
+Throttling a hidden editor suspends drawing, not state. Application state stays authoritative while hidden; when the editor becomes visible again, apply the latest state, update every visible control and indicator, and render once. Do not replay missed visual updates or queue a backlog of visual-only events, unless the product needs the history.
+
+### What a meter costs in a WebView
+
+A small element does not guarantee a small cost. Repaint and compositor overhead can dominate even for a visually tiny meter, and it may not scale with the dirty area or linearly with the update rate. Find out which part pays (bridge traffic, script, layout, paint or compositing) before choosing a remedy: measure the host main thread, the content process and the GPU process with the meter hidden (`display: none`), then with each piece shown.
+
+Patterns that helped, each to be confirmed by measurement on the target WebView:
+
+- Move bars and needles with `transform` on an element that has its own compositor layer (`will-change: transform`), which can avoid layout and repaint for that element. Promoting a layer while something else still repaints on every event may save nothing, and a promoted layer is not free: it costs memory, a backing surface and compositing work. Promote only what measurement shows benefits, not every element pre-emptively.
+- Give text its own, slower cadence, independent of the bar, with a trailing write so the last value is not left stale.
+- Write each DOM value only when it changed. A status event should not rewrite calibration text, tooltips, ARIA attributes or marker positions that did not move.
+- Read layout once per frame, compute, then write; interleaved read/write pairs can force a layout at every read. Profile before and after: the saving may be small.
+- A meter update should not redraw a WebGL scene.
+
+*Case study (one WebView, one machine): a few-pixel bar and a numeric reading updated on every status event cost a double-digit percentage of a core across the main thread, content process and GPU process, with zero WebGL frames. Hidden, the same traffic cost a fraction of that; a composited bar added almost nothing beyond the bridge traffic; the text repaint was the cost, and it did not scale linearly with rate. The rates finally chosen came from those measurements and are that product's, not defaults.*
+
+### Idle acceptance
+
+For a **static** editor, one with no intentionally continuous visual behaviour, the target when nothing changes is approximately zero frames, zero unnecessary bridge traffic in either direction, zero resize callbacks and zero parameter or preset polling. Verify with counters (wrap `requestAnimationFrame` and the bridge entry points from a test host), not by reading the code.
+
+Intentional activity is not a failure: a meter while audio flows, a tuner, a scope or spectrum, an animated visualization. Each should have an explicit rate, a measured cost, throttling when not visible and no unnecessary 3D redraws. "Zero frames at all times" is not a universal gate.
+
+Whether this activity shows in a host's own performance meter depends on the host; attribute it by thread and process as described in [performance-investigation.md](performance-investigation.md).
 
 ## Sources and verification
 

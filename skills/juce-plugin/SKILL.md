@@ -1,6 +1,6 @@
 ---
 name: juce-plugin
-description: Build JUCE audio plugins (VST3, AU, AAX, Standalone, LV2) in C++ with CMake. Covers the full development workflow from project scaffolding to multi-format builds, including AudioProcessor lifecycle, parameter management with APVTS, DSP module chains, custom editor GUIs, Three.js/GLB WebView interfaces, state serialization, real-time audio safety, and cross-platform CI/CD. Use this skill whenever the user mentions JUCE, audio plugins, VST plugins, AU plugins, audio effects, synthesizers, MIDI processors, AudioProcessor, AudioProcessorEditor, Projucer, or wants to create audio software — even if they just say "make a plugin" or "audio plugin". Also applies when users are working in an existing JUCE codebase (files like PluginProcessor.cpp, PluginEditor.cpp, CMakeLists.txt with juce_add_plugin).
+description: Build JUCE audio plugins (VST3, AU, AAX, Standalone, LV2) in C++ with CMake. Covers the full development workflow from project scaffolding to multi-format builds, including AudioProcessor lifecycle, parameter management with APVTS, DSP module chains, custom editor GUIs, Three.js/GLB WebView interfaces, state serialization, real-time audio safety, and cross-platform CI/CD. Use this skill whenever the user mentions JUCE, audio plugins, VST plugins, AU plugins, audio effects, synthesizers, MIDI processors, AudioProcessor, AudioProcessorEditor, Projucer, or wants to create audio software — even if they just say "make a plugin" or "audio plugin". Also applies when users are working in an existing JUCE codebase (files like PluginProcessor.cpp, PluginEditor.cpp, CMakeLists.txt with juce_add_plugin), or investigating a plugin's CPU usage in a host.
 ---
 
 # JUCE Audio Plugin Development
@@ -314,7 +314,7 @@ Modules are the building blocks. Link the top-level module and transitive depend
 | `juce_opengl` | OpenGL rendering in plugins | `juce::juce_opengl` |
 | `juce_osc` | Open Sound Control (OSC) | `juce::juce_osc` |
 
-The 24 JUCE modules are: `juce_analytics`, `juce_animation`, `juce_audio_basics`, `juce_audio_devices`, `juce_audio_formats`, `juce_audio_plugin_client`, `juce_audio_processors`, `juce_audio_utils`, `juce_box2d`, `juce_core`, `juce_cryptography`, `juce_data_structures`, `juce_dsp`, `juce_events`, `juce_graphics`, `juce_gui_basics`, `juce_gui_extra`, `juce_javascript`, `juce_midi_ci`, `juce_opengl`, `juce_osc`, `juce_product_unlocking`, `juce_video`.
+The 24 JUCE modules are: `juce_analytics`, `juce_animation`, `juce_audio_basics`, `juce_audio_devices`, `juce_audio_formats`, `juce_audio_plugin_client`, `juce_audio_processors`, `juce_audio_processors_headless`, `juce_audio_utils`, `juce_box2d`, `juce_core`, `juce_cryptography`, `juce_data_structures`, `juce_dsp`, `juce_events`, `juce_graphics`, `juce_gui_basics`, `juce_gui_extra`, `juce_javascript`, `juce_midi_ci`, `juce_opengl`, `juce_osc`, `juce_product_unlocking`, `juce_video`.
 
 ## WebView UIs (JUCE 9)
 
@@ -330,10 +330,11 @@ Read these as needed based on what you're implementing:
 - **`references/parameter-management.md`** — APVTS patterns: parameter layout, attachments, raw pointers, non-parameter state, parameter groups
 - **`references/dsp-patterns.md`** — DSP cookbook: ProcessorChain, filters, oscillators, waveshapers, convolution reverb, delay lines, wavetable synthesis, LFO at control rate, two-level chain architecture, per-sample vs block processing
 - **`references/ui-patterns.md`** — Editor patterns: component layout, custom widgets, LookAndFeel, meters, FFT spectrum analyser, responsive resize, binary data for assets
-- **`references/webview-ui.md`** — JUCE 9 WebBrowserComponent, WebView2, local resources, native functions, parameter bindings, frontend frameworks and explicit development mode
-- **`references/threejs-webview-ui.md`** — Interactive guitar-gear GLBs, mock/JUCE bindings, physical controls, derived visual state, render-on-demand and staged host validation
+- **`references/webview-ui.md`** — JUCE 9 WebBrowserComponent, WebView2, local resources, native functions, parameter bindings, frontend frameworks, explicit development mode, and streaming visual data (meter and repaint cost, idle acceptance)
+- **`references/threejs-webview-ui.md`** — Interactive guitar-gear GLBs, mock/JUCE bindings, physical controls, derived visual state, render-on-demand, shadow-map invalidation, redraw cadence, pixel ratio, draw calls and staged host validation
 - **`references/audio-thread-safety.md`** — Real-time safety rules: what you can/cannot do in processBlock, lock-free patterns, atomics, debugging audio glitches
 - **`references/cmake-reference.md`** — Full CMake API: all juce_add_plugin properties, SDK paths, binary data, CI/CD, platform specifics
+- **`references/performance-investigation.md`** — A plugin "uses too much CPU": attributing audio-thread, message-thread and WebView cost before optimizing, headless versus live-callback measurement, the test matrix, stage breakdown, harness and live-host tooling, null tests, multi-instance scaling, performance gates, and the report
 - **`references/production-plugin-practices.md`** — Product-shaped plugin practices: CMake presets, test/measurement targets, asset/model loading, state restore, latency/tail updates, oversampled circuit-model plugins (rate policy, integer latency, bypass parameter, model revision), host validation, and release gates
 
 ## Common Patterns
@@ -368,5 +369,6 @@ Store presets as XML files loaded via `juce::File` or embedded as binary data. U
 - **Cache `getRawParameterValue()` pointers** as members — never call it inside `processBlock()`.
 - **Pre-allocate all buffers** in `prepareToPlay()`, never in `processBlock()`.
 - **Use `juce::ScopedNoDenormals`** at the top of `processBlock()` to avoid performance penalties from denormal floats.
+- **Attribute CPU before optimizing** — what a host's performance meter measures is host-specific. Compare the audio callback with the editor closed and open, and bypassed, before deciding whether the DSP or the UI is the problem (`references/performance-investigation.md`).
 - **Set `COPY_PLUGIN_AFTER_BUILD TRUE`** in CMake for rapid iteration — plugins auto-install after each build.
 - **Close your DAW before rebuilding** — DAWs lock plugin files while loaded.

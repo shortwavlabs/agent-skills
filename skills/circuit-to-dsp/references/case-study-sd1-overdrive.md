@@ -27,15 +27,21 @@ An asymmetric diode-feedback overdrive built around one dual-op-amp package (one
 | The real oversampling filters had to be measured | Integer-latency polyphase IIR filters gave 6-sample latency at 8×/4× and bit-exact latency-matched bypass; their non-linear phase dominates host-rate waveform comparisons, so fidelity was gated at the island rate and the filters were gated separately. | `integrators-and-rates.md` |
 | Plugin validation and fidelity are separate | pluginval (strictness 10) and auval passing said nothing about circuit accuracy; the SPICE reference tiers said nothing about host behaviour. Both were required. | `validation-gates.md` (product checks) |
 | Solver memory must describe the returned root | Carrying the last evaluated point instead of the returned root into the next predictor was a latent correctness bug, found in a code-correctness review. | `nonlinear-solvers.md` |
+| The host CPU complaint was the model, not the editor | A DAW showed about 11 % idle and 16 % playing for one instance with a heavy 3D WebView editor. The live callback read the same with the editor open or closed and 0.1 % bypassed; the islands were 87–94 % of the callback and the oversampling filters 5–7 %. | `juce-plugin`: performance-investigation; `model-performance.md` |
+| Stereo cost was duplicated work | A mono source on a stereo track ran two islands on identical samples. Sharing one island while inputs and states were bit-identical took stereo from 9.7 % to 5.1 % of a core, bit-identical in a 15-render null test. | `model-performance.md` (identical-channel sharing) |
+| Silence cost 82 % of signal | The idle model integrated every state on zeros. A hold entered when no state moved by more than 1e-14 V in 0.25 s (slowest time constant 0.78 s; 27× the measured noise floor) took settled idle from 8.1 % to 0.6 %; a 1e-12 V tolerance engaged about 3 s sooner but held a measurably different state; the held output was within −317 dBFS of uninterrupted integration, and after a hold only single float-rounding steps of the output differed. The hold engages 16–18 s after a signal, when the tail has reached the model's noise floor. | `model-performance.md` (settled-state hold) |
+| Bit-stationary state did not arrive | Two of three control settings were still in a limit cycle of about 2e-16 V after 120 s of silence, so a fixed-point test could not be the criterion. The settled noise floor measured over 108 corners was 3.7e-16 V per window. | `model-performance.md` (settled-state hold) |
+| The profiler blamed the state commit | 30 % of samples landed on a short commit at the end of a 59 ns serial stage. Alignment made no difference and link-time inlining, already in the plugin build, was worth 3.6 %. No kernel change was made. | `model-performance.md` (where the time goes) |
+| The benchmark itself misled | With the engine on the benchmark thread's stack, identical code timed 5.1–6.6 % depending on the size of the process environment; on the heap, as in the plugin, it was stable. | `juce-plugin`: performance-investigation (harness) |
 
 ## Numbers Worth Remembering Only As Examples
 
 - Newton budget after adding a conditional re-seed table: maximum 6 evaluations over 6 million synthetic solves (previously the cap was hit 31 % of the time from arbitrary warm starts), 0 cap hits in every time-series corpus.
 - Table proof: 8192-node cubic Hermite, minimum interpolant/node slope ratio 0.996 at the device-law kink interval, Fritsch–Carlson α²+β² ≤ 2.24.
-- CPU (one machine): about 5 % of a core mono and 10 % stereo at 48 kHz × 8 back to back; about 10 % mono at 16×.
+- CPU (one machine): about 5 % of a core mono and 10 % stereo at 48 kHz × 8 back to back; about 10 % mono at 16×. With the shortcuts: 5.1 % for stereo with identical channels, 0.6 % settled idle. A live callback read 1.3–2× the back-to-back figure depending on buffer size.
 - Interface calibration default: +12 dBu at the jack = 0 dBFS (a product choice for typical interfaces), with a user trim.
 - Fidelity envelope: 1.4 V peak at the input, set by the measured onset of the tone op-amp's saturation; above it, robustness grade.
 
 ## What Not To Copy
 
-The rate, the integrator, the state count, the explicit coupling, the 1 mV diode gate, the 3 dB margin, the +12 dBu calibration and the 1.4 V envelope were **derived** for this circuit. Derive yours the same way.
+The rate, the integrator, the state count, the explicit coupling, the 1 mV diode gate, the 3 dB margin, the +12 dBu calibration, the 1.4 V envelope, and the 1e-14 V / 0.25 s hold criterion were **derived** for this circuit. Derive yours the same way.
