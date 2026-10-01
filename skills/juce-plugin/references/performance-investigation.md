@@ -53,7 +53,7 @@ A plugin with a web editor typically has these cost domains, measured by differe
 
 | Figure | Is | Note |
 |---|---|---|
-| Callback duty | Time inside the process callback ÷ the audio block period | The deadline figure; one callback on one thread |
+| Callback duty | Elapsed wall time from callback entry to return ÷ the audio block period | The deadline figure, wherever the work executes; not thread CPU time |
 | Percent of one core | CPU time of a thread ÷ wall-clock time | Says nothing about deadlines |
 | Process CPU | CPU time of every thread of a process ÷ wall-clock time | Can exceed 100 % |
 | WebView helper CPU | Process CPU of a content or GPU helper | The helper may serve more than this editor |
