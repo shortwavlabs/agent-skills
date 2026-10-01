@@ -31,11 +31,11 @@ Italic case-study notes describe one product on one machine. They show how a dec
 
 ## Attribute Before Optimizing
 
-A plugin with a web editor typically has these cost domains, measured by different tools (the process model depends on the WebView backend, and DSP is not always a single thread):
+A plugin with a web editor typically has these cost domains, measured by different tools (the process model depends on the WebView backend):
 
 | Domain | Runs in |
 |---|---|
-| DSP | Audio thread |
+| Realtime DSP | Host audio callback thread(s), plus any realtime worker threads the architecture manages itself; attribute all realtime audio-engine work, not one thread by assumption |
 | Native editor, timers, bridge | Host message thread |
 | Page script, style, layout, paint | WebView content process |
 | WebGL, raster, compositing | WebView GPU process and the GPU |
@@ -49,6 +49,22 @@ A plugin with a web editor typically has these cost domains, measured by differe
 
 *Case study: for a pedal plugin with a 3D WebView editor, the live callback read the same with the editor open or closed and near zero when bypassed, and the idle editor drew no frames. The figure its DAW reported was the circuit model; the editor's cost was real but in other processes. A plugin with the same symptoms can have the opposite answer: the isolations decide, not this precedent.*
 
+**A percentage needs its denominator.** These are different quantities and are not interchangeable:
+
+| Figure | Is | Note |
+|---|---|---|
+| Callback duty | Time inside the process callback ÷ the audio block period | The deadline figure; one callback on one thread |
+| Percent of one core | CPU time of a thread ÷ wall-clock time | Says nothing about deadlines |
+| Process CPU | CPU time of every thread of a process ÷ wall-clock time | Can exceed 100 % |
+| WebView helper CPU | Process CPU of a content or GPU helper | The helper may serve more than this editor |
+| Host performance meter | Whatever the host defines | Establish it first (above) |
+
+Never write "CPU = X %" in a report without saying which of these X is, with the sample rate, buffer size, layout and editor state, and the machine and build where practical.
+
+**Helper-process CPU is not GPU load.** The CPU time of a WebView GPU process is CPU spent submitting, rasterising and compositing. It is not GPU utilisation or GPU execution time: a quiet helper does not prove an idle GPU, nor a busy one a GPU bottleneck. For the GPU itself use frame time with completion forced, platform GPU instrumentation, and memory or residency estimates. Draw-call and triangle counts describe the work submitted (say whether per pass or for the whole frame including shadow passes), not which resource is the bottleneck.
+
+**Helper processes may be shared.** Depending on backend, platform and host, a content or GPU helper can be dedicated to one WebView, shared by several, or reused. Do not charge a helper's whole CPU to one editor: measure controlled baselines and take the deltas (no editor, one editor, two editors).
+
 ## Two Measurements, Two Questions
 
 | | Headless, back to back | Live audio callback |
@@ -60,11 +76,13 @@ A plugin with a web editor typically has these cost domains, measured by differe
 
 - A sleep-paced synthetic loop is neither: it can read far above or below both.
 - Callback duty cycle depends on scheduling and CPU clock scaling as well as on work. Compare algorithms with headless numbers and judge deadlines with live numbers, and do not derive per-sample cost from host percentages across buffer sizes. *Observed on macOS/Apple silicon: a longer block read a larger percentage for the same work per sample, and total duty was not linear in instance count.*
-- Label every figure with which measurement it is, plus machine, build, rate, buffer and layout.
+- **A low average does not prove glitch safety.** Average and headless figures say how much work is done; p99, p99.9, maximum and overrun counts say how reliably the deadline is met. Report both, and do not make a single average the performance gate.
+- A tail percentile needs enough callbacks behind it: over a short run a p99.9 rests on a handful of observations. Record the run duration or callback count with every percentile, and run longer for the tails that matter.
+- Label every figure with which of the two measurements it is, and with the unit and conditions [above](#attribute-before-optimizing).
 
 ## Measurement Matrix
 
-Vary one axis at a time against a fixed default.
+For diagnosis, vary one axis at a time against a fixed default.
 
 | Axis | Values | Reveals |
 |---|---|---|
@@ -77,6 +95,8 @@ Vary one axis at a time against a fixed default.
 | Instances | A ladder such as 1, 2, 4, 8 | Scaling |
 
 Hosts often instantiate an effect stereo even on a mono source, so "stereo with identical L/R" is a common real case and needs its own row.
+
+One axis at a time finds a cause; it does not cover interactions. For acceptance, add the combinations that matter, not an exhaustive cross-product: where the implementation policy changes, where production users operate, where a boundary exists, and where profiling showed sensitivity. Typical pairs are sample rate × layout when the rate changes the oversampling factor, buffer size × live scheduling, editor activity × audio activity, and instance count × scheduling. Benchmark the host rates just below, at and just above each rate-policy boundary, the same rates the model's [policy tests](../../circuit-to-dsp/references/integrators-and-rates.md#oversampling-factor-policy) cover.
 
 ## Stage Breakdown And Reading A Profile
 
@@ -131,7 +151,7 @@ General notes for the live host:
 A performance change is incomplete without output evidence against the previous build.
 
 1. Before touching the DSP, render a reference set from the unmodified engine: every supported rate, several buffer sizes, each layout, representative signal, automation, gain and control steps, bypass transitions, overload, silence, a tail into long silence, and signal after long silence.
-2. After each change compare sample by sample. A change claimed bit-exact must be bit-identical. For a bounded change report the largest difference in dBFS, with the float rounding of the output separated from any real difference.
+2. After each change compare sample by sample. A change claimed bit-exact must be bit-identical. For a stateful shortcut that covers future-state behaviour as well as output: the renders must cross its transitions (into the shortcut, out of it mid-block, independent continuation afterwards, and back in after a reset or re-convergence). For a bounded change report the largest difference in dBFS, with the float rounding of the output separated from any real difference.
 3. Check solver statistics, cap hits and finite output over the same runs.
 4. Run every existing correctness gate unchanged (unit tests, reference tiers). Do not relax a tolerance to admit an optimization.
 
@@ -141,9 +161,9 @@ Classify every optimization. The class says what evidence it owes and who decide
 
 | Class | Meaning | Owes | Examples |
 |---|---|---|---|
-| **Bit-exact** | Output and the state that determines future output are identical | A bit-identical null test | Sharing work between identical channels; skipping constant work while smoothers rest |
+| **Bit-exact** | Output and the state that determines future output are identical | A bit-identical null test that crosses the shortcut's transitions | Sharing work between identical channels; skipping constant work while smoothers rest |
 | **Bounded-numerical** | A measured numerical difference exists inside an explicitly validated bound | The bound, how it was derived, residuals against the unshortened path | A settled-state hold based on a convergence threshold |
-| **Visual-equivalent** | Rendering behaviour changes; matched evidence shows no unacceptable visible change (pixel-identical under stated preconditions is the strongest form) | Matched views and the preconditions | Change-driven shadow maps; a lower redraw rate for host-driven changes |
+| **Visual-equivalent** | Rendering behaviour changes; matched evidence shows no unacceptable visible change (pixel-identical under stated preconditions is the strongest form) | Matched views for a static change, motion and final-state checks for a temporal one, and the preconditions ([visual candidates](../../guitar-gear-qa/references/runtime-qa.md#performance-candidates-that-can-change-appearance)) | Change-driven shadow maps (pixel-identical while their preconditions hold); coalesced redraws of host-driven changes (temporally coalesced: same final state, fewer intermediate frames) |
 | **Product-semantic** | Behaviour or fidelity actually changes | An explicit product decision | Summing a stereo input to mono; lower model fidelity or oversampling; visibly lower visual quality; removing interaction, views or editor sizes |
 
 The first three are engineering work, done with the evidence shown; where the project has not already set the acceptable bound or visual threshold, that threshold still needs the owner's agreement. A performance pass does not take a product-semantic change silently; it records the option with its cost and gain. Do not describe a bounded change as exact.
@@ -167,7 +187,7 @@ The structure is reusable; each project sets its own numbers.
 | Layer | Gates |
 |---|---|
 | DSP correctness | Unit tests; reference or oracle tiers where fidelity is a requirement; null test against the previous build |
-| DSP performance | Headless benchmark; live callback with no overruns and p99/p99.9 within a stated share of the block |
+| DSP performance | Headless benchmark; live callback with no overruns and p99/p99.9 within a stated share of the block, over a stated run length |
 | Frontend | Logic tests; idle frame and message counters; interaction tests |
 | Integrated editor | Real system WebView host: first-paint sync, both directions, gestures, automation, presets, resize, reopen, teardown mid-gesture, state restore |
 | Plugin | Format validators at the accepted strictness |
@@ -182,10 +202,10 @@ Correctness criteria describe product behaviour independently of any performance
 Write the control document from the unmodified build before the first optimization. A time-boxed pass still needs the four isolations, one headless before/after on the dominant case, a null test and the existing gates; drop breadth, not those. When no target figure was given, report the measured floor and what each further step would cost, and do not invent a target. A thorough pass covers the following.
 
 1. Reported problem and its source (which meter, which host, and what that meter measures).
-2. Machine, OS, display, audio device, build, binary hashes.
+2. Machine, OS, display, audio device, build, and the identity of what was measured where it matters: commit, plugin binary hash, frontend asset hash.
 3. Baseline: editor closed/open, rates, buffers, layouts.
 4. Headless benchmark, stage breakdown, profiler findings and how they were read.
-5. Editor findings: idle activity, bridge and message rates, drawing buffer and pixel ratio, shadows, textures and memory, draw calls.
+5. Editor findings: idle activity, bridge and message rates, drawing buffer and pixel ratio, shadows, textures and memory, draw calls (per pass or whole frame, stated).
 6. Implemented optimizations, each with its equivalence class and the evidence that class owes.
 7. **Rejected candidates and why.** They are engineering knowledge: a fidelity gate fails, visible degradation, no measured benefit, a memory-only benefit, a platform or security-policy dependency, bit parity lost, complexity above the expected gain. Recording them stops the next agent repeating the same dead ends.
 8. Visual comparison; DSP regression and null test; frontend and integrated-editor tests; plugin validation.

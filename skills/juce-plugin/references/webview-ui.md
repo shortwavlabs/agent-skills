@@ -213,13 +213,17 @@ Never access WebView from `processBlock()`. Publish reduced meter/spectrum state
 
 Choose the rate by measurement and by looking at the result; 30 Hz is a common starting point, not a rule. When the rate changes, keep the display's timing: scale per-tick decay and hold counts so the ballistics stay the same per second.
 
+Change-only sending is preferred when the receiver needs no heartbeat. If a heartbeat is part of the product protocol, make it explicit and low-rate.
+
+Throttling a hidden editor suspends drawing, not state. Application state stays authoritative while hidden; when the editor becomes visible again, apply the latest state, update every visible control and indicator, and render once. Do not replay missed visual updates or queue a backlog of visual-only events, unless the product needs the history.
+
 ### What a meter costs in a WebView
 
 A small element does not guarantee a small cost. Repaint and compositor overhead can dominate even for a visually tiny meter, and it may not scale with the dirty area or linearly with the update rate. Find out which part pays (bridge traffic, script, layout, paint or compositing) before choosing a remedy: measure the host main thread, the content process and the GPU process with the meter hidden (`display: none`), then with each piece shown.
 
 Patterns that helped, each to be confirmed by measurement on the target WebView:
 
-- Move bars and needles with `transform` on an element that has its own compositor layer (`will-change: transform`), which can avoid layout and repaint for that element. Promoting a layer while something else still repaints on every event may save nothing.
+- Move bars and needles with `transform` on an element that has its own compositor layer (`will-change: transform`), which can avoid layout and repaint for that element. Promoting a layer while something else still repaints on every event may save nothing, and a promoted layer is not free: it costs memory, a backing surface and compositing work. Promote only what measurement shows benefits, not every element pre-emptively.
 - Give text its own, slower cadence, independent of the bar, with a trailing write so the last value is not left stale.
 - Write each DOM value only when it changed. A status event should not rewrite calibration text, tooltips, ARIA attributes or marker positions that did not move.
 - Read layout once per frame, compute, then write; interleaved read/write pairs can force a layout at every read. Profile before and after: the saving may be small.

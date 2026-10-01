@@ -44,7 +44,14 @@ Lower pixel ratio, smaller shadow maps, smaller textures, a lower redraw rate an
 
 A comparison is only valid when the candidate was actually applied. When a texture is swapped at runtime for the study, release the GPU texture first so storage is re-allocated at the new size, and confirm the result looks like a softer version of the original, not a displaced or tiled one. For a texture candidate, compare texel density with screen density before rendering anything ([budget from pixels](../../guitar-gear-materials/references/runtime-pbr.md#budget-from-pixels-then-profile)).
 
-Changes that are pixel-identical under their preconditions (cached shadow maps, coalesced host-driven redraws) still need a functional check of those preconditions: shadows follow every moving part, the last value of an automation run is drawn, and the editor returns to idle. Record the class of each accepted change ([equivalence classes](../../juce-plugin/references/performance-investigation.md#equivalence-classes)).
+The matched snapshots above judge **static image candidates** (pixel ratio, texture resolution, shadow-map resolution, geometry). **Temporal candidates** (a redraw cap for host automation, animation cadence, damping duration, meter update rate) change a motion sequence, and one final screenshot cannot validate a cadence. Check them with event and state counters, by watching the motion, by asserting the final value, the trailing update and the return to idle, and with a recorded frame sequence only where that is useful; video infrastructure is not required.
+
+Two accepted changes that are easy to misclassify:
+
+- **Cached shadow maps** are pixel-identical while their stated preconditions hold. Verify that the shadow result matches the uncached one and that a moving caster invalidates the cache.
+- **Coalesced host-driven redraws** are visual-equivalent and temporally coalesced, not pixel-identical as a motion sequence: fewer intermediate frames are drawn. Verify that every state update is applied and the latest value wins; that the motion is acceptably smooth and no transition the product needs shown is skipped; that a trailing frame is drawn and the final pose matches the authoritative state; and that the scheduler returns to idle.
+
+Record the class of each accepted change ([equivalence classes](../../juce-plugin/references/performance-investigation.md#equivalence-classes)).
 
 ## State-space integrity tests
 

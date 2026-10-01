@@ -58,7 +58,7 @@ With bit-identical inputs and state the output is bit-identical to running both 
 
 This is **not** "process stereo as mono". Summing or forcing mono changes what a true stereo input sounds like (class: product-semantic).
 
-Tests: identical → different → identical input, including a divergence in the middle of a block, bit-exact against an engine with the shortcut disabled; sharing observed where expected and absent where not.
+Tests: identical → different → identical input, including a divergence in the middle of a block, and sharing again after a reset or restore, bit-exact against an engine with the shortcut disabled; sharing observed where expected and absent where not.
 
 ## Settled-State Hold
 
