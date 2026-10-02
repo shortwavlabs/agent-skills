@@ -31,7 +31,7 @@ This skill also owns [references/circuit-reference-validation.md](references/cir
 8. **Validate controls in motion** against a time-varying reference.
 9. **Gates must mean something**: hard gates for required bounds, visible quality targets for preferred margins, NOT EVALUATED when the data cannot establish a gate, completeness checked by content.
 10. **Never loosen a gate to get green.** Revise a criterion only as a documented, evidenced revision.
-11. **Speed up a validated model without silently changing it.** Remove duplicated, inactive and settled work first, each with the evidence its equivalence class owes; any change to the arithmetic, rate or tolerance is a new revision that reopens its gates.
+11. **Speed up a validated model without silently changing it.** Remove duplicated, inactive and settled work first, then reschedule the unchanged arithmetic (overlap independent channels, inline a hot call boundary where a measured variant gains), each with the evidence its equivalence class owes; any change to the arithmetic, rate or tolerance is a new revision that reopens its gates.
 
 ## End-To-End Playbook
 
@@ -71,7 +71,7 @@ Iterate: a failed gate at step 16 usually sends you back to 9–13, not to a wid
 | [references/nonlinear-solvers.md](references/nonlinear-solvers.md) | Deriving the nonlinear residual, feedback clipping, monotone scalar solvers, solver memory, fuzzing, device laws, table proofs |
 | [references/integrators-and-rates.md](references/integrators-and-rates.md) | Comparing integrators, choosing the internal rate and oversampling policy, measuring production filters, latency/bypass, coefficient cadence, performance measurement |
 | [references/validation-gates.md](references/validation-gates.md) | Error decomposition, stage isolation, hard gates versus quality targets, phase ensembles, population-level gates, tiers, criteria changes, reporting |
-| [references/model-performance.md](references/model-performance.md) | Reducing the cost of a model that already passes its gates: what the current validated contract covers, order of work, identical-channel sharing, settled-state hold and how to derive its tolerance, constants while controls rest, the evidence required |
+| [references/model-performance.md](references/model-performance.md) | Reducing the cost of a model that already passes its gates: what the current validated contract covers, order of work, identical-channel sharing, interleaving independent channels (true stereo), settled-state hold and how to derive its tolerance, constants while controls rest, composing shortcuts, call boundaries and code generation, the evidence required |
 | [references/case-study-sd1-overdrive.md](references/case-study-sd1-overdrive.md) | A worked example (clearly labelled case study) when a concrete precedent helps; never a source of defaults |
 
 ## Project-Specific Outcomes Are Not Rules
@@ -99,6 +99,8 @@ Rates, integrators, state counts, coupling choices, tolerance values, margin siz
 | Lowering the oversampling factor, solver accuracy or integrator to save CPU | They belong to the current validated contract; changing one is a new revision with its gates. Time the stages and remove duplicated, inactive and settled work first |
 | Assuming silence is cheap | A stateful model integrates on zeros; benchmark silence and hold only after verified convergence |
 | Forcing mono to halve stereo cost | Share one island only while inputs and complete state are equivalent; mono processing is a product decision |
+| Concluding that a latency-bound kernel cannot go faster without a numerical change | One island is serial; two uncoupled islands that differ are two chains. Interleave them, each in its own unchanged order, and prove it bit-exact against two mono engines. Identical channels stay shared |
+| Trusting link-time optimization to have inlined the hot path, or forcing everything inline | Read what the shipped binary inlined; time inlining variants separately, because more can be slower |
 | Picking a convergence tolerance as a round number, or waiting for bit-stationary state | Derive it from the settled model's measured rounding-noise floor over the corners |
 | Comparing channel state with a whole-struct `memcmp`, or only the obvious voltages | An explicit comparison of every field that affects future output |
 | Calling a threshold-based hold "exact" | It is a bounded shortcut; report the bound |

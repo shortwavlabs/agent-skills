@@ -244,8 +244,8 @@ Two skills cover circuit-accurate modeling end to end, and route to the existing
 | Measurement methodology: spectra, windows, coherent tones, sub-sample phase ensembles, error metrics | [dsp-engineer](skills/dsp-engineer/SKILL.md) |
 | Realtime filter and numerical building blocks | [dsp](skills/dsp/SKILL.md) |
 | AudioProcessor/APVTS, lifecycle, latency/bypass APIs, CMake, formats, host validation | [juce-plugin](skills/juce-plugin/SKILL.md) |
-| Making a validated circuit model cheaper without changing it: identical-channel sharing, settled-state hold, what forces re-validation | [circuit-to-dsp](skills/circuit-to-dsp/SKILL.md) ([model-performance.md](skills/circuit-to-dsp/references/model-performance.md)) |
-| Plugin CPU investigation: audio-thread versus editor attribution, headless versus live-callback measurement, tooling, performance gates, reporting | [juce-plugin](skills/juce-plugin/SKILL.md) ([performance-investigation.md](skills/juce-plugin/references/performance-investigation.md)) |
+| Making a validated circuit model cheaper without changing it: identical-channel sharing, interleaving independent channels (true stereo), settled-state hold, composing shortcuts, call boundaries and code generation, what forces re-validation | [circuit-to-dsp](skills/circuit-to-dsp/SKILL.md) ([model-performance.md](skills/circuit-to-dsp/references/model-performance.md)) |
+| Plugin CPU investigation: audio-thread versus editor attribution, headless versus live-callback measurement, tooling, harness build parity and measurement noise, generated code as evidence, performance gates, reporting | [juce-plugin](skills/juce-plugin/SKILL.md) ([performance-investigation.md](skills/juce-plugin/references/performance-investigation.md)) |
 
 ### spice-circuit-modeling
 
@@ -291,7 +291,7 @@ skills/circuit-to-dsp/
     ├── nonlinear-solvers.md         KCL residuals, feedback clipping, monotone scalar solvers, solver memory, fuzzing, device laws, table proofs
     ├── integrators-and-rates.md     Integrator comparison, internal rate, oversampling policy, production filters, latency/bypass, coefficient cadence, performance
     ├── validation-gates.md          Error decomposition, stage isolation, hard gates vs targets, phase ensembles, population gates, tiers, criteria changes
-    ├── model-performance.md         Cheaper without changing the model: contract, order of work, identical-channel sharing, settled-state hold, evidence
+    ├── model-performance.md         Cheaper without changing the model: contract, order of work, identical-channel sharing, independent-channel interleaving, settled-state hold, call boundaries, evidence
     └── case-study-sd1-overdrive.md  Labelled case study: decisions and surprises from an op-amp diode-clipper overdrive plugin
 ```
 

@@ -183,6 +183,7 @@ Attribute the cost before optimizing, then fix the dominant stage, not the most 
 The fastest wins usually came from removing work from the hot path:
 
 - Find duplicated stereo work: a mono guitar often reaches the plugin as two identical channels. Collapsing a core that is mono by design and sharing an expensive stage between equivalent channels are different remedies; see the [mono and stereo policy](guitar-signal-chain.md#mono-and-stereo-policy).
+- A stereo source whose channels genuinely differ is the other case. Nothing is duplicated, so sharing does not apply, but two per-channel cores that share no state (no linked detector, no cross-feed) can be advanced side by side so the processor overlaps them, with each channel's arithmetic unchanged: [independent-channel interleaving](../../circuit-to-dsp/references/model-performance.md#independent-channel-interleaving).
 - Benchmark digital silence as its own signal; a stateful nonlinear stage is not automatically cheap on zeros. Stopping that work safely is a [settled-state hold](../../circuit-to-dsp/references/model-performance.md#settled-state-hold), not a gate.
 - Hoist repeated buffer pointer lookups out of inner loops.
 - Cache coefficient sets and mode-dependent constants.
