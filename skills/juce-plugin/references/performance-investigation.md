@@ -96,6 +96,8 @@ For diagnosis, vary one axis at a time against a fixed default.
 
 Hosts often instantiate an effect stereo even on a mono source, so "stereo with identical L/R" is a common real case and needs its own row.
 
+Report a kernel change with controls static and with controls moving as separate rows: a gain measured one way does not transfer to the other.
+
 One axis at a time finds a cause; it does not cover interactions. For acceptance, add the combinations that matter, not an exhaustive cross-product: where the implementation policy changes, where production users operate, where a boundary exists, and where profiling showed sensitivity. Typical pairs are sample rate × layout when the rate changes the oversampling factor, buffer size × live scheduling, editor activity × audio activity, and instance count × scheduling. Benchmark the host rates just below, at and just above each rate-policy boundary, the same rates the model's [policy tests](../../circuit-to-dsp/references/integrators-and-rates.md#oversampling-factor-policy) cover.
 
 ## Stage Breakdown And Reading A Profile
@@ -106,6 +108,9 @@ Split the callback into its major stages (input conditioning, up/down-sampling, 
 - The [hot-path audit](audio-thread-safety.md#hot-path-audit) finds risks; the profile sets priority.
 - Do not assume the resampling filters are the cost of an oversampled design. Time the filters and the work done inside the oversampled domain separately.
 - A sampling profiler can pile samples on the instruction where a long dependency chain finally resolves, often the last store or state commit of a stage. That marks where the chain ends, not necessarily where time is spent. For serial numerical kernels, read the dependency structure and the generated code and trust stage timings over flat-profile percentages. Simple arithmetic can be latency-bound.
+- **Generated code is evidence when the hypothesis is about the compiler** (was this inlined, did this loop vectorise, what is spilled). Read the optimized product binary, not the source and not the build flags: the kernel symbols that survive, the calls inside the hot function, vector instructions, stack traffic. Use it to explain a measured difference and to choose the next variant. Do not accept or reject a change on how the assembly looks; the timing decides.
+- **Time each stage the way the product executes it.** A stage timed alone under another schedule (two channels one after the other when the product overlaps them) no longer sums to the whole. A stage total above the engine total, or a negative remainder, is the tell.
+- **Estimate the leverage before investing.** For additive serial costs, a stage's measured share is a useful upper bound on the whole-engine gain from optimizing it, provided the rest of the work stays as it is. When stages overlap in the product's schedule, or the change alters how surrounding work is scheduled, isolated shares are not additive and the bound does not hold: measure the integrated engine again. After each meaningful gain, profile again: the mix has changed, and yesterday's dominant stage is not automatically the next target.
 
 *Case study: nearly all of the callback was the circuit core; the oversampling filters were a few percent and host-rate work under one. The profiler put almost a third of its samples on a short state commit that was only the end of the chain.*
 
@@ -116,11 +121,14 @@ The benchmark is part of the experiment. Validate it before trusting a differenc
 - Release build, production DSP sources, warm-up excluded, input synthesised outside the timed region.
 - **Match production object lifetime and placement.** Construct and own the engine the way the product does: on the heap inside the processor if that is what ships, embedded differently if it is not. A benchmark can mislead because its environment changes code or data placement or scheduling.
 - Before and after with the **same harness code** built against both DSP revisions, same compiler and flags, same construction, runs interleaved.
+- **Build the harness like the product, compile and link.** The same sources are not enough. Optimization level, target architecture, floating-point mode, link-time optimization and any linker option that affects code generation, and the defines that select code paths must match the shipped target. A separate benchmark target does not automatically inherit them: verify the effective settings of both targets, then confirm in the binaries that the hot path has the same shape.
+- **If the harness itself changes** (a flag corrected, construction fixed), time the previous kernel again under the new harness. Never compare an old figure from the old harness with a new figure from the new one.
+- **Know the noise before judging a small difference.** Interleave baseline and candidate, repeat, and take the spread of the repeated medians as the floor. A difference inside it is not a result, and complexity is not kept for one.
 - Keep benchmark scheduling consistent and record it (priority or QoS class, and core tier on machines that have tiers); control unwanted migration where practical. A benchmark thread is not a realtime audio thread: use the live callback for deadline behaviour.
 - Re-run an outlier before believing it. If timings change with things that should not matter (environment size, path, an unrelated edit), fix the harness first.
 - Keep instrumentation out of the product: measurement modes live in harness and test targets.
 
-*Case study: with the engine on the benchmark thread's own stack, identical code timed up to 30 % apart depending only on the size of the process environment. Constructed as in the plugin (there, on the heap) it was stable. The lesson is to match production, not that the heap is faster.*
+*Case study: with the engine on the benchmark thread's own stack, identical code timed up to 30 % apart depending only on the size of the process environment. Constructed as in the plugin (there, on the heap) it was stable. The lesson is to match production, not that the heap is faster. The same harness linked without link-time optimization while the plugin used it, and in interleaved runs read 4–8 % above the shipped kernel until it was built the same way. Run-to-run noise of its medians was about 3 %, which decided several candidates.*
 
 Three small tools answer most questions:
 
@@ -152,7 +160,7 @@ A performance change is incomplete without output evidence against the previous 
 
 1. Before touching the DSP, render a reference set from the unmodified engine: every supported rate, several buffer sizes, each layout, representative signal, automation, gain and control steps, bypass transitions, overload, silence, a tail into long silence, and signal after long silence.
 2. After each change compare sample by sample. A change claimed bit-exact must be bit-identical. For a stateful shortcut that covers future-state behaviour as well as output: the renders must cross its transitions (into the shortcut, out of it mid-block, independent continuation afterwards, and back in after a reset or re-convergence). For a bounded change report the largest difference in dBFS, with the float rounding of the output separated from any real difference.
-3. Check solver statistics, cap hits and finite output over the same runs.
+3. Check solver statistics, cap hits and finite output over the same runs. For a pure scheduling or code-generation change the workload counters are expected to equal the previous build's. If a counter moves, explain it and show that output and future state still meet the claimed class.
 4. Run every existing correctness gate unchanged (unit tests, reference tiers). Do not relax a tolerance to admit an optimization.
 
 ## Equivalence Classes
@@ -161,7 +169,7 @@ Classify every optimization. The class says what evidence it owes and who decide
 
 | Class | Meaning | Owes | Examples |
 |---|---|---|---|
-| **Bit-exact** | Output and the state that determines future output are identical | A bit-identical null test that crosses the shortcut's transitions | Sharing work between identical channels; skipping constant work while smoothers rest |
+| **Bit-exact** | Output and the state that determines future output are identical | A bit-identical null test that crosses the shortcut's transitions | Sharing work between identical channels; skipping constant work while smoothers rest; interleaving independent channels or inlining a call boundary, once the null test confirms it on each supported target, compiler and floating-point mode |
 | **Bounded-numerical** | A measured numerical difference exists inside an explicitly validated bound | The bound, how it was derived, residuals against the unshortened path | A settled-state hold based on a convergence threshold |
 | **Visual-equivalent** | Rendering behaviour changes; matched evidence shows no unacceptable visible change (pixel-identical under stated preconditions is the strongest form) | Matched views for a static change, motion and final-state checks for a temporal one, and the preconditions ([visual candidates](../../guitar-gear-qa/references/runtime-qa.md#performance-candidates-that-can-change-appearance)) | Change-driven shadow maps (pixel-identical while their preconditions hold); coalesced redraws of host-driven changes (temporally coalesced: same final state, fewer intermediate frames) |
 | **Product-semantic** | Behaviour or fidelity actually changes | An explicit product decision | Summing a stereo input to mono; lower model fidelity or oversampling; visibly lower visual quality; removing interaction, views or editor sizes |
@@ -202,12 +210,12 @@ Correctness criteria describe product behaviour independently of any performance
 Write the control document from the unmodified build before the first optimization. A time-boxed pass still needs the four isolations, one headless before/after on the dominant case, a null test and the existing gates; drop breadth, not those. When no target figure was given, report the measured floor and what each further step would cost, and do not invent a target. A thorough pass covers the following.
 
 1. Reported problem and its source (which meter, which host, and what that meter measures).
-2. Machine, OS, display, audio device, build, and the identity of what was measured where it matters: commit, plugin binary hash, frontend asset hash.
+2. Machine, OS, display, audio device, build, and the identity of what was measured where it matters: commit, plugin binary hash, frontend asset hash. For a kernel figure the build means compiler and version, optimization level, architecture, link-time optimization on or off, and the floating-point mode.
 3. Baseline: editor closed/open, rates, buffers, layouts.
 4. Headless benchmark, stage breakdown, profiler findings and how they were read.
 5. Editor findings: idle activity, bridge and message rates, drawing buffer and pixel ratio, shadows, textures and memory, draw calls (per pass or whole frame, stated).
 6. Implemented optimizations, each with its equivalence class and the evidence that class owes.
-7. **Rejected candidates and why.** They are engineering knowledge: a fidelity gate fails, visible degradation, no measured benefit, a memory-only benefit, a platform or security-policy dependency, bit parity lost, complexity above the expected gain. Recording them stops the next agent repeating the same dead ends.
+7. **Rejected candidates and why.** They are engineering knowledge: a fidelity gate fails, visible degradation, no measured benefit, a gain inside the measurement noise, a memory-only benefit, a platform or security-policy dependency, bit parity lost, complexity above the expected gain. Recording them stops the next agent repeating the same dead ends.
 8. Visual comparison; DSP regression and null test; frontend and integrated-editor tests; plugin validation.
 9. Multi-instance results.
 10. Remaining bottlenecks, separating engineering work from product-semantic decisions.

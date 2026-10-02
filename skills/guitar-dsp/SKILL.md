@@ -52,7 +52,7 @@ Use this skill for guitar-centric DSP work that spans tone, realtime safety, C++
 | `references/runtime-code-patterns.md` | Need compact C++ runtime patterns for parameter snapshots, model/IR handoff, per-channel model state, smoothing, latency/tail updates, or test target shape. |
 | `references/validation-and-release.md` | Building test plans, measurement harnesses, native validator runs, aliasing reports, DAW smoke tests, pluginval/auval gates, and release checklists. |
 | `juce-plugin` → [performance-investigation.md](../juce-plugin/references/performance-investigation.md) | A plugin uses too much CPU, or a performance pass is planned: separating audio-thread DSP from editor cost, headless versus live-callback measurement, the test matrix, stage breakdown, null tests, multi-instance scaling and the report. |
-| `circuit-to-dsp` → [model-performance.md](../circuit-to-dsp/references/model-performance.md) | Making a validated circuit model cheaper without changing it: identical-channel sharing, settled-state hold, what forces re-validation. |
+| `circuit-to-dsp` → [model-performance.md](../circuit-to-dsp/references/model-performance.md) | Making a validated circuit model cheaper without changing it: identical-channel sharing, interleaving independent channels for a true-stereo source, settled-state hold, what forces re-validation. |
 | `references/example-prompts.md` | Need realistic prompts to test or demonstrate this skill's intended use cases. |
 
 ## Helper Scripts
