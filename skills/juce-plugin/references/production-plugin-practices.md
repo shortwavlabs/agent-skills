@@ -144,7 +144,7 @@ Processor tests:
 
 Measurement target:
 
-- Build Release-only, with the plugin's compile and link optimization settings (link-time optimization included). A separate target does not inherit them from the plugin target.
+- Build Release-only, with the plugin's effective compile and link optimization settings (link-time optimization included). A separate target does not automatically inherit the plugin target's options; it has them only where the build shares them deliberately (a common interface target, a shared library, common configuration). Verify the effective settings instead of assuming parity from shared sources.
 - Benchmark per-stage and full-chain timing at target sample rates and buffer sizes.
 - Include expensive stages such as neural inference, convolution, tuner analysis, pitch shifting, reverb, and full chain.
 - Capture automation stress metrics where abrupt changes can cause clicks or instability.
@@ -162,7 +162,7 @@ JUCE-specific practices for plugins whose DSP runs an oversampled circuit model 
 - Some hosts and validators query latency before the first `prepareToPlay()`. Define a valid pre-prepare policy: if the latency is invariant, or can be computed correctly before the host rate is known (for example integer-latency oversampling whose latency is the same for every factor the policy can choose), report it in the constructor; otherwise do not invent a value. Always call `setLatencySamples()` with the correct value in `prepareToPlay()` and on every reconfiguration, and test the wrappers and hosts you actually target.
 - Expose bypass through `getBypassParameter()`. In current JUCE wrappers the host bypass then arrives as that parameter and `processBlockBypassed()` is used only when no bypass parameter exists; verify this on your JUCE version. Implement a dry path delayed by exactly the reported latency plus a crossfade, and test that the bypassed output equals the delayed input bit for bit after the crossfade.
 - Non-parameter state such as an interface calibration reference: a user edit notifies the host (`updateHostDisplay (ChangeDetails().withNonParameterStateChanged (true))`); `setStateInformation()` stores the value **without** notifying, so restoring a session does not mark it dirty.
-- Store a **model revision** string (changes only when the audio changes) separately from the **state schema version** (changes only when serialization changes). A bit-exact implementation change (scheduling, inlining) leaves the model revision alone; the commit and the binary hash still identify the build. Test that a session saved by an older model revision restores every parameter unchanged and re-saves with the new revision.
+- Store a **model revision** string (changes only when the audio changes) separately from the **state schema version** (changes only when serialization changes). Under that convention a proven bit-exact implementation change (scheduling, inlining) leaves the model revision alone; the commit and the binary hash still identify the build. Test that a session saved by an older model revision restores every parameter unchanged and re-saves with the new revision.
 - Publish engine facts the editor shows (factor, latency, degraded flag) through atomics written in `prepareToPlay()`, not by reading engine members from the message thread.
 - Guard the product formats in CMake: fail configuration if a target you do not ship (for example `<Plugin>_Standalone`) appears.
 
