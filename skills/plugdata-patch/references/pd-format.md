@@ -96,7 +96,7 @@ Messages can contain:
 #X text X Y CONTENT;
 ```
 
-Non-functional annotations displayed on the canvas.
+Non-functional annotations displayed on the canvas. Comments still take an object index, so count them when numbering connections (see Connections).
 
 Example:
 ```
@@ -110,30 +110,35 @@ Example:
 ```
 
 - All values are 0-based integers
-- `SRC_INDEX` / `DST_INDEX` — object indices (sequential from 0, only `#X obj` and `#X msg` count)
+- `SRC_INDEX` / `DST_INDEX` — object indices: sequential from 0 on the current canvas, counting every item placed on it (comments included, see below)
 - `SRC_OUTLET` / `DST_INLET` — outlet/inlet numbers (0-based)
 
-Only these line types increment the index counter:
-- `#X obj`
+Every item placed on the canvas takes the next index:
+- `#X obj` (including GUI objects such as `tgl`, `hsl`, `bng`, `nbx`)
 - `#X msg`
-- `#X floatatom`
-- `#X symbolatom`
-- `#X text` (in some Pd versions)
+- `#X text` (comments: always counted, in every Pd version and in plugdata)
+- `#X floatatom` / `#X symbolatom` / `#X listbox`
+- `#X restore` (a subpatch or graph placed on the parent; its contents are numbered separately, starting from 0)
 
 These do NOT increment the counter:
 - `#X connect`
-- `#X array`
 - `#X coords`
+- `#X array` / `#A` (they belong to the enclosing graph, which is counted by its `#X restore`)
+- `#X declare`
+- `#N canvas` (opens a subpatch; the subpatch takes its parent index at `#X restore`)
 
 Example:
 ```
-#X obj 50 30 osc~ 440;       // index 0
-#X obj 50 80 *~ 0.5;         // index 1
-#X obj 50 130 dac~;          // index 2
-#X connect 0 0 1 0;          // osc~ outlet 0 -> *~ inlet 0
-#X connect 1 0 2 0;          // *~ outlet 0 -> dac~ inlet 0
-#X connect 1 0 2 1;          // *~ outlet 0 -> dac~ inlet 1 (stereo)
+#X text 50 10 stereo sine;   // index 0 (comment, still counted)
+#X obj 50 30 osc~ 440;       // index 1
+#X obj 50 80 *~ 0.5;         // index 2
+#X obj 50 130 dac~;          // index 3
+#X connect 1 0 2 0;          // osc~ outlet 0 -> *~ inlet 0
+#X connect 2 0 3 0;          // *~ outlet 0 -> dac~ inlet 0
+#X connect 2 0 3 1;          // *~ outlet 0 -> dac~ inlet 1 (stereo)
 ```
+
+If you forget that comments count, every connection after the first comment shifts. Pd then reports `name.pd A B C D (text->...) connection failed`, or `audio signal outlet connected to nonsignal inlet (ignored)` when a signal wire lands on the wrong object.
 
 ## Arrays
 
@@ -252,9 +257,16 @@ Signal send/receive (`send~`/`receive~`, `throw~`/`catch~`) work the same way bu
 ## Declaration (Search Paths)
 
 ```
-#X obj X Y declare -path /path/to/abstractions;
-#X obj X Y declare -lib library_name;
+#N canvas 0 0 600 400 12;
+#X declare -path /path/to/abstractions -lib library_name;
+#X obj X Y declare -path /path/to/abstractions -lib library_name;
 ```
+
+Pd saves a declaration as two lines, and a generated patch needs both:
+- `#X declare ...;` directly after the top `#N canvas` line. This line loads the libraries and adds the paths when the patch is opened, before any objects are created. It takes no object index.
+- `#X obj X Y declare ...;` is the visible `[declare]` box. It takes an index like any other object, but **on its own it loads nothing**. Objects from the library will fail with "couldn't create".
+
+plugdata and Gem: Gem is compiled into plugdata, but its classes are registered only as `Gem/<name>`. Prefer the prefixed names (`[Gem/gemwin]`, `[Gem/gemhead]`, `[Gem/pix_film]`, `[Gem/rectangle]`, ...), which need no declaration. `#X declare -lib Gem;` also works, but it makes the plain Gem names global for the rest of the session and replaces any ELSE object with the same name (for example ELSE's `[circle]` GUI).
 
 ## Line Continuation
 
@@ -270,10 +282,10 @@ that continues on the next line;
 ```
 #N canvas 0 0 WIDTH HEIGHT 12;
 
-// Comments (use #X text for visible comments)
+// Comments (use #X text for visible comments) take an index too: this one is 0
 #X text 50 10 Patch description;
 
-// Objects (track index for each)
+// Objects (track index for each; numbering continues after the comment: 1, 2, 3)
 #X obj X1 Y1 TYPE1 ARGS;
 #X obj X2 Y2 TYPE2 ARGS;
 #X obj X3 Y3 TYPE3 ARGS;
@@ -286,7 +298,7 @@ that continues on the next line;
 ## Common Pitfalls
 
 1. **Missing semicolons** — every line must end with `;`
-2. **Wrong indices** — verify object count matches connection references
+2. **Wrong indices** — verify object count matches connection references. Comments (`#X text`) and subpatch `#X restore` lines count. The giveaway is `(text->...) connection failed` in the console.
 3. **Signal/control mismatch** — `~` outlets cannot connect to non-`~` inlets
 4. **Spaces in paths** — file paths in objects must not contain spaces
 5. **$0 expansion** — `$0` in objects is replaced with a unique canvas ID at load time, useful for local send/receive names

@@ -41,15 +41,18 @@ This creates a 440Hz sine oscillator at half volume, output to both audio channe
 
 ### Object Indexing
 
-Every `#X obj` and `#X msg` line gets a sequential 0-based index. `#X connect` lines reference these indices. `#X text` and `#X connect` lines do NOT get indices.
+Every `#X obj`, `#X msg`, `#X text`, `#X floatatom`, `#X symbolatom` and `#X restore` line gets a sequential 0-based index on its canvas. **Comments count.** `#X connect` lines reference these indices. `#X connect`, `#X coords`, `#X array`, `#X declare` and `#A` lines do NOT get indices.
 
 ```
-#X obj 50 30 osc~ 440;      // index 0
-#X obj 50 80 *~ 0.5;        // index 1
-#X obj 50 130 dac~;         // index 2
-#X connect 0 0 1 0;         // osc~ out0 -> *~ in0
-#X connect 1 0 2 0;         // *~ out0 -> dac~ in0
+#X text 50 10 sine at half volume;  // index 0 — comments take an index too
+#X obj 50 30 osc~ 440;      // index 1
+#X obj 50 80 *~ 0.5;        // index 2
+#X obj 50 130 dac~;         // index 3
+#X connect 1 0 2 0;         // osc~ out0 -> *~ in0
+#X connect 2 0 3 0;         // *~ out0 -> dac~ in0
 ```
+
+If you skip comments when counting, every later connection shifts. In the console that shows up as `(text->...) connection failed` or `audio signal outlet connected to nonsignal inlet (ignored)`.
 
 ### Signal vs Control
 
@@ -101,7 +104,7 @@ Use this template pattern:
 Build an array of objects, each with {type, x, y, args}
 Build an array of connections, each with {src, src_outlet, dst, dst_inlet}
 Emit #N canvas header
-Emit #X obj lines in order (track index)
+Emit #X obj / msg / text lines in order (each one, comments included, takes the next index)
 Emit #X connect lines using tracked indices
 ```
 
@@ -189,13 +192,25 @@ Types: `float`, `bool`, `int`, `trig`, `dB`, `Hz`, `log`, `log_hz`
 ## Key Constraints
 
 1. **Every line ends with `;`** — missing semicolons break the file
-2. **Object indices are 0-based and sequential** — only `#X obj`, `#X msg`, `#X floatatom`, `#X symbolatom` count
+2. **Object indices are 0-based and sequential per canvas** — `#X obj`, `#X msg`, `#X text` (comments!), `#X floatatom`, `#X symbolatom` and `#X restore` all count
 3. **Signal/control boundary** — `~` objects only connect to `~` objects unless bridged
 4. **No spaces in file paths** referenced by objects (soundfiler, readsf~, etc.)
 5. **`[dac~]`** takes channel args: `[dac~ 1]` = left, `[dac~ 1 2]` = stereo, `[dac~ 1 2 3 4]` = quad
 6. **`[adc~]`** similarly takes channel args for audio input
 7. **hvcc compilation** only supports vanilla + heavylib objects (~323 total) — no ELSE, Gem, Cyclone, or pdlua
 8. **Send/receive** (`s`/`r`, `send`/`receive`) provides wireless connections — useful for clean layouts and parameter distribution
+9. **Gem in plugdata** is built in, but its classes are registered only as `Gem/<name>`. Use `[Gem/gemwin]`, `[Gem/gemhead]`, `[Gem/pix_film]` and so on. The other option is a canvas-level `#X declare -lib Gem;` line, which makes the plain names global for the whole session and replaces ELSE objects with the same name (e.g. `[circle]`). A `#X obj ... declare -lib Gem;` box on its own loads nothing (see `references/pd-format.md` → Declaration)
+10. **Gem video in plugdata**: plugdata runs Gem on the audio thread. `[pix_film]`'s default AVF backend rebuilds its AVAssetReader on every frame, which measured about 64 ms per frame for 1080p H.264, so 30 fps playback pins the CPU at 100%. Play a light copy through the ffmpeg backend instead (about 1 ms per frame):
+    ```
+    ffmpeg -i in.mov -map 0:v:0 -an -vf "scale=960:540,setpts=PTS-STARTPTS" -fps_mode cfr -r 30 \
+      -c:v libx264 -crf 21 -g 1 -bf 0 -pix_fmt yuv420p -video_track_timescale 15360 out_540p.mov
+    ```
+    Then send `[backend ffmpeg AVF, open out_540p.mov RGBA(` to `[Gem/pix_film]`. The flags matter:
+    - `-g 1 -bf 0` makes every frame a keyframe, so per-frame seeks are exact.
+    - Gem's ffmpeg backend seeks to `frame * timescale / fps`, so keep the timescale a multiple of the frame rate.
+    - `-an` and `setpts` stop an audio track or a video start offset from skewing Gem's frame numbering. Gem counts frames over the container duration, which the audio track can lengthen.
+
+    Check that the frame count in the console's `loaded file` line matches the video's.
 
 ## Reference Files
 
@@ -239,7 +254,7 @@ Before writing the .pd file, verify:
 
 1. Does the signal path flow from source to output?
 2. Are signal (`~`) and control domains properly separated?
-3. Are object indices correct for all connections?
+3. Are object indices correct for all connections, counting comments and subpatch `#X restore` lines?
 4. Is every line terminated with `;`?
 5. Does the first line declare a canvas?
 6. If targeting compilation, are all objects hvcc-compatible?
