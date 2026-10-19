@@ -166,8 +166,9 @@ installed copy. Publish `SHA256SUMS`.
 
 ## CI Jobs
 
-Actions built for the deprecated Node 20 (`actions/checkout` and `actions/setup-node` before v5,
-`actions/upload-artifact` before v6) log a warning and are forced onto Node 24. Take majors from the actions'
+Recent Node-20 majors (`actions/checkout@v4`, `actions/setup-node@v4`, `actions/upload-artifact@v4` and `@v5`)
+are now run under Node 24 with a deprecation warning (observed 2026-10); older majors target even older Node
+versions. Take majors from the actions'
 release pages, not from this file (v7 when checked, 2026-10). In jobs that hold signing credentials, pin to full
 commit SHAs ([signing-and-notarization.md](signing-and-notarization.md#windows-release-workflow)).
 

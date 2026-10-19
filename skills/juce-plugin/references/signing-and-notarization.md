@@ -83,8 +83,9 @@ agree. A workflow with only `workflow_dispatch` can be started only after its fi
 branch. Steps, each failing fast:
 
 1. **Check secrets** are non-empty (loop over names with `${!name}`), so a missing one fails before the build.
-2. **Temporary keychain.** Import the identities for named tools only, never with `-A` (which lets any
-   application use the private key without asking), and keep the existing keychains in the search list:
+2. **Temporary keychain.** Import the identities without `-A` (which lets any application use the private key
+   without asking), with explicit tool ACLs (`-T`), then set the Apple partition list that non-interactive
+   signing needs; keep the existing keychains in the search list:
 
    ```bash
    KC="$RUNNER_TEMP/signing.keychain-db"; KC_PW="$(openssl rand -hex 24)"
