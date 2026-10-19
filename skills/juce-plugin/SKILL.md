@@ -1,6 +1,6 @@
 ---
 name: juce-plugin
-description: Build JUCE audio plugins (VST3, AU, AAX, Standalone, LV2) in C++ with CMake. Covers the full development workflow from project scaffolding to multi-format builds, including AudioProcessor lifecycle, parameter management with APVTS, DSP module chains, custom editor GUIs, Three.js/GLB WebView interfaces, state serialization, real-time audio safety, and cross-platform CI/CD. Use this skill whenever the user mentions JUCE, audio plugins, VST plugins, AU plugins, audio effects, synthesizers, MIDI processors, AudioProcessor, AudioProcessorEditor, Projucer, or wants to create audio software — even if they just say "make a plugin" or "audio plugin". Also applies when users are working in an existing JUCE codebase (files like PluginProcessor.cpp, PluginEditor.cpp, CMakeLists.txt with juce_add_plugin), or investigating a plugin's CPU usage in a host.
+description: Build JUCE audio plugins (VST3, AU, AAX, Standalone, LV2) in C++ with CMake. Covers the full development workflow from project scaffolding to multi-format builds, including AudioProcessor lifecycle, parameter management with APVTS, DSP module chains, custom editor GUIs, Three.js/GLB WebView interfaces, state serialization, real-time audio safety, and cross-platform CI/CD. Use this skill whenever the user mentions JUCE, audio plugins, VST plugins, AU plugins, audio effects, synthesizers, MIDI processors, AudioProcessor, AudioProcessorEditor, Projucer, or wants to create audio software — even if they just say "make a plugin" or "audio plugin". Also applies when users are working in an existing JUCE codebase (files like PluginProcessor.cpp, PluginEditor.cpp, CMakeLists.txt with juce_add_plugin), or investigating a plugin's CPU usage in a host, porting a plugin to Windows or Linux, or code signing, notarizing or packaging plugin releases.
 ---
 
 # JUCE Audio Plugin Development
@@ -282,11 +282,11 @@ cmake --build build --config Release
 # On Linux:
 #   ~/.vst3/
 #   ~/.lv2/ (if LV2 format enabled)
-# On Windows:
-#   %APPDATA%/VST3/
+# On Windows (64-bit; copying there needs an elevated build):
+#   C:\Program Files\Common Files\VST3\
 ```
 
-For cross-platform builds, CI/CD with GitHub Actions, and releasing, read `references/cmake-reference.md`.
+For CMake options and a CI matrix, read `references/cmake-reference.md`. For what differs on Windows and Linux (MSVC fixes, WebView2/WebKitGTK, glibc baseline, headless tests, x86 floating-point differences), read [platform builds](references/platform-builds.md). For signed releases (Developer ID, notarized `.pkg`, Windows Artifact Signing from GitHub Actions), read [signing and notarization](references/signing-and-notarization.md).
 
 ## Plugin Types
 
@@ -334,6 +334,8 @@ Read these as needed based on what you're implementing:
 - **`references/threejs-webview-ui.md`** — Interactive guitar-gear GLBs, mock/JUCE bindings, physical controls, derived visual state, render-on-demand, shadow-map invalidation, redraw cadence, pixel ratio, draw calls and staged host validation
 - **`references/audio-thread-safety.md`** — Real-time safety rules: what you can/cannot do in processBlock, lock-free patterns, atomics, debugging audio glitches
 - **`references/cmake-reference.md`** — Full CMake API: all juce_add_plugin properties, SDK paths, binary data, CI/CD, platform specifics
+- **`references/platform-builds.md`** — macOS vs Windows vs Linux: formats and bundle layouts, copy folders, MSVC portability fixes, npm/CRLF/path plumbing, Linux packages and glibc baseline, test executables that compile a WebView editor, headless tests (Xvfb), Intel-only snap-to-zero and other cross-CPU float differences, CI jobs, local Linux reproduction
+- **`references/signing-and-notarization.md`** — macOS Developer ID certificates, `.p12`/`.p8` credentials, keychain, `codesign`, `pkgbuild`/`productbuild`, notarytool, stapler, installer branding; Windows Artifact Signing (identity validation, certificate profile, OIDC federated credential, signing action, verification); GitHub secrets on the Free plan
 - **`references/performance-investigation.md`** — A plugin "uses too much CPU": attributing audio-thread, message-thread and WebView cost before optimizing, headless versus live-callback measurement, the test matrix, stage breakdown, harness and live-host tooling, null tests, multi-instance scaling, performance gates, and the report
 - **`references/production-plugin-practices.md`** — Product-shaped plugin practices: CMake presets, test/measurement targets, asset/model loading, state restore, latency/tail updates, oversampled circuit-model plugins (rate policy, integer latency, bypass parameter, model revision), host validation, and release gates
 
