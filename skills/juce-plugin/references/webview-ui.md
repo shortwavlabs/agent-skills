@@ -4,7 +4,7 @@ Use WebBrowserComponent for an existing web frontend or a requested web-based pl
 
 ## Compatibility baseline
 
-All concrete API examples below target JUCE 9.0.1, not an unversioned promise. Inspect the pinned project's headers (`juce_WebBrowserComponent.h`, `juce_WebControlRelays.h`, `juce_ParameterAttachments.h/.cpp`), frontend package and `docs/CMake API.md` before adapting them. Keep version-sensitive platform assumptions here.
+All concrete API examples below target JUCE 9.0.1, not an unversioned promise. Inspect the pinned project's headers (`juce_WebBrowserComponent.h`, `juce_WebControlRelays.h`, `juce_ParameterAttachments.h/.cpp`), frontend package and `docs/CMake API.md` before adapting them. Keep version-sensitive platform assumptions here. The [Platform backends](#platform-backends) section was rechecked against JUCE 9.0.3.
 
 | Area | For JUCE 9.0.1 | Recheck for another version/target |
 |---|---|---|
@@ -20,7 +20,7 @@ These are source-verified compatibility facts, not claims that every platform wa
 
 ## CMake and WebView2
 
-Using the compatibility baseline above, in the existing target declaration enable `NEEDS_WEB_BROWSER TRUE` (including Linux WebKit linkage) and `NEEDS_WEBVIEW2 TRUE` for Windows. Replace a native-editor target's `JUCE_WEB_BROWSER=0` with `JUCE_WEB_BROWSER=1`; do not define both.
+Using the compatibility baseline above, in the existing target declaration enable `NEEDS_WEB_BROWSER TRUE` (on Linux this adds the GTK/WebKit headers and, for plugins, the embedded helper; WebKitGTK itself is loaded at run time) and `NEEDS_WEBVIEW2 TRUE` for Windows. Replace a native-editor target's `JUCE_WEB_BROWSER=0` with `JUCE_WEB_BROWSER=1`; do not define both.
 
 ```cmake
 target_compile_definitions(MyPlugin PUBLIC JUCE_WEB_BROWSER=1)
@@ -40,11 +40,11 @@ Select `Options::Backend::webview2` on Windows and set `WinWebView2::withUserDat
 **Test executables that compile the editor** need the same browser dependencies. Create them with `juce_add_console_app (... NEEDS_WEB_BROWSER TRUE NEEDS_WEBVIEW2 TRUE)`, as in the [gesture check](#gesture-cleanup-on-editor-destruction), so JUCE adds them. An existing plain `add_executable` gets nothing and must link them itself, or it fails with `gtk/gtk.h: No such file or directory` on Linux and cannot link the WebView2 loader on Windows:
 
 ```cmake
-if(TARGET juce::pkgconfig_JUCE_BROWSER_LINUX_DEPS)   # Linux/BSD; created when JUCE is added
+if(TARGET juce::pkgconfig_JUCE_BROWSER_LINUX_DEPS)   # created by JUCE on Linux/BSD only
     target_link_libraries(MyPluginTests PRIVATE juce::pkgconfig_JUCE_BROWSER_LINUX_DEPS)
 endif()
 if(WIN32)   # its own lookup: the plugin target's may run later, so do not test if(TARGET juce::juce_webview2)
-    list(APPEND CMAKE_MODULE_PATH "${JUCE_DIR}/extras/Build/CMake")
+    list(APPEND CMAKE_MODULE_PATH "${JUCE_CMAKE_UTILS_DIR}")   # global, set when JUCE is added
     find_package(WebView2 REQUIRED)
     target_link_libraries(MyPluginTests PRIVATE juce::juce_webview2)
 endif()
@@ -70,7 +70,7 @@ Checked against JUCE 9.0.3 (`juce_WebBrowserComponent_windows.cpp`, `juce_WebBro
 ### Linux (WebKitGTK)
 
 - WebKitGTK is not linked: at run time JUCE `dlopen`s `libwebkit2gtk-4.1.so.0` (with `libjavascriptcoregtk-4.1` and `libsoup-3.0`), falling back to the 4.0 set, plus GTK 3. No WebKitGTK 6/GTK 4. The `-dev` package is needed only for headers. Users need the runtime package (`libwebkit2gtk-4.1-0` on Debian/Ubuntu, `webkit2gtk4.1` on Fedora); GNOME desktops usually have it, minimal and KDE installs may not.
-- WebKit runs in a forked helper process. A plugin embeds a helper executable that JUCE writes to the temp directory and runs, so a `noexec` `/tmp` breaks the editor. Creating a browser needs an X display: without one the process dies with SIGPIPE. Run editor tests and pluginval under `xvfb-run -a`.
+- WebKit runs in a forked helper process. A plugin embeds a helper executable that JUCE writes to the temp directory and runs, so a `noexec` `/tmp` breaks the editor. Creating a browser needs an X display: without one the helper logs "cannot open display" and the process dies with SIGPIPE. Run editor tests and pluginval under `xvfb-run -a`.
 - GDK is restricted to X11 and the view is embedded with XEmbed: X11 or XWayland only.
 - Hardware acceleration is hard-coded to "never" (no option), yet WebGL and WebGL2 contexts still work (verified on WebKitGTK 2.50 with Mesa software GL, including a full Three.js scene). Compositing is in software; measure frame rate on real hardware.
 - The `juce://` resource scheme is registered only with `withNativeIntegrationEnabled()`.

@@ -35,8 +35,12 @@ Release bundles.
 
 ## macOS: Credentials
 
-**Developer ID certificates.** Export each identity (certificate with its private key) from Keychain Access as
-a `.p12` with an export password. The password is the one chosen at export, not the Apple ID password. Check
+**Developer ID certificates.** Only the team's Account Holder can create them: in Keychain Access, Certificate
+Assistant > Request a Certificate From a Certificate Authority (saved to disk), then in Certificates, Identifiers &
+Profiles create a **Developer ID Application** and a **Developer ID Installer** certificate from that request and
+open the downloaded `.cer` on the same Mac, so it pairs with the private key. They last five years, and the same
+identities sign every product of the team. Export each identity (certificate with its private key) from Keychain
+Access as a `.p12` with an export password. The password is the one chosen at export, not the Apple ID password. Check
 it before storing it:
 
 ```bash
@@ -104,7 +108,23 @@ branch. Steps, each failing fast:
   `/Library/Audio/Plug-Ins/...` even if a copy exists elsewhere. Build one component package per format with
   `--install-location`, `--component-plist`, `--ownership recommended`.
 - `productbuild --distribution Distribution.xml --resources <dir> --package-path <components>`; in
-  `Distribution.xml`, `<options customize="allow" …>` and one `<choice>` per format with `start_selected="true"`.
+  `Distribution.xml`, `<options customize="allow" …>` and one `<choice>` per format with `start_selected="true"`:
+
+  ```xml
+  <installer-gui-script minSpecVersion="2">
+      <title>Product</title>
+      <options customize="allow" require-scripts="false" hostArchitectures="x86_64,arm64"/>
+      <domains enable_anywhere="false" enable_currentUserHome="false" enable_localSystem="true"/>
+      <background file="logo.png" alignment="bottomleft" scaling="none" mime-type="image/png"/>
+      <background-darkAqua file="logo-white.png" alignment="bottomleft" scaling="none" mime-type="image/png"/>
+      <choices-outline><line choice="au"/><line choice="vst3"/></choices-outline>
+      <choice id="au" title="Audio Unit (AU)" start_selected="true"><pkg-ref id="com.vendor.product.au.pkg"/></choice>
+      <choice id="vst3" title="VST3" start_selected="true"><pkg-ref id="com.vendor.product.vst3.pkg"/></choice>
+      <pkg-ref id="com.vendor.product.au.pkg">Product-AU.pkg</pkg-ref>
+      <pkg-ref id="com.vendor.product.vst3.pkg">Product-VST3.pkg</pkg-ref>
+  </installer-gui-script>
+  ```
+
   Gate it in CI: `installer -showChoicesXML` must list each choice visible, enabled and selected, and
   `pkgutil --payload-files` must contain each bundle.
 - **Background logo.** Installer ignores `<background>` in Dark Mode; add `<background-darkAqua>` with a light
@@ -147,7 +167,9 @@ In the Azure portal, as the subscription owner:
    validated identity, **Program type: None** (Windows endpoint security platform and Windows recovery remote
    management are for those Microsoft partner programs). Name it for reuse across products.
 
-Certificates under the profile last about three days and are renewed automatically. A signature made while a
+Certificates under the profile last about three days and are renewed automatically: Microsoft keeps them
+short-lived for security, and the private key never leaves its HSM, so a misused certificate expires quickly
+and there is nothing long-lived to steal or renew by hand. A signature made while a
 certificate was valid stays valid because the signing timestamp proves when it was made.
 
 ## Windows: GitHub Access Without A Password
@@ -161,8 +183,7 @@ certificate was valid stays valid because the signing timestamp proves when it w
 
    ```bash
    gh api repos/<owner>/<repo>/actions/oidc/customization/sub
-   gh api orgs/<owner> --jq .id
-   gh api repos/<owner>/<repo> --jq .id
+   gh api repos/<owner>/<repo> --jq '.owner.id, .id'   # owner ID, repository ID (user or organization owner)
    ```
 
    With `"use_immutable_subject": true` the subject is
@@ -262,7 +283,8 @@ is optional.
 - Microsoft Learn: [Artifact Signing quickstart](https://learn.microsoft.com/en-us/azure/artifact-signing/quickstart)
   and [FAQ](https://learn.microsoft.com/en-us/azure/artifact-signing/faq); [SmartScreen reputation](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation).
 - [azure/artifact-signing-action](https://github.com/Azure/artifact-signing-action) (v2 inputs: `endpoint`,
-  `signing-account-name`, `certificate-profile-name`, `files`, `timestamp-rfc3161`); [azure/login](https://github.com/Azure/login).
+  `signing-account-name`, `certificate-profile-name`, `files`, `timestamp-rfc3161`, `timestamp-digest`);
+  [azure/login](https://github.com/Azure/login).
 - GitHub: OIDC subject customization REST API (`/repos/{owner}/{repo}/actions/oidc/customization/sub`);
   [Actions billing and plans](https://docs.github.com/en/billing/concepts/product-billing/github-actions).
 - CA/B Forum ballot CSC-13; DigiCert on the 460-day code-signing validity limit.

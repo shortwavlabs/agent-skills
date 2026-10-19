@@ -156,7 +156,7 @@ void processBlock (AudioBuffer<float>& buffer, MidiBuffer&) override
 
 With `ScopedNoDenormals` in place, filter `snapToZero()` calls are unnecessary. They only act on Intel CPUs
 (`JUCE_SNAP_TO_ZERO` is a no-op elsewhere), and because they zero state at block ends they make x86 output depend
-on the host's block size. Call them only where denormals are not flushed, and see
+on the host's block size. Call them only where denormals are not flushed (`JUCE_DSP_ENABLE_SNAP_TO_ZERO=0` turns them into no-ops), and see
 [platform-builds.md](platform-builds.md#floating-point-results-differ-between-cpus).
 
 ## Hot-Path Audit

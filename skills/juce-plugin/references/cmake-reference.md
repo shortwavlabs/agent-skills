@@ -259,7 +259,8 @@ Generated targets (with the example name `MyPlugin`):
 
 ## GitHub Actions CI/CD
 
-A compile-only matrix. Wire `COPY_PLUGIN_AFTER_BUILD` to a CMake option and pass it OFF in CI. Release builds, editor tests under Xvfb, an older-glibc container for Linux, the WebView2
+A compile-only matrix for a native-editor plugin; a WebView2 editor also needs the WebView2 SDK on Windows
+([webview-ui.md](webview-ui.md#windows-webview2)). Wire `COPY_PLUGIN_AFTER_BUILD` to a CMake option and pass it OFF in CI. Release builds, editor tests under Xvfb, an older-glibc container for Linux, the WebView2
 SDK on Windows and pluginval per platform are in [platform-builds.md](platform-builds.md#ci-jobs).
 
 ```yaml

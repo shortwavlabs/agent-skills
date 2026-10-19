@@ -52,7 +52,7 @@ are in [signing-and-notarization.md](signing-and-notarization.md).
   `~/Library/Audio/Plug-Ins/Components`. Validating a build-directory `.component` with pluginval fails with
   "No types found" on a clean runner (it passes on a dev machine only because an installed copy is found by its
   type/subtype/manufacturer). In CI, `ditto` the component into `~/Library/Audio/Plug-Ins/Components`, remove
-  `~/Library/Caches/AudioUnitCache`, `killall -9 AudioComponentRegistrar`, wait a moment, run
+  `~/Library/Caches/AudioUnitCache` (and `/Library/Caches/AudioUnitCache` with `sudo` after a system-wide install), `killall -9 AudioComponentRegistrar`, wait a moment, run
   `auval -v <type> <subtype> <manufacturer>`, then pluginval on the installed path. VST3 can be validated in
   place.
 - A universal build's x86_64 slice runs the Intel code paths described in
@@ -122,13 +122,17 @@ include paths. A plain `add_executable` that compiles the editor (a test runner)
 with `gtk/gtk.h: No such file or directory`:
 
 ```cmake
-if(TARGET juce::pkgconfig_JUCE_BROWSER_LINUX_DEPS)   # created on Linux/BSD only
+if(TARGET juce::pkgconfig_JUCE_BROWSER_LINUX_DEPS)   # created by JUCE on Linux/BSD only
     target_link_libraries(MyPluginTests PRIVATE juce::pkgconfig_JUCE_BROWSER_LINUX_DEPS)
 endif()
 ```
 
-**Headless tests.** Creating a WebView forks a helper that needs an X display; without one the test process dies
-with SIGPIPE. Run `xvfb-run -a ctest …` and `xvfb-run -a pluginval …`. In a container without user namespaces
+The Windows counterpart (the WebView2 loader) and the alternative of creating the test runner with
+`juce_add_console_app (... NEEDS_WEB_BROWSER TRUE NEEDS_WEBVIEW2 TRUE)` are in
+[webview-ui.md](webview-ui.md#cmake-and-webview2).
+
+**Headless tests.** Creating a WebView forks a helper that needs an X display; without one it logs "cannot open
+display" and the test process dies with SIGPIPE. Run `xvfb-run -a ctest …` and `xvfb-run -a pluginval …`. In a container without user namespaces
 also set `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1` for the test steps (CI only, never in the product).
 
 **Package.** `.tar.gz` with the bundle, a README (requirements: glibc, X11/XWayland, WebKitGTK and GTK 3
@@ -144,8 +148,9 @@ installed copy. Publish `SHA256SUMS`.
   is a no-op unless `JUCE_INTEL` (`juce_FloatVectorOperations.h`). So on x86 (Intel Macs, Windows x64, Linux
   x86_64) output depends on the host's block size; on ARM it does not. A test asserting that 1-sample and
   64-sample blocks are bit-identical fails only on x86. When `processBlock()` already sets `ScopedNoDenormals`,
-  define `JUCE_DSP_ENABLE_SNAP_TO_ZERO=0` for all targets (JUCE documents this case as safe). ARM output is
-  unchanged by construction; prove it with a bit-exact render comparison before and after.
+  define `JUCE_DSP_ENABLE_SNAP_TO_ZERO=0` for all targets (JUCE documents this case as safe). The flag also turns
+  explicit `filter.snapToZero()` calls into no-ops, since they go through the same `util::snapToZero`. ARM output
+  is unchanged by construction; prove it with a bit-exact render comparison before and after.
 - Apple Clang fuses multiply-adds by default and x86 builds without FMA do not, and `long double` is 64-bit on
   MSVC and Apple silicon, 80-bit on x86_64 Linux and Intel Macs, and 128-bit on Linux aarch64. Compare rendered audio only within one
   platform; cross-platform references need tolerances.
