@@ -1,7 +1,9 @@
 # Building For macOS, Windows And Linux
 
 What changes when a JUCE plugin that builds on macOS is also built, tested and packaged on Windows and Linux.
-Facts are from the JUCE 9.0.3 sources unless marked; recheck them against the pinned JUCE version. WebView
+Three kinds of fact: JUCE behaviour, from the JUCE 9.0.3 sources (recheck when upgrading JUCE); results marked
+*tested*, observed in CI and container builds of a JUCE 9.0.3 VST3 with a WebView editor; and runner images,
+action releases and prices, which are vendor facts checked 2026-10. WebView
 editors have extra platform rules in [webview-ui.md](webview-ui.md#platform-backends); signing and notarization
 are in [signing-and-notarization.md](signing-and-notarization.md).
 
@@ -79,10 +81,13 @@ developer environment.
 - `find_program(NPM npm)` can find the extension-less shell script; use `find_program(NPM NAMES npm.cmd npm REQUIRED)`.
   The Visual Studio generator prefixes `.cmd`/`.bat` custom commands with `call`, so several npm commands in
   one `add_custom_command` all run.
-- Paths in Git Bash steps: pass `$(cygpath -m "$RUNNER_TEMP")` (forward slashes) to CMake. Run GUI-subsystem
-  tools such as `pluginval.exe` from `bash`, which waits for them; PowerShell's `&` does not wait for GUI apps.
-- Git for Windows converts text files to CRLF on checkout. Anything that hashes text files (fixtures, SPICE
-  netlists) needs a `.gitattributes` with `eol=lf` for those files; binary files are never converted.
+- Paths in Git Bash steps: pass `$(cygpath -m "$RUNNER_TEMP")` (forward slashes) to CMake. Do not rely on a shell
+  waiting implicitly for a GUI-subsystem tool such as `pluginval.exe`: wait explicitly and check its exit code.
+  From Git Bash (*tested*) a plain invocation waits and returns the exit code; in PowerShell use
+  `$p = Start-Process pluginval.exe -ArgumentList $args -Wait -PassThru; if ($p.ExitCode) { exit $p.ExitCode }`.
+- Git on Windows may rewrite text files to CRLF on checkout, depending on `core.autocrlf` (Git for Windows
+  installs with it on). Make hashed inputs (fixtures, SPICE netlists) invariant with `.gitattributes`
+  (`eol=lf` for them, `binary` for binary blobs) instead of relying on a runner's configuration.
 - WebView editors: see [webview-ui.md](webview-ui.md#windows-webview2). In CI, install the SDK with
   `nuget install Microsoft.Web.WebView2 -Version <version> -OutputDirectory <dir>` and configure with
   `-DJUCE_WEBVIEW2_PACKAGE_LOCATION=<dir>`.
@@ -114,8 +119,9 @@ objdump -T "Name.so" | grep -oE 'GLIBC_[0-9.]+' | sort -Vu | tail -1   # must no
 readelf -d "Name.so" | grep NEEDED                                     # webkit/gtk must not appear
 ```
 
-A JUCE WebView plugin links only libc, libm, libstdc++, libgcc_s, fontconfig and freetype; WebKitGTK and GTK are
-loaded at run time.
+*Tested* (JUCE 9.0.3 VST3 with a WebView editor, GCC 11 and 12, x86_64 and aarch64): the direct `NEEDED`
+entries were libc, libm, libstdc++, libgcc_s, fontconfig, freetype and the dynamic loader. WebKitGTK and GTK are
+loaded at run time; check your own binary with `readelf` rather than assuming the same list.
 
 **Targets JUCE did not create.** `juce_add_plugin(... NEEDS_WEB_BROWSER TRUE)` gives its targets the GTK/WebKit
 include paths. A plain `add_executable` that compiles the editor (a test runner) does not get them and fails
@@ -160,8 +166,10 @@ installed copy. Publish `SHA256SUMS`.
 
 ## CI Jobs
 
-Use current action majors: `actions/checkout` and `actions/setup-node` run on Node 24 from v5, `actions/upload-artifact`
-from v6; v4 runs on the deprecated Node 20 and logs a warning.
+Actions built for the deprecated Node 20 (`actions/checkout` and `actions/setup-node` before v5,
+`actions/upload-artifact` before v6) log a warning and are forced onto Node 24. Take majors from the actions'
+release pages, not from this file (v7 when checked, 2026-10). In jobs that hold signing credentials, pin to full
+commit SHAs ([signing-and-notarization.md](signing-and-notarization.md#windows-release-workflow)).
 
 Linux job (Ubuntu 22.04 glibc on a current runner):
 
@@ -174,7 +182,7 @@ linux:
     WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS: 1     # container only
   steps:
     - run: apt-get update && apt-get install -y ca-certificates curl git unzip xvfb xauth <packages above>
-    - uses: actions/checkout@v5          # after git is installed, so it is a real clone
+    - uses: actions/checkout@v7          # after git is installed, so it is a real clone
     # setup-node, configure with -G Ninja and "$GITHUB_WORKSPACE" (not ${{ github.workspace }}:
     # in container jobs that expression is the host path), build, then:
     - run: xvfb-run -a ctest --test-dir build -L "unit" --output-on-failure
@@ -193,8 +201,9 @@ minute); a macOS job of a few minutes costs more than Linux and Windows jobs sev
 Docker reproduces the Linux job: run the job's `run:` steps in `ubuntu:22.04`, fetching JUCE at the CI pin and
 Node from its tarball in place of the actions. arm64 containers run natively on Apple silicon;
 `--platform linux/amd64` runs under emulation, slowly (the link-time-optimized link is single-threaded).
-pluginval publishes Linux builds for x86_64 only. Windows binaries cannot be built locally from macOS or Linux;
-the Windows CI job is the first build. Docker Desktop shares only some host folders (not `/Applications`):
+pluginval publishes Linux builds for x86_64 only. This reference's Windows path is native MSVC on Windows (JUCE
+dropped MinGW and does not support building Windows binaries from Linux); cross-compilation is not covered.
+Without a Windows machine, the Windows CI job is the first build. Docker Desktop shares only some host folders (not `/Applications`):
 fetch dependencies inside the container instead.
 
 ## Common Mistakes

@@ -5,6 +5,9 @@ Signed, distributable plugin builds produced in GitHub Actions: macOS Developer 
 signing. Building each platform is in [platform-builds.md](platform-builds.md); this file starts from built
 Release bundles.
 
+Apple tool behaviour and the action inputs shown are stable; eligibility, prices, portal labels, runner images
+and action releases are vendor facts checked 2026-10: confirm them on the vendors' pages before relying on them.
+
 ## Contents
 
 - [Quick Reference](#quick-reference)
@@ -80,11 +83,27 @@ agree. A workflow with only `workflow_dispatch` can be started only after its fi
 branch. Steps, each failing fast:
 
 1. **Check secrets** are non-empty (loop over names with `${!name}`), so a missing one fails before the build.
-2. **Temporary keychain:** `security create-keychain` with a random password, `set-keychain-settings -lut 21600`,
-   `unlock-keychain`, `security import <p12> -P <password> -A -t cert -f pkcs12 -k <keychain>` for both
-   certificates, then `security set-key-partition-list -S apple-tool:,apple: -s -k <password> <keychain>` (without
-   it `codesign` prompts and hangs), `security list-keychain -d user -s <keychain>`, and confirm both identities
-   with `find-certificate -c "<exact Common Name>"`. Delete the keychain and decoded files in an `if: always()` step.
+2. **Temporary keychain.** Import the identities for named tools only, never with `-A` (which lets any
+   application use the private key without asking), and keep the existing keychains in the search list:
+
+   ```bash
+   KC="$RUNNER_TEMP/signing.keychain-db"; KC_PW="$(openssl rand -hex 24)"
+   security create-keychain -p "$KC_PW" "$KC"
+   security set-keychain-settings -lut 21600 "$KC"
+   security unlock-keychain -p "$KC_PW" "$KC"
+   for app in codesign security pkgbuild productbuild productsign; do TOOLS+=(-T "/usr/bin/$app"); done
+   security import application.p12 -k "$KC" -f pkcs12 -P "$APP_P12_PASSWORD" "${TOOLS[@]}"
+   security import installer.p12   -k "$KC" -f pkcs12 -P "$INSTALLER_P12_PASSWORD" "${TOOLS[@]}"
+   security set-key-partition-list -S apple-tool:,apple: -s -k "$KC_PW" "$KC"   # without it codesign hangs on a prompt
+   # list-keychains -s replaces the search list: prepend the new keychain to the existing ones
+   # (xargs keeps the quoted paths intact)
+   security list-keychains -d user | xargs security list-keychains -d user -s "$KC"
+   # identities (certificate + private key), not just certificates
+   security find-identity -v "$KC" | grep -F "Developer ID Application: <Name> (<TEAM_ID>)"
+   security find-identity -v "$KC" | grep -F "Developer ID Installer: <Name> (<TEAM_ID>)"
+   ```
+
+   Delete the keychain (`security delete-keychain "$KC"`) and the decoded files in an `if: always()` step.
 3. **Build** universal (`CMAKE_OSX_ARCHITECTURES="arm64;x86_64"`) with copy-after-build off.
 4. **Check the artifacts** before signing: bundle ID, both slices (`lipo -archs`), the version
    (`plutil -extract CFBundleShortVersionString`), the AU type/subtype/manufacturer, no unexpected formats.
@@ -214,12 +233,12 @@ jobs:
     runs-on: windows-2025  # no `environment:` here; see below
     steps:
       # ... build, then copy the bundle to dist/stage
-      - uses: azure/login@v3
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      - uses: azure/artifact-signing-action@v2
+      - uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
         with:
           endpoint: https://eus.codesigning.azure.net/
           signing-account-name: <account>
@@ -235,6 +254,9 @@ jobs:
           if ($null -eq $sig.TimeStamperCertificate) { throw "No timestamp" }
 ```
 
+- **Pin actions in signing jobs to full commit SHAs**, with the release tag in a comment on the same line
+  (Dependabot updates both). These jobs hold signing identities and an Azure token, and a tag can be moved. The
+  SHAs above are the tags named; resolve a newer tag with `gh api repos/<owner>/<action>/commits/<tag> --jq .sha`.
 - **No `environment:` key on the job.** With one, GitHub's subject becomes `…:environment:<name>` and the
   branch credential no longer matches.
 - **Keep `AZURE_CLIENT_ID`/`AZURE_TENANT_ID` out of job-level `env`.** The signing action uses
@@ -249,14 +271,17 @@ jobs:
 
 ## GitHub Secrets On A Free Plan
 
-Environment secrets, deployment-branch restrictions and required reviewers need GitHub Pro, Team or Enterprise
-for private repositories. On the Free plan:
+On GitHub Free, private repositories cannot configure environments, environment secrets, deployment branch
+restrictions or protection rules (those need Pro, Team or Enterprise). Therefore:
 
 - Store signing secrets as **repository** secrets. `${{ secrets.NAME }}` reads one pool (organization,
   repository, environment; the most specific wins), so a job with an `environment:` line still finds them.
-- An `environment:` line on a Free private repository only creates a deployment record; it enforces nothing.
-- Any workflow pushed to any branch can read repository secrets: give write access only to people trusted with
-  the signing identities. Windows OIDC adds a second guard, since only `main` matches the federated credential.
+- A workflow that references a nonexistent environment can implicitly create it, with no protection rules or
+  secrets: on Free it protects nothing.
+- Repository secrets reach workflows run in the repository on any branch that someone with write access pushes.
+  GitHub withholds them from workflows triggered by pull requests from forks, and Dependabot-triggered runs get
+  Dependabot secrets instead. Give write access only to people trusted with the signing identities; Windows OIDC
+  adds a second guard, since only `main` matches the federated credential.
 - On a paid plan, move the secrets to a protected environment (main only, reviewers) and delete the repository
   copies; for Windows OIDC, change the federated credential's entity type to Environment.
 

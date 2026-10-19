@@ -281,7 +281,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5      # v4 runs on the deprecated Node 20
+      - uses: actions/checkout@v7      # take majors from the release pages; v4 is on deprecated Node 20
         with:
           submodules: true
 
@@ -301,7 +301,7 @@ jobs:
         run: cmake --build build --config Release -j 4
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: plugin-${{ runner.os }}
           path: |
