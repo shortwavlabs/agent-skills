@@ -20,7 +20,7 @@ Use separate build presets or build directories for:
 - Debug tests for local iteration.
 - Release measurement harnesses.
 
-Keep plugin auto-copy/install enabled only for builds intended for DAW auditioning. Disable it for tests and measurements so CI/local validation does not disturb installed plugins.
+Keep plugin auto-copy/install enabled only for builds intended for DAW auditioning. Disable it for tests and measurements so CI/local validation does not disturb installed plugins. A macOS AU is the exception for validation: the system only finds AUs installed in `Plug-Ins/Components`, so a CI validation job installs it first (see the `juce-plugin` skill's [platform-builds.md](../../juce-plugin/references/platform-builds.md#macos)).
 
 Generic CMake preset shape:
 
@@ -131,7 +131,7 @@ For JUCE plugins:
 
 - Run `auval` for AU targets on macOS.
 - Run pluginval for AU/VST3 when available, preferably strictness level 5 before wider release.
-- Verify signed bundles with platform signing tools before distribution.
+- Verify signed bundles with platform signing tools before distribution ([signing-and-notarization.md](../../juce-plugin/references/signing-and-notarization.md)).
 - Validate both mono and stereo buses.
 - Validate plugins with MIDI input as the correct AU type when applicable.
 
@@ -176,6 +176,6 @@ Before sharing wider test builds:
 - Confirm DAW state restore.
 - Confirm model and IR missing-file behavior.
 - Confirm no known file I/O/model parsing/IR loading path can run in `processBlock()`.
-- Check package/signing/notarization where relevant.
+- Check package/signing/notarization where relevant ([signing-and-notarization.md](../../juce-plugin/references/signing-and-notarization.md)).
 - Run a clean-machine install when distributing installers.
 - Generate checksums for public artifacts.

@@ -246,7 +246,7 @@ void processBlock (AudioBuffer<float>& buffer, MidiBuffer&) override
         }
     }
 
-    svf.snapToZero();  // avoid denormal accumulation
+    svf.snapToZero();  // Intel only; redundant with ScopedNoDenormals (see platform-builds.md)
 }
 ```
 

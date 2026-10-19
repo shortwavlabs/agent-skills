@@ -154,11 +154,10 @@ void processBlock (AudioBuffer<float>& buffer, MidiBuffer&) override
 }
 ```
 
-Also call `snapToZero()` on filters after processing:
-
-```cpp
-filter.snapToZero();
-```
+With `ScopedNoDenormals` in place, filter `snapToZero()` calls are unnecessary. They only act on Intel CPUs
+(`JUCE_SNAP_TO_ZERO` is a no-op elsewhere), and because they zero state at block ends they make x86 output depend
+on the host's block size. Call them only where denormals are not flushed, and see
+[platform-builds.md](platform-builds.md#floating-point-results-differ-between-cpus).
 
 ## Hot-Path Audit
 

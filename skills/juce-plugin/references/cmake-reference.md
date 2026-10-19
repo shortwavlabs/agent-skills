@@ -150,10 +150,16 @@ target_compile_definitions(MyPlugin PUBLIC
     JUCE_DISPLAY_SPLASH_SCREEN=0    # Disable splash screen (commercial license)
     JUCE_REPORT_APP_USAGE=0         # Disable usage reporting
     JUCE_STRICT_REFCOUNTEDPOINTER=1 # Compile-time null pointer checks
+    JUCE_DSP_ENABLE_SNAP_TO_ZERO=0  # Only with ScopedNoDenormals in processBlock: see below
 )
 ```
 
 Module-specific flags are documented in each module's header file (e.g., `juce_core/juce_core.h`).
+
+`juce::dsp` filters and `dsp::Oversampling` zero tiny state values at the end of every block, on Intel CPUs
+only, so x86 output depends on the host block size while ARM output does not. With denormals already flushed by
+`ScopedNoDenormals`, `JUCE_DSP_ENABLE_SNAP_TO_ZERO=0` makes x86 match ARM; see
+[platform-builds.md](platform-builds.md#floating-point-results-differ-between-cpus).
 
 ## Plugin Copy Directories
 
@@ -168,11 +174,13 @@ juce_add_plugin(MyPlugin
 )
 ```
 
-Default locations:
+Default locations (`COPY_PLUGIN_AFTER_BUILD` itself defaults to off):
 - **macOS VST3**: `~/Library/Audio/Plug-Ins/VST3/`
 - **macOS AU**: `~/Library/Audio/Plug-Ins/Components/`
-- **Linux VST3**: `~/.vst3/`
-- **Windows VST3**: `%APPDATA%/VST3/` or `%LOCALAPPDATA%/VST3/`
+- **Linux VST3 / LV2**: `~/.vst3/` / `~/.lv2/`
+- **Windows VST3 (64-bit)**: `C:\Program Files\Common Files\VST3` (`$ENV{CommonProgramW6432}/VST3`): the build
+  needs administrator rights to copy there, so turn copying off in CI
+- **Windows LV2**: `%APPDATA%\LV2`
 
 ## macOS Specifics
 
@@ -180,15 +188,14 @@ Default locations:
 # Universal binary (Apple Silicon + Intel)
 set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64")
 
-# Hardened runtime (required for notarization)
-juce_add_plugin(MyPlugin
-    ...
-    # Info.plist additions for hardened runtime
-)
-
 # Bundle resources (xcassets, storyboards)
 juce_add_bundle_resources_directory(MyPlugin Resources/Assets.xcassets)
 ```
+
+The hardened runtime that notarization requires is not a CMake setting: it is applied when signing, with
+`codesign --options runtime`. Signing, packaging and notarization are in
+[signing-and-notarization.md](signing-and-notarization.md); Windows and Linux build differences are in
+[platform-builds.md](platform-builds.md).
 
 ## VST3 Manifest
 
@@ -252,6 +259,9 @@ Generated targets (with the example name `MyPlugin`):
 
 ## GitHub Actions CI/CD
 
+A compile-only matrix. Wire `COPY_PLUGIN_AFTER_BUILD` to a CMake option and pass it OFF in CI. Release builds, editor tests under Xvfb, an older-glibc container for Linux, the WebView2
+SDK on Windows and pluginval per platform are in [platform-builds.md](platform-builds.md#ci-jobs).
+
 ```yaml
 name: Build Plugin
 on: [push, pull_request]
@@ -265,12 +275,12 @@ jobs:
             cmake_args: -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
           - os: windows-latest
             cmake_args: ""
-          - os: ubuntu-latest
+          - os: ubuntu-24.04     # builds against its glibc; release builds use an older container
             cmake_args: ""
 
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5      # v4 runs on the deprecated Node 20
         with:
           submodules: true
 
@@ -279,10 +289,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libasound2-dev libjack-jackd2-dev \
-            ladspa-sdk libcurl4-openssl-dev libfreetype-dev \
-            libx11-dev libxcomposite-dev libxcursor-dev libxext-dev \
-            libxinerama-dev libxrandr-dev libxrender-dev \
-            libfontconfig1-dev
+            libfreetype-dev libfontconfig1-dev libx11-dev libxcomposite-dev \
+            libxcursor-dev libxext-dev libxinerama-dev libxrandr-dev \
+            libxrender-dev libxi-dev libwebkit2gtk-4.1-dev
 
       - name: Configure
         run: cmake -B build ${{ matrix.cmake_args }}
@@ -291,7 +300,7 @@ jobs:
         run: cmake --build build --config Release -j 4
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: plugin-${{ runner.os }}
           path: |
@@ -311,17 +320,20 @@ For production plugins, [Pamplejuce](https://github.com/sudara/pamplejuce) is th
 
 ## Linux Dependencies
 
-Install all required packages for JUCE development on Ubuntu:
+JUCE's full list for Ubuntu (`docs/Linux Dependencies.md`; JUCE 9 added `libxi-dev`, and `juce_opengl` now uses EGL):
 
 ```bash
 sudo apt-get install -y clang libasound2-dev libjack-jackd2-dev \
     ladspa-sdk libcurl4-openssl-dev libfreetype-dev libfontconfig1-dev \
     libx11-dev libxcomposite-dev libxcursor-dev libxext-dev \
-    libxinerama-dev libxrandr-dev libxrender-dev \
-    libglu1-mesa-dev mesa-common-dev
+    libxinerama-dev libxrandr-dev libxrender-dev libxi-dev \
+    libwebkit2gtk-4.1-dev libglu1-mesa-dev mesa-common-dev libegl-dev
 ```
 
-Optional: `libwebkit2gtk-4.1-dev` (for `juce::WebBrowserComponent`).
+Only some are needed for a given plugin: `libcurl4-openssl-dev` with `JUCE_USE_CURL=1`, `ladspa-sdk` for plugin
+hosting, the GL/EGL packages for `juce_opengl`. `libwebkit2gtk-4.1-dev` is required (headers only; WebKitGTK is
+loaded at run time) whenever a target uses `juce::WebBrowserComponent`. A missing package shows up as a
+compile error, not a configure error. Trimmed list and glibc baseline: [platform-builds.md](platform-builds.md#linux).
 
 ## WebView editor targets
 

@@ -12,7 +12,7 @@ All concrete API examples below target JUCE 9.0.1, not an unversioned promise. I
 | Windows | Explicit `Backend::webview2`; static-loader macro enables WebView2, but a browser runtime is still required | Runtime availability, loader packaging and options support |
 | WebView2 package | `JUCE_WEBVIEW2_PACKAGE_LOCATION` is the parent containing the `*Microsoft.Web.WebView2*` NuGet directory | Discovery layout, supported loader architectures |
 | macOS | Native backend uses system WebKit | Supported OS version, resource/CSP/WebGL behavior |
-| Linux | Backend uses WebKitGTK; this release uses WebKit2GTK 4.1 dependencies | Required development/runtime packages for the pinned release/distribution |
+| Linux | Backend uses WebKitGTK 4.1 (4.0 fallback), loaded with `dlopen` and run in a helper process; X11/XWayland only (see [Linux (WebKitGTK)](#linux-webkitgtk)) | Required development/runtime packages for the pinned release/distribution |
 | Frontend | `@juce-framework/webview`; bundled source under `modules/juce_gui_extra/native/typescript/webview-interop` | Matching frontend/backend protocol; older releases may use `native/javascript` |
 | Slider teardown | WebSliderParameterAttachment destructor removes its listener without ending an active gesture | Destructor and relay-listener behavior before reusing the guard below |
 
@@ -36,6 +36,57 @@ Static loader linking enables `JUCE_USE_WIN_WEBVIEW2` in the installed module he
 JUCE CMake searches the NuGet package directory. For a nonstandard location set `JUCE_WEBVIEW2_PACKAGE_LOCATION` before adding JUCE using the layout in the compatibility table. Inspect the pinned CMake implementation if discovery fails. Detect the browser runtime and document its prerequisite or the product's supported installer path; test on a clean Windows system. Do not silently fall back to the legacy browser for WebGL.
 
 Select `Options::Backend::webview2` on Windows and set `WinWebView2::withUserDataFolder()` to a writable product-specific directory outside the plugin bundle. Establish compatible folder/options behavior across instances/processes; avoid creating a permanent profile on every editor reopen. Use `areOptionsSupported()` to report unavailable options. Use the platform dependencies in the compatibility table and validate each backend rather than assuming Chrome behavior transfers.
+
+**Test executables that compile the editor** need the same browser dependencies. Create them with `juce_add_console_app (... NEEDS_WEB_BROWSER TRUE NEEDS_WEBVIEW2 TRUE)`, as in the [gesture check](#gesture-cleanup-on-editor-destruction), so JUCE adds them. An existing plain `add_executable` gets nothing and must link them itself, or it fails with `gtk/gtk.h: No such file or directory` on Linux and cannot link the WebView2 loader on Windows:
+
+```cmake
+if(TARGET juce::pkgconfig_JUCE_BROWSER_LINUX_DEPS)   # Linux/BSD; created when JUCE is added
+    target_link_libraries(MyPluginTests PRIVATE juce::pkgconfig_JUCE_BROWSER_LINUX_DEPS)
+endif()
+if(WIN32)   # its own lookup: the plugin target's may run later, so do not test if(TARGET juce::juce_webview2)
+    list(APPEND CMAKE_MODULE_PATH "${JUCE_DIR}/extras/Build/CMake")
+    find_package(WebView2 REQUIRED)
+    target_link_libraries(MyPluginTests PRIVATE juce::juce_webview2)
+endif()
+```
+
+## Platform backends
+
+Checked against JUCE 9.0.3 (`juce_WebBrowserComponent_windows.cpp`, `juce_WebBrowserComponent_linux.cpp`, `JUCEUtils.cmake`). Build-system differences per platform are in [platform-builds.md](platform-builds.md).
+
+### Windows (WebView2)
+
+- Without `withBackend (Backend::webview2)`, Windows uses the legacy Internet Explorer view, which cannot run a modern bundle (no ES modules, no WebGL2). `withResourceProvider` does not even compile on Windows unless `JUCE_USE_WIN_WEBVIEW2` is defined: that is usually the first Windows compile error. Put the backend and `WinWebView2` options under `#if JUCE_WINDOWS`; on Linux `areOptionsSupported()` accepts only the default backend.
+- Define `JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1` for Windows only (`$<$<PLATFORM_ID:Windows>:…>`): defining it to any value, even 0, turns WebView2 on.
+- If the runtime is missing or fails to start, JUCE silently falls back to the Internet Explorer view and the editor shows a broken page. Check `areOptionsSupported (options)` (on Windows it creates a WebView2 environment, so call it once per editor) and paint an explanation instead.
+- The default user-data folder sits next to the **host's** executable; under Program Files creation fails with Access Denied and triggers that fallback. Always set `withUserDataFolder()` (JUCE's plugin demo uses the temp directory). Instances sharing a folder share one browser process.
+- `WinWebView2::withBackgroundColour()` must be fully opaque or fully transparent; matching the editor's paint colour avoids a white flash. `withStatusBarDisabled()` hides link previews.
+- Release builds still show WebView2's context menu (Back, Reload): suppress it in the frontend with a `contextmenu` handler calling `preventDefault()`.
+- The resource root is `https://juce.backend/` on Windows and `juce://juce.backend/` elsewhere: navigate with `getResourceProviderRoot()`, use relative asset URLs, and if the CSP names origins, include both.
+- JUCE issue #1642 reports a blank WebView2 page in Release builds with `/O2`/`/Ox` (JUCE 8.0.12, VS 2022 14.44); JUCE could not reproduce it with VS 2026 and SDK 1.0.3485.44. pluginval opens the editor but does not check the page: look at the first Release build. If it is blank, build the JUCE modules with `/O1`.
+- In CI, install the SDK with `nuget install Microsoft.Web.WebView2 -Version <version> -OutputDirectory <dir>` and pass `-DJUCE_WEBVIEW2_PACKAGE_LOCATION=<dir>`; keep exactly one matching package there.
+- The Evergreen runtime ships with Windows 11 and most Windows 10 installs; an installer can check the `pv` value under `…\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}` and run Microsoft's bootstrapper when it is missing.
+
+### Linux (WebKitGTK)
+
+- WebKitGTK is not linked: at run time JUCE `dlopen`s `libwebkit2gtk-4.1.so.0` (with `libjavascriptcoregtk-4.1` and `libsoup-3.0`), falling back to the 4.0 set, plus GTK 3. No WebKitGTK 6/GTK 4. The `-dev` package is needed only for headers. Users need the runtime package (`libwebkit2gtk-4.1-0` on Debian/Ubuntu, `webkit2gtk4.1` on Fedora); GNOME desktops usually have it, minimal and KDE installs may not.
+- WebKit runs in a forked helper process. A plugin embeds a helper executable that JUCE writes to the temp directory and runs, so a `noexec` `/tmp` breaks the editor. Creating a browser needs an X display: without one the process dies with SIGPIPE. Run editor tests and pluginval under `xvfb-run -a`.
+- GDK is restricted to X11 and the view is embedded with XEmbed: X11 or XWayland only.
+- Hardware acceleration is hard-coded to "never" (no option), yet WebGL and WebGL2 contexts still work (verified on WebKitGTK 2.50 with Mesa software GL, including a full Three.js scene). Compositing is in software; measure frame rate on real hardware.
+- The `juce://` resource scheme is registered only with `withNativeIntegrationEnabled()`.
+- Field reports (JUCE 8, not reproduced here): a dying helper delivers SIGPIPE that kills the host; Ardour's bundled glib breaks JUCE's WebKit check; Flatpak hosts have no WebKitGTK in the sandbox; `GDK_BACKEND=wayland` makes the helper fail; NVIDIA on Wayland can show a blank view (workaround `WEBKIT_DISABLE_DMABUF_RENDERER=1`). Test in Bitwig and REAPER on X11 and Wayland before claiming Linux support.
+- A headless check of the frontend under JUCE's settings: serve the built bundle locally and load it with Python GObject (`gir1.2-webkit2-4.1`) in a WebKit2 WebView with `set_hardware_acceleration_policy (NEVER)` and `GDK_BACKEND=x11`, under `xvfb-run`; report results through `document.title` and save `get_snapshot()`. In a container also set `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1`.
+
+### Fonts differ per platform
+
+`font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif` renders SF Pro on macOS, Segoe UI on Windows and a distribution default (often DejaVu Sans) on Linux. SF Pro cannot be redistributed. To make Windows and Linux match macOS without changing macOS, bundle an open-licensed variable font close to SF Pro (Inter, SIL OFL) and list it after the system font:
+
+```css
+@font-face { font-family:Inter; src:url(assets/fonts/InterVariable.woff2) format("woff2"); font-weight:100 900; font-style:normal }
+:root { font:13px -apple-system,BlinkMacSystemFont,Inter,sans-serif }
+```
+
+Embed the `.woff2` with the other assets, serve it as `font/woff2`, keep the license next to it, and make the bundler leave the URL alone (esbuild: `external: ['assets/*']`; otherwise it tries to resolve the path at build time). Same-origin fonts pass a `font-src 'self'` CSP. Verify that macOS snapshots stay pixel-identical and that `[...document.fonts].map(f => f.family + ': ' + f.status)` reports the bundled face `loaded` on Linux and Windows.
 
 ## Relays and lifetime
 
@@ -187,6 +238,7 @@ Treat `dist` as generated and do not commit it by default, but preserve an exist
 | JS / CSS | `text/javascript` / `text/css` |
 | GLB / JSON | `model/gltf-binary` / `application/json` |
 | PNG / JPEG / WASM | `image/png` / `image/jpeg` / `application/wasm` |
+| WOFF2 font | `font/woff2` |
 
 Serve `/` as the entry HTML; use an explicit route map and return `std::nullopt` for unknown resources. Package fonts, environments, textures and optional KTX2/Draco decoder/transcoder assets locally. Production must not require CDN imports, remote GLBs or localhost. Verify with the server stopped and networking unavailable.
 

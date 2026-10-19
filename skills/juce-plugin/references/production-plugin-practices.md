@@ -21,7 +21,10 @@ Read this when moving from a minimal JUCE plugin to a product-shaped plugin with
 Use CMake options to separate development convenience from validation:
 
 - Enable `COPY_PLUGIN_AFTER_BUILD` only for plugin audition builds.
-- Disable bundle copying for test and measurement builds.
+- Disable bundle copying for test and measurement builds. Exception: a macOS AU must be installed in
+  `~/Library/Audio/Plug-Ins/Components` before `auval` or pluginval can find it; install it in the validation job
+  only ([platform-builds.md](platform-builds.md#macos)).
+- On Windows the default VST3 copy folder needs administrator rights; keep copying off in CI.
 - Keep test and measurement targets separate from plugin formats.
 - Make dependency paths explicit and overridable.
 - Fail early when required local dependencies are missing, or use a pinned fetch fallback deliberately.
@@ -141,6 +144,9 @@ Processor tests:
 - State save/restore preserves paths and parameters.
 - Missing files fail safely.
 - Latency updates when delayed stages are enabled or replaced.
+- Block-size invariance and other exact-equality checks run on every shipped CPU and compiler: on x86, JUCE's
+  Intel-only snap-to-zero makes `juce::dsp` filter and oversampler output depend on block size
+  ([platform-builds.md](platform-builds.md#floating-point-results-differ-between-cpus)).
 
 Measurement target:
 
@@ -188,7 +194,7 @@ DAW smoke should include:
 - Sample-rate changes.
 - Multiple instances of the heaviest expected preset, with the editor closed and with one editor open.
 
-For signed distribution, add platform signing, notarization, installer validation, clean-machine install, strict plugin validation, and checksums.
+For signed distribution, add platform signing, notarization, installer validation, clean-machine install, strict plugin validation, and checksums: [signing-and-notarization.md](signing-and-notarization.md). Windows and Linux builds and their validation (pluginval under Xvfb on Linux) are in [platform-builds.md](platform-builds.md).
 
 ## Sources
 

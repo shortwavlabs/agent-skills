@@ -187,6 +187,11 @@ oversampling = std::make_unique<juce::dsp::Oversampling<float>> (
 oversampling->initProcessing (static_cast<size_t> (maxBlockSize));
 ```
 
+On Intel CPUs this oversampler zeroes small IIR state values at the end of every block (JUCE snap-to-zero), so
+x86 output depends on the host block size while ARM output does not. With `ScopedNoDenormals` in `processBlock()`,
+define `JUCE_DSP_ENABLE_SNAP_TO_ZERO=0`; see the `juce-plugin` skill's
+[platform-builds.md](../../juce-plugin/references/platform-builds.md#floating-point-results-differ-between-cpus).
+
 Hot-path rules:
 
 - Do not construct or resize oversamplers in `processBlock`.
