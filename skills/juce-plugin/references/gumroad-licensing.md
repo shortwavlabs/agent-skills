@@ -227,8 +227,8 @@ held for the file work only:
 What the protocol guarantees: two host processes cannot both hold the claim on one key, so at most one
 incrementing verify is sent per acquired claim, and a counting request is never retried automatically. It does
 not guarantee one use per machine and key: a later legitimate activation creates a new claim with its own
-counting request. That happens after a refusal, a lost or corrupt `license.json`, a device-id change, or a manual
-reset. A lost reply leaves unknowable whether a use was counted, so exactly-once accounting remains impossible in A.
+counting request. That happens when an earlier activation left no license (refused or abandoned), after a lost
+or corrupt `license.json`, a device-id change, or a manual reset. A lost reply leaves unknowable whether a use was counted, so exactly-once accounting remains impossible in A.
 
 Customer-facing while uncertain: stay in demo mode and show "Couldn't confirm the activation with Gumroad. It
 will retry automatically and won't use another activation." Retry when the editor opens and on "Try again". The
