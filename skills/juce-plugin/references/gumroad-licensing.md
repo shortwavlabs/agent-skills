@@ -186,47 +186,76 @@ claim (limits below):
    limit message, also without spending.
 3. **Claim** the key (below). Only the claimant continues.
 4. The claimant sends exactly one incrementing verify, never retried with increment, then **finishes** (below):
-   it commits the result only if it still owns its claim. No answer: the outcome is **uncertain**.
+   it commits the result only if it still owns its claim and, to install a license, still has replacement
+   authority. No answer: the outcome is **uncertain**.
 
 Check-and-claim, all inside the one `juce::InterProcessLock` of the [file protocol](#license-file-protocol),
 held for the file work only:
 
 - Markers are per key: one small file per key (named from a hash of the normalised key) holding `key`, `claimId`
-  (a fresh random id), `startedAt` and `uncertain`. Activations of different keys never share or overwrite a
+  (a fresh random id), `startedAt`, `uncertain` and `seq`. Activations of different keys never share or overwrite a
   marker.
+- **Claim ownership is not replacement authority.** `claimId` says whether a result may settle its marker. Whether
+  it may also install its key depends on what was installed since: a marker for X can outlive its request (no
+  answer, resolved later in the background) while the customer installs Y, and resolving X must not bring X back.
+  Record activation order:
+  - each new claim's `seq` is one more than the highest `seq` among the markers on disk and the install record;
+  - the **install record**, a separate small file (for example `installed.json`), holds the `seq` of the claim
+    whose license was last installed. Never delete it: a revocation or a lost `license.json` must not erase it,
+    so a missing `license.json` is never read as "nothing newer was installed";
+  - re-checks refresh `license.json` without touching it, so a background re-check never blocks an install.
+    Don't use `license.json`'s revision or timestamps for this: re-checks change the one, clocks lie about the other.
 - **Claim.** Under the lock, re-read `license.json` and this key's marker, then:
   - the license already holds this key for this device: no claim; re-check without incrementing;
   - a marker exists and is younger than the request deadline plus a margin (for example twice the deadline):
     another process is activating this key. No claim and no request; report `pending` and pick the outcome up
     from the file;
   - a marker exists and is older, marked uncertain, or its `startedAt` is in the future: its claimant crashed,
-    timed out or got no answer. No claim; **resolve** it (below);
-  - no marker: write one with a new `claimId`, remember that id, release the lock. This process is the claimant.
-- **Finish** (claimant): one read-compare-update under the lock. Re-read the key's marker and `license.json`.
-  - The marker still carries this process's `claimId` (the claim is still owned): on "licensed", write the
-    license and delete the marker; on a definitive refusal, delete the marker and leave `license.json` as it is;
-    on "no answer", keep the marker and mark it uncertain.
+    timed out or got no answer. No claim; give the marker a fresh `seq` (same `claimId`), because the customer is
+    asking for this key now, then **resolve** it (below). A background resolve keeps the marker's old `seq`;
+  - no marker: write one with a new `claimId` and `seq`, remember the id, release the lock. This process is the
+    claimant.
+- **Finish** (claimant): one read-compare-update under the lock. Re-read the key's marker and the install record.
   - The marker is gone or carries another `claimId` (a resolver settled it, or the key was claimed again): the
-    result is stale. Write nothing and delete nothing, neither license nor marker; discard the result, adopt what
-    is on disk and notify editors.
-  - The ownership check and the file changes happen in the same lock acquisition, never in two: checking, then
-    re-locking to write, would let another process commit in between.
+    claim is lost and the result stale. Write nothing and delete nothing; discard the result, adopt what is on
+    disk and notify editors.
+  - Still owned, definitive refusal: delete the marker, leave `license.json` as it is.
+  - Still owned, "no answer": keep the marker and mark it uncertain.
+  - Still owned, "licensed", but the marker's `seq` is lower than the install record's: a newer claim's license is
+    installed. Retire (delete) the marker, leave `license.json`, adopt it, notify editors.
+  - Still owned, "licensed", `seq` at least the install record's: write the install record (`seq`), then the
+    license, then delete the marker. An equal `seq` can only come from this claim's own earlier, partial commit.
+  - Both checks and the file changes happen in the same lock acquisition, never in two: checking, then re-locking
+    to write, would let another process commit in between.
 - **Resolve** an old or uncertain marker: snapshot its `claimId`, verify without incrementing, then the same
-  single read-compare-update as Finish, with that `claimId`. Still owned: licensed writes the license and deletes
-  the marker, a definitive refusal deletes the marker only, "no answer" keeps it. Otherwise stale: change nothing,
-  discard, adopt, notify.
-- A late claimant or resolver therefore never overwrites a newer license, never deletes or edits another claim's
-  marker, and never changes persistent state after losing its claim. A refusal never deletes a license.
-- **Different keys at once:** each claimant may spend one use of its own key. `license.json` ends with the last
-  activation whose claim was still owned when it finished; the replaced key's use on this machine is spent
-  without being kept. The UI asks before replacing a license.
+  single read-compare-update as Finish, with that `claimId`: lost, refused, superseded or installed exactly as
+  above; "no answer" keeps the marker.
+- A late claimant or resolver therefore never overwrites a license installed by a newer claim, never deletes or
+  edits another claim's marker, and never changes persistent state after losing its claim. A refusal never deletes
+  a license.
+- **Different keys at once:** each claimant may spend one use of its own key. `license.json` ends with the newest
+  claim's license, whatever order the replies arrive in; an older claim finishing later only retires its marker,
+  and its use on this machine is spent without being kept. The UI asks before replacing a license.
+- **Failed persistence.** The lock orders cooperating processes; it does not make the three files change together,
+  so don't claim crash atomicity. The commit order keeps every stop recoverable without counting: nothing written
+  leaves the marker for a later non-counting resolve; the install record written but not the license leaves the
+  marker with `seq` equal to the record, so its later resolve still installs while older claims stay blocked; the
+  license written but the marker not deleted lets a later resolve rewrite the same license or retire the marker.
+  When `license.json` can't be written, license the session with a "couldn't be saved" warning and keep the
+  marker. Deleting the marker first would lose it, and the next attempt would count again.
+- **Degraded path:** when no marker can be saved (unwritable folder), there is no claim and no `seq`. The
+  activation may still send its one counting request; on "licensed" it writes only if `license.json` does not now
+  hold this device's license for a third key (neither the one it held at the claim nor the one being activated).
+  It cannot rank itself against claims from processes that can save markers, and two degraded activations of
+  different keys end on the last write.
 - **Crash recovery:** a crash after the claim leaves an old marker, which is only ever resolved without
   incrementing. If the crash came before the request left, the machine ends up authorized without a counted use;
   if after, the count is right. Which one happened cannot be known: an accepted under-count.
 
 What the protocol guarantees: two host processes cannot both hold the claim on one key, so at most one
-incrementing verify is sent per acquired claim, and a counting request is never retried automatically. It does
-not guarantee one use per machine and key: a later legitimate activation creates a new claim with its own
+incrementing verify is sent per acquired claim, and a counting request is never retried automatically. A
+non-incrementing resolve never leads to a counting request, and a license is replaced only by a newer claim. It
+does not guarantee one use per machine and key: a later legitimate activation creates a new claim with its own
 counting request. That happens when an earlier activation left no license (refused or abandoned), after a lost
 or corrupt `license.json`, a device-id change, or a manual reset. A lost reply leaves unknowable whether a use was counted, so exactly-once accounting remains impossible in A.
 
@@ -259,7 +288,7 @@ All in one folder (for example `Source/licensing/`), one namespace:
 | `LicenseRules` | Pure: `Evaluation evaluate (int status, const String& body, juce::Time now, bool activating)` implementing the decision table |
 | `Verifier` | `Reply verify (const String& key, bool countUse)`, `void abortCurrent()`, `void shutdown()`, with `struct Reply { int status = 0; String body; }` (0 = no answer; `kStatusNoHttps = -1` from the Linux probe): the seam for fakes and for B |
 | `GumroadVerifier` | The real request ([below](#network-requests-cancellation-and-shutdown)) with an injectable HTTPS probe |
-| `LicenseFile` | Locked, revision-checked reads, writes and deletes of `license.json`; per-key pending markers; claim, finish and resolve as single claim-checked transactions |
+| `LicenseFile` | Locked, revision-checked reads, writes and deletes of `license.json`; per-key pending markers with `seq`; the install record; claim, finish and resolve as single transactions checking claim and replacement authority |
 | `LicenseManager` | Shared state, one worker thread, the atomic flag, `AsyncUpdater`-based results; built from `Deps { verifier, folder, now(), deviceId }` |
 | `ProductionLicenseManager` | Default-constructible subclass with the real dependencies, for `SharedResourcePointer` |
 | `DemoGate` | Header-only audio-thread dropouts |
@@ -283,12 +312,14 @@ nothing before writing or deleting):
 3. **Every job carries the identity it checked.** A re-check snapshots `(key, revision)` when it starts.
 4. **Apply a result only if that identity is still on disk.** Under the lock, re-read the file. Same key and
    revision: apply (refresh `lastChecked` with a new revision, or delete on a revocation). Anything else (another
-   key, a newer revision, no file): discard the result and adopt what is on disk. A user-initiated activation
-   does not compare license revisions, but it writes only while it still owns its claim, checked in the same
-   lock acquisition ([Activation Accounting](#activation-accounting), Finish).
+   key, a newer revision, no file): discard the result and adopt what is on disk. A user-initiated activation or
+   a resolve does not compare license revisions. It writes only while it still owns its claim and its `seq` is not
+   lower than the install record's, both checked in the same lock acquisition
+   ([Activation Accounting](#activation-accounting), Finish).
 5. **Adopt, then report.** After any discard, set the in-memory state from the file just read: licensed or not,
    `entitledUntil`, cleared stale messages. Then notify editors. A process never deletes a license it did not
-   just verify as revoked, and never writes one after losing its claim.
+   just verify as revoked, and never writes one after losing its claim or being superseded. Nothing deletes
+   the install record.
 6. **Pick up other processes' changes** when an editor opens, before every job, and optionally on a slow timer.
    Reads need no lock (replacement is atomic); compare-and-change does.
 7. **Start-up:** ignore a file whose `deviceId` differs. Licensed if `now - lastChecked <= grace` and
@@ -420,7 +451,7 @@ Built on [native functions and events](webview-ui.md#native-functions-and-events
 | | Scope |
 | --- | --- |
 | Executed for this reference | `scripts/validate_skills.py`; before/after retrieval tests of the text. No licensing code was compiled or run for it |
-| Case-study implementation (another repository) | Implements and tests much of this for one-time purchases, in its own CI: decision rules, the revision-checked file, preflight, per-key claim markers, deadline abort, libcurl probe and a gate-on target. Check its pull request for current coverage; not every rule here is in it (membership `entitledUntil` is not) |
+| Case-study implementation (another repository) | Implements and tests much of this for one-time purchases, in its own CI: decision rules, the revision-checked file, preflight, per-key claim markers, claim-checked finish and resolve with `seq` and an install record, the failed-write ordering, deadline abort, libcurl probe and a gate-on target. Check its pull request for current coverage; not every rule here is in it (membership `entitledUntil` is not) |
 | Required in an implementation | The matrix below, in the normal headless suite, with fakes only |
 | Manual, needs a real purchase | Activation, offline restart, refund revoke, in each target host and platform |
 
@@ -434,8 +465,10 @@ instances on one folder for cross-process cases; a blocking fake makes interleav
 - Stale success: same, A's success arrives: file and revision still B's.
 - Replacement during verification: A and B re-check X; B's success writes a new revision; A's revocation is
   discarded and A adopts the file.
-- Competing activations of different keys: last writer wins; both processes end on the same file.
-- Failed persistence: licensed for the session, warning kept in status, no pending marker left behind.
+- Activations of different keys one after the other: the newer claim's key is installed; both processes end on
+  the same file.
+- Unwritable folder: licensed for the session, warning kept in status; no marker could be written, so none is
+  left behind.
 - Uncertain activation: the incrementing call returns no answer, the marker exists, the next attempt (also in a
   fresh manager) sends only non-incrementing requests and a licensed reply clears the marker.
 - One key, two processes: A claims and blocks inside its incrementing call; B activates the same key. B sends no
@@ -454,8 +487,24 @@ instances on one folder for cross-process cases; a blocking fake makes interleav
 - Late claimant, same key claimed again: A claims X (`c1`) and blocks; B resolves `c1` with a scripted refusal,
   which removes it, then claims X again (`c2`). Release A as licensed: `c2` is untouched, A writes no license,
   sends no further incrementing request and adopts the disk state.
-- Different keys: A claims X while B claims Y; each sends one incrementing call, neither touches the other's
-  marker, and both processes end on the last activation written.
+- Different keys: A claims X and blocks inside its incrementing call; B claims Y and installs it. Release A as
+  licensed: each sent one incrementing call, A's older claim retires its marker without replacing Y, and both
+  processes end on Y.
+- Stale X resolve after Y: A's incrementing call for X gets no answer (marker uncertain); B activates Y; record
+  Y's revision. A resolves X in the background and the reply is licensed. `license.json` still holds Y with that
+  revision, X's marker is retired, no further incrementing request is sent, both managers adopt Y, and the editor
+  notification shows Y.
+- Y during a blocked resolve: an old X marker; A's background resolve of X blocks inside its non-incrementing
+  call; B installs Y; release A as licensed. Same outcome, and A sent no incrementing call.
+- Legitimate resolve: an old or uncertain X marker and nothing installed since; the resolve installs X and
+  removes the marker without counting.
+- X entered again after Y: as in the stale case, but the customer enters X again instead of a background resolve.
+  The explicit request wins: X is installed, still without an incrementing call.
+- Failed license write: make `license.json` unwritable (a directory in its place) while markers stay writable.
+  The activation licenses the session with the warning and keeps the marker; remove the obstacle, advance past
+  the claim's age limit, and a fresh manager installs the license without counting.
+- Degraded path: make the marker folder unwritable (a file in its place). One incrementing call, no marker; a
+  license for another key written during the call stays and is adopted; replacing a key held at the claim works.
 - Refusal keeps a license: an incrementing call refused (over the allowance) while `license.json` holds a license
   leaves that file unchanged.
 - Preflight: over the allowance is refused with no incrementing call.
@@ -522,6 +571,12 @@ support procedure, and a migration that accepts licenses issued under A at first
   processes then both send a counting request.
 - Letting a claimant or resolver write the license after checking its claim in a separate lock acquisition, or
   without checking it at all: a late reply then overwrites a newer license.
+- Treating claim ownership as permission to replace the installed license: resolving an old pending activation
+  then reverses the customer's newer one.
+- Ranking claims by `license.json`'s revision, its timestamps or its presence: re-checks change the revision and a
+  revocation deletes the file, so the evidence of a newer install is lost.
+- Deleting the pending marker before the license write succeeds: a failed write then loses the claim, and the
+  next attempt sends another counting request.
 - Deleting or overwriting `license.json` from a result without checking that its key and revision are still on
   disk.
 - Calling `cancel()` while holding a lock the worker needs, or freeing the stream another thread may cancel.
