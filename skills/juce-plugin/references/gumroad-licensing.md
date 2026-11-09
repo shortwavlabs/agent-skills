@@ -500,9 +500,12 @@ instances on one folder for cross-process cases; a blocking fake makes interleav
   removes the marker without counting.
 - X entered again after Y: as in the stale case, but the customer enters X again instead of a background resolve.
   The explicit request wins: X is installed, still without an incrementing call.
-- Failed license write: make `license.json` unwritable (a directory in its place) while markers stay writable.
-  The activation licenses the session with the warning and keeps the marker; remove the obstacle, advance past
-  the claim's age limit, and a fresh manager installs the license without counting.
+- Failed license write: make `license.json` unwritable while markers stay writable, with a **non-empty** directory
+  in its place, and assert the set-up. An empty one doesn't work on Linux: when `rename()` fails, JUCE 9.0.3 falls
+  back to deleting the target, which removes an empty directory, and the write succeeds (macOS refuses to copy over
+  it, so the test passes there). The activation licenses the session with the warning and keeps the marker;
+  remove the obstacle, advance past the claim's age limit, and a fresh manager installs the license without
+  counting.
 - Degraded path: make the marker folder unwritable (a file in its place). One incrementing call, no marker; a
   license for another key written during the call stays and is adopted; replacing a key held at the claim works.
 - Refusal keeps a license: an incrementing call refused (over the allowance) while `license.json` holds a license
