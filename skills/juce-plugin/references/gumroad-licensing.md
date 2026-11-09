@@ -175,21 +175,46 @@ In A, the count is not exactly-once:
   incrementing request is not idempotent.
 - A lost, corrupt or unsaveable `license.json`, or a device id that changes, makes the machine activate again.
 - Concurrent activations of one key on several machines can pass the preflight together and exceed the allowance.
+- A crash after a counting request was sent, or a request that times out, leaves the count unknowable.
 
-**Specified** activation sequence, which spends at most one use per machine and key in the common failures:
+**Specified** activation sequence, which spends at most one use per machine and key, including across host
+processes on that machine:
 
 1. Normalise the key. If this machine's file already holds it, verify without incrementing (a re-check).
 2. Preflight: verify with `increment_uses_count=false`. A definitive "unlicensed" or "unsupported" refuses
    without spending a use; "retry" shows the network message; licensed with `uses >= allowance` refuses with the
    limit message, also without spending.
-3. Under the file lock, write a pending marker (`key`, time) before the incrementing call.
-4. Incrementing verify. Licensed: write the license and clear the marker. Definitive unlicensed: clear the
-   marker, show the reason. No answer: keep the marker; the outcome is **uncertain**.
-5. While a marker for that key exists on this machine, never send another incrementing request for it: retry
-   with `increment_uses_count=false`. Any definitive verdict clears the marker: licensed authorizes the machine,
-   unlicensed or unsupported refuses. Only "no answer" keeps it. If the timed-out request never reached Gumroad,
-   the machine ends up authorized without a counted use: an accepted under-count. Activating a different key
-   replaces the marker.
+3. **Claim** the key (below). Only the claimant continues.
+4. The claimant sends exactly one incrementing verify, never retried with increment, then **finishes** (below).
+   Licensed: write the license. Definitive unlicensed: show the reason. No answer: the outcome is **uncertain**
+   and the marker stays.
+
+Check-and-claim, all inside the one `juce::InterProcessLock` of the [file protocol](#license-file-protocol),
+held for the file work only:
+
+- Markers are per key: one small file per key (named from a hash of the normalised key) holding `key`, `claimId`
+  (a fresh random id) and `startedAt`. Activations of different keys never share or overwrite a marker.
+- **Claim.** Under the lock, re-read `license.json` and this key's marker, then:
+  - the license already holds this key for this device: no claim; re-check without incrementing;
+  - a marker exists and is younger than the request deadline plus a margin (for example twice the deadline):
+    another process is activating this key. No claim and no request; report `pending` and pick the outcome up
+    from the file;
+  - a marker exists and is older, or its `startedAt` is in the future: its claimant crashed or timed out. No
+    claim; **resolve** it (below);
+  - no marker: write one with a new `claimId`, remember that id, release the lock. This process is the claimant.
+- **Finish** (claimant). Under the lock, re-read the marker. Delete it only if it still carries this
+  process's `claimId`; on "no answer" keep it. Write the license on "licensed" (an activation writes
+  unconditionally, as in the file protocol). A refusal never deletes `license.json`.
+- **Resolve** an old marker. Snapshot its `claimId`, verify without incrementing, then under the lock: if the
+  marker still carries that `claimId`, apply a definitive verdict (licensed: write the license and delete the
+  marker; unlicensed: delete the marker) and keep it on "no answer". If the `claimId` changed or the marker is
+  gone, discard the result and adopt what is on disk. A stale worker therefore never clears a newer marker.
+- **Different keys at once:** each claimant may spend one use of its own key. `license.json` ends with the last
+  successful activation; the replaced key's use on this machine is spent without being kept. The UI asks before
+  replacing a license.
+- **Crash recovery:** a crash after the claim leaves an old marker, which is only ever resolved without
+  incrementing. If the crash came before the request left, the machine ends up authorized without a counted use;
+  if after, the count is right. Which one happened cannot be known: an accepted under-count.
 
 Customer-facing while uncertain: stay in demo mode and show "Couldn't confirm the activation with Gumroad. It
 will retry automatically and won't use another activation." Retry when the editor opens and on "Try again". The
@@ -220,7 +245,7 @@ All in one folder (for example `Source/licensing/`), one namespace:
 | `LicenseRules` | Pure: `Evaluation evaluate (int status, const String& body, juce::Time now, bool activating)` implementing the decision table |
 | `Verifier` | `Reply verify (const String& key, bool countUse)`, `void abortCurrent()`, `void shutdown()`, with `struct Reply { int status = 0; String body; }` (0 = no answer; `kStatusNoHttps = -1` from the Linux probe): the seam for fakes and for B |
 | `GumroadVerifier` | The real request ([below](#network-requests-cancellation-and-shutdown)) with an injectable HTTPS probe |
-| `LicenseFile` | Locked, revision-checked reads, writes and deletes of `license.json` and the pending marker |
+| `LicenseFile` | Locked, revision-checked reads, writes and deletes of `license.json`; per-key pending markers with claim-checked create and delete |
 | `LicenseManager` | Shared state, one worker thread, the atomic flag, `AsyncUpdater`-based results; built from `Deps { verifier, folder, now(), deviceId }` |
 | `ProductionLicenseManager` | Default-constructible subclass with the real dependencies, for `SharedResourcePointer` |
 | `DemoGate` | Header-only audio-thread dropouts |
@@ -232,8 +257,8 @@ All in one folder (for example `Source/licensing/`), one namespace:
 `deviceId`, `lastChecked` (UTC ms), optional `entitledUntil`, and `revision`, a fresh random id written with
 every change. Never store the license in plugin state: it would travel inside project files.
 
-**Specified** rules (the case study's first version re-read and adopted the file but compared nothing before
-writing or deleting; the races below are open there):
+**Specified** rules (the case study's second version implements 1-7 except `entitledUntil`; its first compared
+nothing before writing or deleting):
 
 1. **One lock for every change.** Each write, delete and pending-marker change happens inside one
    `juce::InterProcessLock` named for the product, held only for the file read-compare-write: never across a
@@ -364,7 +389,7 @@ Built on [native functions and events](webview-ui.md#native-functions-and-events
 | `openLicenseLink ("buy" \| "lookup")` | Opens one of two fixed URLs with `URL::launchInDefaultBrowser`; the page never passes a URL |
 
 - State precedence: `licensed` wins over `checking`, or a background re-check shows "Demo" to a paying customer.
-  `pending` is the uncertain activation of [Activation Accounting](#activation-accounting). Activating a
+  `pending` is an uncertain activation, or one another process is running ([Activation Accounting](#activation-accounting)). Activating a
   different key on a licensed machine replaces the license: ask before sending it.
 - The editor listens to the manager and sends `licenseStatus` via `emitEventIfBrowserIsVisible`; the page re-reads
   on `visibilitychange`. Without a manager (builds without the gate) it reports `licensed`, "Test build".
@@ -380,7 +405,7 @@ Built on [native functions and events](webview-ui.md#native-functions-and-events
 | | Scope |
 | --- | --- |
 | Executed for this reference | `scripts/validate_skills.py`; before/after retrieval tests of the text. No licensing code was compiled or run for it |
-| Case-study implementation (another repository) | Tests for the decision rules of its first version, the file, the manager with a fake verifier (adoption, re-entry without a use, clock set back, status during re-check), the demo gate and the bridge. It does not implement the revision check, preflight, pending marker, membership `entitledUntil`, `imported_customer` verdict, deadline abort or full libcurl probe specified here |
+| Case-study implementation (another repository) | Its second version implements and tests the decision rules for one-time purchases (with `imported_customer` and unknown 404 messages), the revision-checked file with two-manager interleavings, the preflight, a single pending marker, the deadline abort, the libcurl probe (Linux build not yet confirmed in its CI) and a gate-on test target. It does not implement membership `entitledUntil` or the per-key check-and-claim above: there, two processes can still both claim one key |
 | Required in an implementation | The matrix below, in the normal headless suite, with fakes only |
 | Manual, needs a real purchase | Activation, offline restart, refund revoke, in each target host and platform |
 
@@ -398,6 +423,19 @@ instances on one folder for cross-process cases; a blocking fake makes interleav
 - Failed persistence: licensed for the session, warning kept in status, no pending marker left behind.
 - Uncertain activation: the incrementing call returns no answer, the marker exists, the next attempt (also in a
   fresh manager) sends only non-incrementing requests and a licensed reply clears the marker.
+- One key, two processes: A claims and blocks inside its incrementing call; B activates the same key. B sends no
+  incrementing request, and none at all while A's marker is young, and reports `pending`. Release A as licensed:
+  the license is written, A's marker removed, B adopts it. Incrementing calls across both managers: exactly one.
+- Simultaneous claims: run B's whole activation of the same key from inside A's preflight call, so B claims
+  between A's preflight and A's claim. A must find B's marker and not claim: one marker, one incrementing call.
+- Crash recovery: a marker older than the deadline, from no live process; B's activation sends only a
+  non-incrementing request, writes the license on "licensed" and removes the marker.
+- Stale resolver: A snapshots marker `c1` and blocks resolving it; B removes `c1` on a definitive verdict, then
+  claims the key again (`c2`). Release A: `c2` is untouched and A's result is discarded.
+- Different keys: A claims X while B claims Y; each sends one incrementing call, neither touches the other's
+  marker, and both processes end on the last activation written.
+- Refusal keeps a license: an incrementing call refused (over the allowance) while `license.json` holds a license
+  leaves that file unchanged.
 - Preflight: over the allowance is refused with no incrementing call.
 - Missing libcurl: an injected failing probe makes no request and returns the libcurl message.
 - Shutdown: with a blocking fake whose cancel releases it, destruction returns promptly and no callback runs
@@ -458,6 +496,8 @@ support procedure, and a migration that accepts licenses issued under A at first
 - Treating `success: true` as entitlement, or a cancelled membership as already ended.
 - Sending `product_permalink` for a new product, or anything but the literal `false` on re-checks.
 - Retrying an activation with `increment_uses_count=true` after a timeout.
+- Writing a pending marker without re-reading it under the lock, or sharing one marker between keys: two
+  processes then both send a counting request.
 - Deleting or overwriting `license.json` from a result without checking that its key and revision are still on
   disk.
 - Calling `cancel()` while holding a lock the worker needs, or freeing the stream another thread may cancel.
