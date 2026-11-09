@@ -177,44 +177,58 @@ In A, the count is not exactly-once:
 - Concurrent activations of one key on several machines can pass the preflight together and exceed the allowance.
 - A crash after a counting request was sent, or a request that times out, leaves the count unknowable.
 
-**Specified** activation sequence, which spends at most one use per machine and key, including across host
-processes on that machine:
+**Specified** activation sequence. Its guarantee is at most one incrementing verify per successfully acquired
+claim (limits below):
 
 1. Normalise the key. If this machine's file already holds it, verify without incrementing (a re-check).
 2. Preflight: verify with `increment_uses_count=false`. A definitive "unlicensed" or "unsupported" refuses
    without spending a use; "retry" shows the network message; licensed with `uses >= allowance` refuses with the
    limit message, also without spending.
 3. **Claim** the key (below). Only the claimant continues.
-4. The claimant sends exactly one incrementing verify, never retried with increment, then **finishes** (below).
-   Licensed: write the license. Definitive unlicensed: show the reason. No answer: the outcome is **uncertain**
-   and the marker stays.
+4. The claimant sends exactly one incrementing verify, never retried with increment, then **finishes** (below):
+   it commits the result only if it still owns its claim. No answer: the outcome is **uncertain**.
 
 Check-and-claim, all inside the one `juce::InterProcessLock` of the [file protocol](#license-file-protocol),
 held for the file work only:
 
 - Markers are per key: one small file per key (named from a hash of the normalised key) holding `key`, `claimId`
-  (a fresh random id) and `startedAt`. Activations of different keys never share or overwrite a marker.
+  (a fresh random id), `startedAt` and `uncertain`. Activations of different keys never share or overwrite a
+  marker.
 - **Claim.** Under the lock, re-read `license.json` and this key's marker, then:
   - the license already holds this key for this device: no claim; re-check without incrementing;
   - a marker exists and is younger than the request deadline plus a margin (for example twice the deadline):
     another process is activating this key. No claim and no request; report `pending` and pick the outcome up
     from the file;
-  - a marker exists and is older, or its `startedAt` is in the future: its claimant crashed or timed out. No
-    claim; **resolve** it (below);
+  - a marker exists and is older, marked uncertain, or its `startedAt` is in the future: its claimant crashed,
+    timed out or got no answer. No claim; **resolve** it (below);
   - no marker: write one with a new `claimId`, remember that id, release the lock. This process is the claimant.
-- **Finish** (claimant). Under the lock, re-read the marker. Delete it only if it still carries this
-  process's `claimId`; on "no answer" keep it. Write the license on "licensed" (an activation writes
-  unconditionally, as in the file protocol). A refusal never deletes `license.json`.
-- **Resolve** an old marker. Snapshot its `claimId`, verify without incrementing, then under the lock: if the
-  marker still carries that `claimId`, apply a definitive verdict (licensed: write the license and delete the
-  marker; unlicensed: delete the marker) and keep it on "no answer". If the `claimId` changed or the marker is
-  gone, discard the result and adopt what is on disk. A stale worker therefore never clears a newer marker.
+- **Finish** (claimant): one read-compare-update under the lock. Re-read the key's marker and `license.json`.
+  - The marker still carries this process's `claimId` (the claim is still owned): on "licensed", write the
+    license and delete the marker; on a definitive refusal, delete the marker and leave `license.json` as it is;
+    on "no answer", keep the marker and mark it uncertain.
+  - The marker is gone or carries another `claimId` (a resolver settled it, or the key was claimed again): the
+    result is stale. Write nothing and delete nothing, neither license nor marker; discard the result, adopt what
+    is on disk and notify editors.
+  - The ownership check and the file changes happen in the same lock acquisition, never in two: checking, then
+    re-locking to write, would let another process commit in between.
+- **Resolve** an old or uncertain marker: snapshot its `claimId`, verify without incrementing, then the same
+  single read-compare-update as Finish, with that `claimId`. Still owned: licensed writes the license and deletes
+  the marker, a definitive refusal deletes the marker only, "no answer" keeps it. Otherwise stale: change nothing,
+  discard, adopt, notify.
+- A late claimant or resolver therefore never overwrites a newer license, never deletes or edits another claim's
+  marker, and never changes persistent state after losing its claim. A refusal never deletes a license.
 - **Different keys at once:** each claimant may spend one use of its own key. `license.json` ends with the last
-  successful activation; the replaced key's use on this machine is spent without being kept. The UI asks before
-  replacing a license.
+  activation whose claim was still owned when it finished; the replaced key's use on this machine is spent
+  without being kept. The UI asks before replacing a license.
 - **Crash recovery:** a crash after the claim leaves an old marker, which is only ever resolved without
   incrementing. If the crash came before the request left, the machine ends up authorized without a counted use;
   if after, the count is right. Which one happened cannot be known: an accepted under-count.
+
+What the protocol guarantees: two host processes cannot both hold the claim on one key, so at most one
+incrementing verify is sent per acquired claim, and a counting request is never retried automatically. It does
+not guarantee one use per machine and key: a later legitimate activation creates a new claim with its own
+counting request. That happens after a refusal, a lost or corrupt `license.json`, a device-id change, or a manual
+reset. A lost reply leaves unknowable whether a use was counted, so exactly-once accounting remains impossible in A.
 
 Customer-facing while uncertain: stay in demo mode and show "Couldn't confirm the activation with Gumroad. It
 will retry automatically and won't use another activation." Retry when the editor opens and on "Try again". The
@@ -245,7 +259,7 @@ All in one folder (for example `Source/licensing/`), one namespace:
 | `LicenseRules` | Pure: `Evaluation evaluate (int status, const String& body, juce::Time now, bool activating)` implementing the decision table |
 | `Verifier` | `Reply verify (const String& key, bool countUse)`, `void abortCurrent()`, `void shutdown()`, with `struct Reply { int status = 0; String body; }` (0 = no answer; `kStatusNoHttps = -1` from the Linux probe): the seam for fakes and for B |
 | `GumroadVerifier` | The real request ([below](#network-requests-cancellation-and-shutdown)) with an injectable HTTPS probe |
-| `LicenseFile` | Locked, revision-checked reads, writes and deletes of `license.json`; per-key pending markers with claim-checked create and delete |
+| `LicenseFile` | Locked, revision-checked reads, writes and deletes of `license.json`; per-key pending markers; claim, finish and resolve as single claim-checked transactions |
 | `LicenseManager` | Shared state, one worker thread, the atomic flag, `AsyncUpdater`-based results; built from `Deps { verifier, folder, now(), deviceId }` |
 | `ProductionLicenseManager` | Default-constructible subclass with the real dependencies, for `SharedResourcePointer` |
 | `DemoGate` | Header-only audio-thread dropouts |
@@ -270,10 +284,11 @@ nothing before writing or deleting):
 4. **Apply a result only if that identity is still on disk.** Under the lock, re-read the file. Same key and
    revision: apply (refresh `lastChecked` with a new revision, or delete on a revocation). Anything else (another
    key, a newer revision, no file): discard the result and adopt what is on disk. A user-initiated activation
-   writes unconditionally, with a new revision, after its own successful verify.
+   does not compare license revisions, but it writes only while it still owns its claim, checked in the same
+   lock acquisition ([Activation Accounting](#activation-accounting), Finish).
 5. **Adopt, then report.** After any discard, set the in-memory state from the file just read: licensed or not,
    `entitledUntil`, cleared stale messages. Then notify editors. A process never deletes a license it did not
-   just verify as revoked.
+   just verify as revoked, and never writes one after losing its claim.
 6. **Pick up other processes' changes** when an editor opens, before every job, and optionally on a slow timer.
    Reads need no lock (replacement is atomic); compare-and-change does.
 7. **Start-up:** ignore a file whose `deviceId` differs. Licensed if `now - lastChecked <= grace` and
@@ -405,7 +420,7 @@ Built on [native functions and events](webview-ui.md#native-functions-and-events
 | | Scope |
 | --- | --- |
 | Executed for this reference | `scripts/validate_skills.py`; before/after retrieval tests of the text. No licensing code was compiled or run for it |
-| Case-study implementation (another repository) | Its second version implements and tests the decision rules for one-time purchases (with `imported_customer` and unknown 404 messages), the revision-checked file with two-manager interleavings, the preflight, a single pending marker, the deadline abort, the libcurl probe (Linux build not yet confirmed in its CI) and a gate-on test target. It does not implement membership `entitledUntil` or the per-key check-and-claim above: there, two processes can still both claim one key |
+| Case-study implementation (another repository) | Implements and tests much of this for one-time purchases, in its own CI: decision rules, the revision-checked file, preflight, per-key claim markers, deadline abort, libcurl probe and a gate-on target. Check its pull request for current coverage; not every rule here is in it (membership `entitledUntil` is not) |
 | Required in an implementation | The matrix below, in the normal headless suite, with fakes only |
 | Manual, needs a real purchase | Activation, offline restart, refund revoke, in each target host and platform |
 
@@ -432,6 +447,13 @@ instances on one folder for cross-process cases; a blocking fake makes interleav
   non-incrementing request, writes the license on "licensed" and removes the marker.
 - Stale resolver: A snapshots marker `c1` and blocks resolving it; B removes `c1` on a definitive verdict, then
   claims the key again (`c2`). Release A: `c2` is untouched and A's result is discarded.
+- Late claimant, another key: A claims X (`c1`) and blocks inside its incrementing call; advance the clock past
+  the claim's age limit; B resolves `c1` and removes it, then claims Y and writes Y. Release A as licensed:
+  `license.json` still holds Y with B's revision, no marker is created, changed or deleted by A, A discards its
+  result and adopts Y, both processes end on Y, and A sends no further incrementing request.
+- Late claimant, same key claimed again: A claims X (`c1`) and blocks; B resolves `c1` with a scripted refusal,
+  which removes it, then claims X again (`c2`). Release A as licensed: `c2` is untouched, A writes no license,
+  sends no further incrementing request and adopts the disk state.
 - Different keys: A claims X while B claims Y; each sends one incrementing call, neither touches the other's
   marker, and both processes end on the last activation written.
 - Refusal keeps a license: an incrementing call refused (over the allowance) while `license.json` holds a license
@@ -498,6 +520,8 @@ support procedure, and a migration that accepts licenses issued under A at first
 - Retrying an activation with `increment_uses_count=true` after a timeout.
 - Writing a pending marker without re-reading it under the lock, or sharing one marker between keys: two
   processes then both send a counting request.
+- Letting a claimant or resolver write the license after checking its claim in a separate lock acquisition, or
+  without checking it at all: a late reply then overwrites a newer license.
 - Deleting or overwriting `license.json` from a result without checking that its key and revision are still on
   disk.
 - Calling `cancel()` while holding a lock the worker needs, or freeing the stream another thread may cancel.
