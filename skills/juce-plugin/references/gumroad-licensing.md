@@ -1,13 +1,18 @@
 # Gumroad Licensing (License Keys In A JUCE Plugin)
 
 A runbook for selling a JUCE plugin on Gumroad with per-sale license keys: product set-up (including the Gumroad
-MCP server), the Gumroad API facts that shape the code, a `LicenseManager` shared by every instance in a host,
-demo-mode dropouts, HTTPS on all three platforms, and the WebView activation UI. The pattern is "the plugin calls
-Gumroad's verify endpoint itself"; a signing server is the upgrade path, described at the end.
+MCP server), an entitlement decision table built from Gumroad's verify replies, activation accounting, a
+cross-process license-file protocol, network cancellation and shutdown, demo-mode dropouts and the WebView
+activation UI. The base pattern is "the plugin calls Gumroad's verify endpoint itself"; a signing server is the
+upgrade path, with criteria for choosing it.
 
-Gumroad's API behaviour, the MCP server's tools and the JUCE 9.0.3 APIs named here were checked in 2026-11:
-confirm vendor facts before relying on them. Italic case-study notes describe one pedal plugin; they show how a
-decision was reached, not defaults.
+Evidence labels used below:
+
+- **Vendor facts** cite their source: Gumroad's API and help pages, or its public code at commit
+  `antiwork/gumroad@f1a9c5b` (production on 2026-11-08); JUCE 9.0.3 file names. Vendor behaviour changes: re-check
+  before relying on it.
+- **Specified** marks a rule this runbook defines that no implementation has shipped yet.
+- *Italic case-study notes* describe one pedal plugin. They show how a decision was reached, not defaults.
 
 ## Contents
 
@@ -15,15 +20,18 @@ decision was reached, not defaults.
 - [Choose The Architecture](#choose-the-architecture)
 - [Gumroad Product Set-Up](#gumroad-product-set-up)
 - [Gumroad MCP Server](#gumroad-mcp-server)
-- [The Verify Endpoint](#the-verify-endpoint)
+- [The Verify Request](#the-verify-request)
+- [Entitlement Decision Table](#entitlement-decision-table)
+- [Activation Accounting](#activation-accounting)
 - [Reading Gumroad's Source](#reading-gumroads-source)
 - [Units](#units)
-- [LicenseManager Rules](#licensemanager-rules)
-- [HTTPS From JUCE](#https-from-juce)
+- [License File Protocol](#license-file-protocol)
+- [Network Requests, Cancellation And Shutdown](#network-requests-cancellation-and-shutdown)
+- [Linux HTTPS](#linux-https)
 - [Demo Mode In The Audio Path](#demo-mode-in-the-audio-path)
 - [WebView Activation UI](#webview-activation-ui)
-- [Tests And Validation](#tests-and-validation)
-- [Ways Activations Get Burned](#ways-activations-get-burned)
+- [Tests And Evidence](#tests-and-evidence)
+- [Support And Recovery](#support-and-recovery)
 - [Upgrade Path: A Signing Server](#upgrade-path-a-signing-server)
 - [Common Mistakes](#common-mistakes)
 - [Sources](#sources)
@@ -33,119 +41,174 @@ decision was reached, not defaults.
 | Decision | Pattern (bracketed figures are the case study's choices, not defaults) |
 | --- | --- |
 | Who calls Gumroad | The plugin, `POST https://api.gumroad.com/v2/licenses/verify`; no server of your own |
-| Product identifier | `product_id` from the License key block (required for products created on or after 2023-01-09) |
-| Seats | `uses` counter per key; refuse activation above a fixed N, stated on the product page (case study: 3) |
-| Re-check | In the background when the last success is older than a re-check interval, `increment_uses_count=false` (case study: 7 days) |
-| Offline grace | Licensed for a fixed period after the last successful check (case study: 30 days) |
-| Unlicensed | Demo dropouts, only while the effect is engaged (case study: 2 s of silence every 45-60 s, 10 ms fades) |
-| State | One `LicenseManager` per host process (`juce::SharedResourcePointer`), a worker thread, an atomic flag for the audio thread |
-| Storage | `license.json` next to the presets, never in `getStateInformation` |
-| Linux HTTPS | `JUCE_USE_CURL=1` + `JUCE_LOAD_CURL_SYMBOLS_LAZILY=1`, and probe for libcurl before the first request |
+| Product identifier | `product_id` from the License key block |
+| Entitlement | The [decision table](#entitlement-decision-table): `success: true` alone never licenses |
+| Seats | A use allowance per key, checked with a non-incrementing preflight [3] |
+| Re-check | Background, non-incrementing, when the last success is older than an interval [7 days] |
+| Offline grace | Licensed for a fixed period after the last success [30 days], never past a known membership end |
+| State | One `LicenseManager` per host process (`juce::SharedResourcePointer`), one worker thread, an atomic flag for the audio thread |
+| Storage | `license.json` next to the presets, changed only under an inter-process lock with a revision check |
+| Unlicensed | Demo dropouts while the effect is engaged [2 s of silence every 45-60 s, 10 ms fades] |
+| Linux HTTPS | `JUCE_USE_CURL=1` + `JUCE_LOAD_CURL_SYMBOLS_LAZILY=1`, and a probe that mirrors JUCE's libcurl loading |
+| Shutdown | Cancel, then wait for the worker; never force-kill it |
 | UI | Header button + dialog in the WebView; four native functions and one status event; the page never touches the network |
-| Tests | The gate compiles into the shipped plugin target only; tests drive the manager through a fake `Verifier` |
 
 ## Choose The Architecture
 
 | | A: plugin verifies directly | B: plugin talks to your server |
 | --- | --- | --- |
-| Infrastructure | None | A service (for example a Cloudflare Worker) for the product's lifetime |
-| Offline check | Unsigned cached state: forgeable, the check can be patched out | Key file signed with your private key, checked offline with an embedded public key |
-| Seat management | Only the seller frees a seat (dashboard) | Your server frees a seat on "deactivate this computer" |
-| Refunds | Seen at the next re-check | Immediately, through Gumroad's signed Ping webhook |
-| Fit | Small catalogue, low price, honest-customer protection | Piracy or seat-reset support becomes a measurable cost |
+| Infrastructure | None | A service for the product's lifetime |
+| Offline check | Unsigned local state: forgeable, the check can be patched out | Signed license with an expiry, verified offline with an embedded public key |
+| Seats | Gumroad's `uses` counter only (see [Activation Accounting](#activation-accounting)) | A device registry with self-service deactivation |
+| Refunds, chargebacks, ended memberships | Seen at the next re-check | Webhook plus reconciliation, pushed at the next refresh |
+| Fit | Small catalogue, low price, honest-customer protection | Any of the criteria below |
 
-Start with A and keep the network call behind one interface, so B replaces only that class. Every client-only
-scheme can be cracked; A aims to keep honest customers honest without hurting them offline.
+Choose B when any of these matters: customers moving machines without contacting support; seat limits that must
+count devices rather than requests; prompt revocation after refunds, chargebacks or membership ends; licenses
+that must not be forgeable offline; or support time spent resetting `uses` becomes a measurable cost.
 
-JUCE's `juce_product_unlocking` (`OnlineUnlockStatus`, `KeyGeneration::generateKeyFile`) is not a drop-in for A:
-it expects an RSA-signed key file produced by *your* server. It fits B.
+JUCE's `juce_product_unlocking` (`OnlineUnlockStatus`) is not a drop-in for A: it expects a key file signed by
+*your* server. It can serve B.
 
 ## Gumroad Product Set-Up
 
-1. Create the product (by hand or with the MCP server below). Description copy: avoid other companies' trademarks
-   (name "a classic yellow overdrive pedal", not the brand and model).
-2. On the product's **Content** page: **Insert → License key**. Leave the multi-seat toggle off unless selling site
-   licenses (then `is_multiseat_license` is true and `quantity` is the seat count).
-3. Copy the `product_id` the block shows while editing. It equals the `id` the API and the MCP server return for
-   the product. It is not secret: compile it in.
-4. The key the editor shows (labelled "License key (sample)") is a placeholder, the same for every product. Gumroad
-   answers it with "That license does not exist for the provided product." Useful to test the error path only.
-5. A draft product is not for sale to anyone, the seller included ("This product is not currently for sale").
-   A real test key needs a purchase: publish briefly with a 100 %-off, single-use, expiring discount code, buy it,
-   unpublish. A purchase made while signed in as the seller is flagged `test: true`.
-6. Before rotating a leaked key in the dashboard, reset its **Uses**: the old count stays on the license.
-
-Customers find their key in the receipt email, on the download page, and through
-`https://gumroad.com/license-key-lookup` (link it from the plugin as "Find my key").
+1. Create the product by hand or with the [MCP server](#gumroad-mcp-server). In the copy, describe what the
+   plugin models without other companies' trademarks.
+2. On the product's **Content** page: **Insert → License key**. Leave multi-seat off unless selling site licenses
+   (then `is_multiseat_license` is true and `quantity` is the seat count).
+3. Copy the `product_id` the block shows. It is not secret; compile it in. *Case study: it equalled the `id` the
+   API and the MCP server returned for the product.*
+4. The key the editor shows ("License key (sample)") is a fixed placeholder (`ProductEdit/ContentTab/index.tsx`
+   at `f1a9c5b`); verify answers it with the not-found 404. It tests the error path only.
+5. A draft is not for sale to anyone, the seller included. A real test key needs a purchase: publish briefly
+   with a 100 %-off, single-use, expiring discount code, buy, unpublish. A purchase by the seller's signed-in
+   account carries `test: true`.
 
 ## Gumroad MCP Server
 
-When the session has the Gumroad connector (an MCP server bound to the creator's store), use it for the store side:
+Tool names as exposed by the connected Gumroad server on 2026-11-08; list the server's tools before relying on them.
 
 | Task | Tool | Notes |
 | --- | --- | --- |
-| Confirm the account | `get_account` | Name, username, storefront URL, currency |
-| Find products | `list_products`, `get_product` | `get_product` returns the id to compile in |
-| Create the product | `create_draft_product` | Name, `price_cents`, currency, description; stays a draft. Confirm name and price with the creator first |
-| Edit copy and listing | `update_product` | Category, tags, summary, receipt text, permalink |
-| Media and deliverables | `add_cover`, `add_file`, `add_content_link` | Files up to 250 MB from a public URL; larger in the editor |
-| Test purchase code | `create_discount_code` | `percent_off`, `product_id`, `max_purchase_count`, `expires_at` |
-| Go on/off sale | `publish_product`, `unpublish_product` | Confirm with the creator before either |
-| After launch | `list_sales`, `get_customers`, `get_sales_totals`, `get_analytics` | Read-only |
+| Account | `get_account` | Name, username, storefront URL, currency |
+| Products | `list_products`, `get_product`, `search_products`, `list_categories` | `get_product` returns the product id |
+| Create | `create_draft_product` | Name, `price_cents`, currency, description; stays a draft. Confirm name and price with the creator |
+| Edit | `update_product` | Category, tags, summary, receipt text, permalink |
+| Media, deliverables | `add_cover`, `add_file`, `list_files`, `add_content_link` | Files up to 250 MB from a public URL |
+| Test purchase code | `create_discount_code`, `update_discount_code`, `expire_discount_code` | `percent_off`, `product_id`, `max_purchase_count`, `expires_at` |
+| On/off sale | `publish_product`, `unpublish_product` | Confirm with the creator before either |
+| After launch | `list_sales`, `get_customers`, `get_subscriptions`, `get_sales_totals`, `get_analytics`, `list_payouts` | Read-only |
 
-It cannot insert the License key block (do that in the Content tab) and it cannot buy anything (checkout is the
-buyer's, with their email). Record the product id in the project's licensing doc once the block exists.
+It cannot insert the License key block (Content tab), read or reset a key's `uses` (dashboard), or buy anything.
 
-## The Verify Endpoint
+## The Verify Request
 
-`POST https://api.gumroad.com/v2/licenses/verify`, form-encoded, no API token, CORS `*`:
+`POST https://api.gumroad.com/v2/licenses/verify`, form-encoded, no API token, CORS `*` (API page; observed).
 
 | Parameter | Value |
 | --- | --- |
-| `product_id` | From the License key block |
-| `license_key` | Trimmed and upper-cased (keys are an upper-case UUID regrouped as four 8-hex groups) |
-| `increment_uses_count` | Counts a use unless the value is exactly the string `false`; `"0"`, `"no"` or a typo all count |
+| `product_id` | From the License key block. Without it, products created after Gumroad's cutoff (help article: 2023-01-09) get **500** with a message naming `product_id` |
+| `license_key` | Trimmed and upper-cased (keys are an upper-case UUID regrouped as four 8-hex groups, `license.rb`) |
+| `increment_uses_count` | Counts a use unless the value is exactly `false` (`clean_params` in `licenses_controller.rb`): `"0"` or `"no"` count |
 
-Legacy `product_permalink`, `id` and `link_id` only work for products created before 2023-01-09; omitting
-`product_id` on a newer product returns **500**, not 404.
+Rate limits: no Rack::Attack rule matches this route at `f1a9c5b` (only malformed-parameter throttling); an edge
+limit, if any, is not in the repository. Treat 429 as retry and honour `Retry-After`.
 
-| Reply | Meaning | Plugin action |
+Seller endpoints (`enable`, `disable`, `decrement_uses_count`, `rotate`) need an OAuth `access_token` that acts on
+the whole store: never ship it. In A the plugin therefore cannot free or decrement a use.
+
+## Entitlement Decision Table
+
+`LicenseRules::evaluate` maps one reply to one verdict. Inputs: HTTP status (0 = no answer), body, `now`, and
+whether the call was the incrementing activation. Verdicts: **licensed** (with an optional `entitledUntil`),
+**unlicensed** (with a reason; deletes nothing by itself, see the file protocol), **retry** (keep the current
+state; grace still applies), **unsupported** (deterministic, never retried). Evaluate the rows top to bottom; the
+first match wins (so `imported_customer` is classified before the malformed-reply row, and a refund or dispute
+before a membership's dates). Source: `licenses_controller.rb`,
+`go_web/internal/licenses/purchase_json.go`, `refundable.rb`, `subscription.rb` at `f1a9c5b`.
+
+| Reply | Verdict |
+| --- | --- |
+| No answer: connection failure, timeout, cancellation | retry. After an incrementing call: **uncertain** ([Activation Accounting](#activation-accounting)) |
+| 429, 5xx, 3xx, 400, any status other than 200/404 | retry. A 400 or a 500 naming `product_id` is an integration bug: log it |
+| Body not a JSON object, or no boolean `success` | retry |
+| 404, JSON `success: false`, `"That license does not exist for the provided product."` | unlicensed: unknown key, another product's key, or a rotated key |
+| 404, `"This license key has been disabled."` | unlicensed: disabled by the seller, **or fully refunded** (Gumroad disables the key after a full refund) |
+| 404, `"Access to the purchase associated with this license has expired."` | unlicensed: the seller revoked access to the purchase |
+| 404, JSON, any other message | Activation: refuse and show the message. Re-check: retry, so a reworded message cannot revoke every customer at once; grace still bounds it |
+| 404 that is not JSON | retry (a proxy page or a moved endpoint is not Gumroad's verdict) |
+| 200 `success: true` with `imported_customer` and no `purchase` | unsupported, unless the seller imports customers for this product: then licensed with no refund or dispute data to check. Default: show "This license needs manual activation. Contact <support>." |
+| 200 `success: true` without `purchase`, or `uses` not a number | retry (malformed) |
+| One-time purchase (`purchase` has `chargebacked`, no `subscription_*`): `refunded` | unlicensed (normally already the disabled 404) |
+| One-time: `chargebacked`, or `disputed && !dispute_won` | unlicensed. A chargeback does **not** disable the key |
+| One-time: partial refund | licensed. The reply does not expose partial refunds (`refunded` is false, the key stays enabled) |
+| One-time: otherwise | licensed |
+| Membership (`purchase` has `subscription_ended_at`, `_cancelled_at`, `_failed_at`): `refunded`, or `disputed && !dispute_won` | unlicensed |
+| Membership: `subscription_failed_at` set | unlicensed: renewal failed and access was deactivated then |
+| Membership: `subscription_ended_at` set | unlicensed: a fixed-length membership ended |
+| Membership: `subscription_cancelled_at` in the future | licensed with `entitledUntil = subscription_cancelled_at`: a cancellation keeps the paid period (`Subscription#cancel!` stores the period's end; `alive?` counts a future value as alive) |
+| Membership: `subscription_cancelled_at` now or past | unlicensed (a chargeback or product deletion cancels a membership at once) |
+| Membership: all three null | licensed |
+| Activation only: licensed but `uses` above the allowance | unlicensed with the limit message (that call already counted; see the preflight) |
+
+Gumroad keeps a membership's key enabled after it ends: the timestamps are the only signal, and a restarted
+membership clears them. `test: true` appears only for a seller self-purchase and is otherwise absent, never
+`false`. Compare `entitledUntil` with the local clock; A cannot defend against a changed clock anyway, so store
+`entitledUntil` and cap offline grace at it. An end the plugin has not seen yet (a failed renewal while offline)
+is bounded only by the grace period.
+
+## Activation Accounting
+
+Four different things, often conflated:
+
+| Concept | Where it lives | Authoritative for |
 | --- | --- | --- |
-| 404 `"That license does not exist for the provided product."` | Unknown key, other product's key, rotated (old) key | Unlicensed |
-| 404 `"This license key has been disabled."` | Seller disabled it, **or the purchase was fully refunded** (Gumroad disables the key itself) | Unlicensed |
-| 404 `"Access to the purchase associated with this license has expired."` | Seller revoked access | Unlicensed |
-| 404 that is not JSON `{"success":false,…}` | A proxy page or moved endpoint, not Gumroad's answer | Retry later; never remove a license on it |
-| 400 `"The '<name>' parameter must be a string."` | Bug on your side | Retry later |
-| 0 / timeout / 429 / 5xx / unreadable body | Network or service trouble | Retry later; keep the license within grace; honour `Retry-After` |
-| 200 `success: true` | Key exists and is enabled | Licensed **unless** `chargebacked`, or `disputed && !dispute_won`: a chargeback does not disable the key |
+| Verification count | Gumroad's `uses`, raised by each verify sent with `increment_uses_count` other than `false` | Nothing per device: it counts requests |
+| Local machine authorization | This machine's `license.json` | Whether this plugin plays without dropouts |
+| Activation allowance | The seller's policy (for example 3), compared with `uses` | What the plugin refuses; support can reset `uses` in the dashboard |
+| Registered devices | Only a server of your own (architecture B) | Self-service deactivation, exact seat counts |
 
-Also in the 200 reply: `uses` (top level, the only seat counter), `purchase.email` (show "Licensed to…", never
-log it), `refunded` (normally already a 404; keep the check as a guard), `subscription_ended_at` /
-`_cancelled_at` / `_failed_at` for memberships (the key stays enabled when a membership ends), and `test` (present
-as `true` only for a seller self-purchase, otherwise absent, never `false`). A 200 with `success: true` but no
-`purchase` object or a non-numeric `uses` is malformed: retry later, never license.
+In A, the count is not exactly-once:
 
-Rate limits: none at Gumroad's application layer for this route (only malformed-parameter throttling); any
-Cloudflare edge limit is unknown. At one call per activation and about one per week per machine a limit is
-unlikely to matter; handle 429 anyway.
+- An incrementing call consumes a use even when the plugin then refuses the activation (over the allowance).
+- A timeout or lost reply leaves the outcome unknown: the use may or may not be counted, and retrying an
+  incrementing request is not idempotent.
+- A lost, corrupt or unsaveable `license.json`, or a device id that changes, makes the machine activate again.
+- Concurrent activations of one key on several machines can pass the preflight together and exceed the allowance.
 
-Seller-only endpoints (`enable`, `disable`, `decrement_uses_count`, `rotate`) need an OAuth `access_token` that
-can act on the whole store: never ship it in a plugin. Consequence for A: the plugin cannot free a seat.
+**Specified** activation sequence, which spends at most one use per machine and key in the common failures:
+
+1. Normalise the key. If this machine's file already holds it, verify without incrementing (a re-check).
+2. Preflight: verify with `increment_uses_count=false`. A definitive "unlicensed" or "unsupported" refuses
+   without spending a use; "retry" shows the network message; licensed with `uses >= allowance` refuses with the
+   limit message, also without spending.
+3. Under the file lock, write a pending marker (`key`, time) before the incrementing call.
+4. Incrementing verify. Licensed: write the license and clear the marker. Definitive unlicensed: clear the
+   marker, show the reason. No answer: keep the marker; the outcome is **uncertain**.
+5. While a marker for that key exists on this machine, never send another incrementing request for it: retry
+   with `increment_uses_count=false`. Any definitive verdict clears the marker: licensed authorizes the machine,
+   unlicensed or unsupported refuses. Only "no answer" keeps it. If the timed-out request never reached Gumroad,
+   the machine ends up authorized without a counted use: an accepted under-count. Activating a different key
+   replaces the marker.
+
+Customer-facing while uncertain: stay in demo mode and show "Couldn't confirm the activation with Gumroad. It
+will retry automatically and won't use another activation." Retry when the editor opens and on "Try again". The
+count may read one high afterwards; only support can correct it.
 
 ## Reading Gumroad's Source
 
-Gumroad's code is public (`antiwork/gumroad`), and every API response carries an `x-revision` header that is a
-commit of that repository. For behaviour the docs omit, read the code at that commit:
+Gumroad's code is public (`antiwork/gumroad`). Responses observed in 2026-11 carried an `x-revision` header naming
+the deployed commit; it is undocumented and may disappear. When present, read the code at that commit:
 
 ```bash
 curl -s -D - -o /dev/null -X POST https://api.gumroad.com/v2/licenses/verify -d product_id=x -d license_key=y | grep -i x-revision
 gh api -H 'Accept: application/vnd.github.raw' "repos/antiwork/gumroad/contents/app/controllers/api/v2/licenses_controller.rb?ref=<sha>"
 ```
 
-Useful files: `app/controllers/api/v2/licenses_controller.rb` and its Go port `go_web/internal/licenses/`
-(reply bodies, fields), `app/modules/purchase/refundable.rb` (refunds disable keys), `config/initializers/rack_attack.rb`
-(rate limits), `app/models/license.rb` (key format). A fake key with `increment_uses_count=false` is a safe live
-probe of error shapes.
+Useful files: `app/controllers/api/v2/licenses_controller.rb` and `go_web/internal/licenses/` (replies, fields),
+`app/models/subscription.rb` (membership timestamps), `app/modules/purchase/refundable.rb` (refunds),
+`app/models/imported_customer.rb`, `config/initializers/rack_attack.rb`, `app/sidekiq/post_to_individual_ping_endpoint_worker.rb`
+(Ping delivery). A fake key with `increment_uses_count=false` is a safe live probe of error shapes.
 
 ## Units
 
@@ -153,100 +216,141 @@ All in one folder (for example `Source/licensing/`), one namespace:
 
 | Unit | Responsibility |
 | --- | --- |
-| `LicenseConfig.h` | Product id, URLs, `kMaxActivations`, timeout, re-check and grace periods, every customer-facing string |
-| `LicenseRules` | Pure: `Evaluation evaluate (int httpStatus, const String& body, bool activating)` → licensed / unlicensed / retryLater + message, email, uses |
-| `Verifier` | `virtual Reply verify (const String& key, bool countUse) = 0; virtual void cancel() = 0;` — the seam for tests and for B |
-| `GumroadVerifier` | The real call (below); takes an injectable "HTTPS available?" probe |
-| `LicenseFile` | `read()` / `write()` / `remove()` of `license.json` in a given folder |
-| `LicenseManager` | Shared state, worker thread, flag, change notifications; constructed from `Deps { verifier, folder, now(), deviceId }` |
-| `ProductionLicenseManager` | Default-constructible subclass passing the real dependencies, for `SharedResourcePointer` |
+| `LicenseConfig.h` | Product id, URLs, allowance, timeouts, intervals, every customer-facing string |
+| `LicenseRules` | Pure: `Evaluation evaluate (int status, const String& body, juce::Time now, bool activating)` implementing the decision table |
+| `Verifier` | `Reply verify (const String& key, bool countUse)`, `void abortCurrent()`, `void shutdown()`, with `struct Reply { int status = 0; String body; }` (0 = no answer; `kStatusNoHttps = -1` from the Linux probe): the seam for fakes and for B |
+| `GumroadVerifier` | The real request ([below](#network-requests-cancellation-and-shutdown)) with an injectable HTTPS probe |
+| `LicenseFile` | Locked, revision-checked reads, writes and deletes of `license.json` and the pending marker |
+| `LicenseManager` | Shared state, one worker thread, the atomic flag, `AsyncUpdater`-based results; built from `Deps { verifier, folder, now(), deviceId }` |
+| `ProductionLicenseManager` | Default-constructible subclass with the real dependencies, for `SharedResourcePointer` |
 | `DemoGate` | Header-only audio-thread dropouts |
-| `LicenseBridge` | The editor's native functions and the status payload |
+| `LicenseBridge` | The editor's native functions and status payload |
 
-`evaluate` applies the seat limit only when `activating`: a refused extra machine still raises `uses`, and
-without the exemption every legitimate machine's re-check would start failing.
+## License File Protocol
 
-## LicenseManager Rules
+`userApplicationDataDirectory/<Company>/<Product>/license.json` (macOS `~/Library/<Company>/…`): `key`, `email`,
+`deviceId`, `lastChecked` (UTC ms), optional `entitledUntil`, and `revision`, a fresh random id written with
+every change. Never store the license in plugin state: it would travel inside project files.
 
-- **Start:** read the file. Ignore it if its `deviceId` differs from `juce::SystemStats::getUniqueDeviceID()`
-  (another machine). Licensed if `now - lastChecked <= grace`. A `lastChecked` in the future (clock set back):
-  rewrite it as "just over the re-check interval ago", so a re-check is due and offline use stays bounded. If the
-  device id is empty, substitute a fixed placeholder, or every session writes a file it cannot read back.
-- **`checkIfDue()`** (start-up in production, and every editor open): re-read the file first, adopting a newer
-  license for this device written by another host process, then start a background re-check if due and idle.
-- **`activateNow (key)`** (blocking; worker thread): trim and upper-case; empty → "Enter your license key."
-  without a network call; re-read the file; if this machine already holds that key, verify with
-  `countUse=false` and no seat limit; otherwise `countUse=true`. On success write the file; if the write fails,
-  stay licensed for this process and keep a warning in the status naming the folder and the seat cost.
-- **`recheckNow()`** (`countUse=false`): licensed → refresh `lastChecked` and the file; unlicensed → remove the
-  file, clear the flag, keep Gumroad's message for the dialog; retryLater → change nothing.
-- **Status:** `licensed` wins over `checking`, or a background re-check shows "Demo" to a paying customer and can
-  trigger the activation prompt. Offer "works offline until" only when the last success is over the re-check age.
-- **Threads:** one `juce::Thread` with an atomic `busy`; a second request while busy answers at once with the
-  current status (a JS promise must always resolve). Async results go back with `MessageManager::callAsync`
-  through a `juce::WeakReference` created on the message thread. The destructor calls `verifier->cancel()`, then
-  `stopThread`, so closing the host never waits on the network. `sendChangeMessage()` is safe from the worker.
-- **Shared across instances:** `juce::SharedResourcePointer<ProductionLicenseManager>` as a processor member;
-  activating in one editor unlocks every instance in that process. Hosts that run plug-ins in separate processes
-  pick it up at the next `checkIfDue()`.
-- **File:** `userApplicationDataDirectory/<Company>/<Product>/license.json` (on macOS `~/Library/<Company>/…`),
-  fields `key`, `email`, `deviceId`, `lastChecked` (UTC ms). Write under a `juce::InterProcessLock` with
-  `File::replaceWithText`, which writes a temporary file and replaces the target with it (JUCE 9.0.3:
-  `TemporaryFile::overwriteTargetFileWithTemporary` → `File::replaceFileIn`, which is `rename()` on POSIX and
-  `ReplaceFile` on Windows). `File::moveFileTo` deletes the target first, so it is not an atomic replace. Never store the license in plugin
-  state: it would travel inside project files.
+**Specified** rules (the case study's first version re-read and adopted the file but compared nothing before
+writing or deleting; the races below are open there):
 
-*Case study: a whole-branch review of the first implementation found the "Demo during re-check" status order, the
-second-process re-activation and the clock-set-back gap; each fix shipped with a test that failed first.*
+1. **One lock for every change.** Each write, delete and pending-marker change happens inside one
+   `juce::InterProcessLock` named for the product, held only for the file read-compare-write: never across a
+   network call, never on the audio thread.
+2. **Atomic replacement.** Write with `File::replaceWithText`: a temporary file then `replaceFileIn`, which is
+   `rename()` on POSIX and `ReplaceFile` on Windows in JUCE 9.0.3. This prevents torn reads; it does not prevent
+   lost updates or stale deletes, which is what rules 3-5 are for. `File::moveFileTo` deletes the target first.
+3. **Every job carries the identity it checked.** A re-check snapshots `(key, revision)` when it starts.
+4. **Apply a result only if that identity is still on disk.** Under the lock, re-read the file. Same key and
+   revision: apply (refresh `lastChecked` with a new revision, or delete on a revocation). Anything else (another
+   key, a newer revision, no file): discard the result and adopt what is on disk. A user-initiated activation
+   writes unconditionally, with a new revision, after its own successful verify.
+5. **Adopt, then report.** After any discard, set the in-memory state from the file just read: licensed or not,
+   `entitledUntil`, cleared stale messages. Then notify editors. A process never deletes a license it did not
+   just verify as revoked.
+6. **Pick up other processes' changes** when an editor opens, before every job, and optionally on a slow timer.
+   Reads need no lock (replacement is atomic); compare-and-change does.
+7. **Start-up:** ignore a file whose `deviceId` differs. Licensed if `now - lastChecked <= grace` and
+   `now < entitledUntil` when set. A `lastChecked` in the future (clock set back) is rewritten as "just over the
+   re-check interval ago", so a check is due and offline use stays bounded. An empty device id is replaced by a
+   fixed placeholder, or the machine writes files it cannot read back.
 
-## HTTPS From JUCE
+Device ids (`SystemStats::getUniqueDeviceID`, JUCE 9.0.3): macOS `IOPlatformUUID`, empty if unavailable;
+Windows, derived from SMBIOS data; Linux, `board_serial` (usually readable by root only) or else BIOS date,
+release, vendor and version plus `lscpu` fields, so a BIOS update or different `lscpu` output changes it. The Linux
+path spawns child processes once: call it off the audio thread.
 
-| Platform | Backend | Needs |
+## Network Requests, Cancellation And Shutdown
+
+Background work runs on the manager's worker thread only; the audio thread reads one atomic and nothing else.
+
+What `WebInputStream::withConnectionTimeout` bounds in JUCE 9.0.3:
+
+| Backend | Timeout maps to | `cancel()` |
 | --- | --- | --- |
-| macOS | NSURLSession | Nothing |
-| Windows | WinINet | Nothing |
-| Linux | libcurl via `juce_Network_curl.cpp`; plain sockets otherwise (no TLS) | `JUCE_USE_CURL=1`, `JUCE_LOAD_CURL_SYMBOLS_LAZILY=1`; build needs `libcurl4-openssl-dev` (headers); run time `dlopen`s `libcurl.so` / `.so.4` / `.so.3` / `-gnutls` variants |
+| macOS, NSURLSession (`juce_Network_mac.mm`) | The request's `timeoutInterval`: inactivity, not total time | `[task cancel]` |
+| Windows, WinINet (`juce_Network_windows.cpp`) | Connect, send and receive timeouts, per operation (0 means 30 s) | `InternetCloseHandle` under the stream's lock |
+| Linux, libcurl (`juce_Network_curl.cpp`) | `CURLOPT_CONNECTTIMEOUT`, plus a low-speed abort (under 100 B/s for the same seconds) | Cleanup under the stream's lock, which a `select` step holds for up to about a second |
 
-Lazy loading keeps libcurl out of the plugin's link list, but if no libcurl can be opened, the `WebInputStream`
-constructor calls through a null symbol table in Release builds: in JUCE 9.0.3, `WebInputStream::Pimpl` in
-`juce_Network_curl.cpp` guards `symbols` with a debug-only `jassert`, then calls `symbols->curl_multi_init()`.
-Pressing Activate crashes the host. Re-check this against the JUCE version in use. Probe first with `juce::DynamicLibrary` on the same names and a
-`curl_multi_init` symbol, and return a "needs libcurl 4 (libcurl.so.4)" result instead. See
-[platform builds](platform-builds.md#linux) for the CI packages.
+None bounds the total request time. Enforce a deadline (for example 30 s) with a `juce::Timer` the manager runs on
+the message thread: when it passes, the timer calls `verifier.abortCurrent()` and the request counts as "no answer".
 
-The request:
+Cancellation that cannot deadlock or touch a destroyed stream:
 
 ```cpp
-const auto url = juce::URL (kVerifyUrl).withParameter ("product_id", kProductId)
-                                       .withParameter ("license_key", key)
-                                       .withParameter ("increment_uses_count", countUse ? "true" : "false");
-auto stream = std::make_unique<juce::WebInputStream> (url, true);   // parameters in the body: POST
-stream->withConnectionTimeout (15000);
-// Keep the pointer under a lock so cancel() from another thread can call stream->cancel().
-const bool connected = stream->connect (nullptr);   // a 404 is still a connection
-Reply reply = connected ? Reply { stream->getStatusCode(), stream->readEntireStreamAsString() } : Reply {};
+// Members: juce::CriticalSection lock; std::shared_ptr<juce::WebInputStream> current;
+//          std::atomic<bool> closing { false }, aborted { false };
+Reply GumroadVerifier::verify (const juce::String& key, bool countUse)
+{
+    if (closing) return {};
+    if (! hasHttps()) return { kStatusNoHttps, {} };            // see Linux HTTPS for the probe
+    auto stream = std::make_shared<juce::WebInputStream> (makeUrl (key, countUse), true);   // POST
+    stream->withConnectionTimeout (kConnectTimeoutMs);
+    { const juce::ScopedLock sl (lock); aborted = false; current = stream; }
+    if (closing) stream->cancel();                             // shutdown raced the start
+    Reply reply;
+    if (stream->connect (nullptr))                             // a 404 is still a connection
+        reply = { stream->getStatusCode(), stream->readEntireStreamAsString() };
+    { const juce::ScopedLock sl (lock); current.reset(); }
+    // Aborted after the headers arrived still means "no answer": the body may be truncated, and
+    // isError() is backend-specific in JUCE 9.0.3 (macOS keeps it false once headers exist).
+    return (aborted || closing) ? Reply {} : reply;
+}
+
+void GumroadVerifier::abortCurrent()
+{
+    std::shared_ptr<juce::WebInputStream> s;
+    { const juce::ScopedLock sl (lock); aborted = true; s = current; }   // copy under the lock...
+    if (s != nullptr) s->cancel();                             // ...cancel outside it; the copy keeps the stream alive
+}
+
+void GumroadVerifier::shutdown() { closing = true; abortCurrent(); }
 ```
 
-Never on the audio thread, never in the processor constructor, never synchronously on the message thread (hosts
-scan plug-ins with timeouts).
+Shutdown contract:
+
+- `~LicenseManager` calls `verifier->shutdown()`, then waits for the worker without a timeout
+  (`waitForThreadToExit (-1)`). Do not use `stopThread (timeout)` routinely: in JUCE 9.0.3 a missed timeout calls
+  `killThread()`, which the source itself warns leaves locks and events in broken states, and the killed thread
+  may hold JUCE's, libcurl's or WinINet's locks.
+- What this guarantees: shutdown waits as long as the backend takes to return after `cancel()`. JUCE's backends
+  normally abort promptly; one that ignores cancellation returns at its own timeout (inactivity on macOS,
+  per-operation on Windows, connect or low-speed on Linux), so keep the connect timeout short (for example
+  10-15 s). That is not a hard bound. A plugin cannot leave a thread running into an unloaded binary, so waiting
+  is still the safe choice.
+- Deliver results to the message thread through an `AsyncUpdater` (or `ChangeBroadcaster`) the manager owns:
+  its destructor cancels a pending callback, so no result arrives after the manager is gone. Each result carries
+  its job's identity and is dropped if a newer job started. Editor-side completions are guarded by a
+  `juce::Component::SafePointer` (JUCE's completion captures the browser).
+- Never start requests from the processor constructor, `prepareToPlay` or synchronously on the message thread.
+
+## Linux HTTPS
+
+| | Detail (JUCE 9.0.3) |
+| --- | --- |
+| Configuration | `JUCE_USE_CURL=1` (without it Linux has no HTTPS); `JUCE_LOAD_CURL_SYMBOLS_LAZILY=1` to `dlopen` libcurl instead of linking it |
+| Build time | `libcurl4-openssl-dev` for `<curl/curl.h>` (see [platform builds](platform-builds.md#linux)) |
+| Run time | The first of `libcurl.so`, `libcurl.so.4`, `libcurl.so.3`, `libcurl-gnutls.so.4`, `libcurl-gnutls.so.3` that opens, with 15 symbols (`curl_easy_init`, `_setopt`, `_cleanup`, `_getinfo`, `curl_multi_add_handle`, `_cleanup`, `_fdset`, `_info_read`, `_init`, `_perform`, `_remove_handle`, `_timeout`, `curl_slist_append`, `_free_all`, `curl_version_info`) |
+| Failure | Each `WebInputStream` creates its symbol table; if the library or a symbol is missing it is null. Debug builds stop at a `jassert`; Release builds call `symbols->curl_multi_init()` through null and crash the host |
+
+The probe must mirror that loader: try the names in that order, stop at the **first that opens**, and require all
+15 symbols from that same handle (JUCE does not fall back to the next name). Probe before each request or cache
+the answer per process, and return "needs libcurl 4" instead of building the stream. The probe prevents only
+this crash: missing CA certificates, proxies or a libcurl without TLS still fail, as "no answer".
 
 ## Demo Mode In The Audio Path
 
-- `DemoGate::process (channels, numChannels, numSamples, active)`: unity for a random 45-60 s, linear 10 ms fade
-  down, 2 s of zeros, 10 ms fade up, repeat (case-study timings). Integer fade counters give exact 0 and 1. While
-  inactive at unity, return without touching the buffer (bit-exact). Going inactive mid-dropout fades up and stays.
-- Realtime-safe by construction: the gate allocates nothing, takes no lock, adds no latency and makes no system
-  call; its state is a few integers and a `juce::Random` seeded in `prepare`. The license flag is a
-  `std::atomic<bool>` written by the manager's threads and only loaded on the audio thread.
-- `active = ! manager->isLicensed() && ! bypassed`, evaluated once per block after the DSP; a bypassed instance
-  passes dry audio. One relaxed atomic load per block; one multiply per sample only while active.
-- `prepare (sampleRate, seed)` resets the countdown only when the rate changes: many hosts call `prepareToPlay`
-  at every transport start, and a reset there means a stop-start session never hears a dropout.
-- Compile the gate and the manager only into the shipped plug-in target (for example
-  `YOURPLUGIN_LICENSE_GATE=1` on that target, defaulting to 0 in the header). Test, perf and editor-host targets
-  then have no manager, make no network call, and their golden references and CPU figures do not change.
-
-Realtime rules in general: [audio-thread safety](audio-thread-safety.md).
+- `DemoGate::process (channels, numChannels, numSamples, active)`: unity for a random interval, a linear fade
+  down, silence, a fade up, repeat [45-60 s, 10 ms, 2 s, 10 ms]. Integer fade counters give exact 0 and 1.
+  Inactive at unity, return without touching the buffer (bit-exact); deactivating mid-dropout fades up.
+- No heap members, no locks, no system calls, no latency: a few integers and a `juce::Random` seeded in `prepare`.
+- `active = ! manager->isLicensed() && ! bypassed`, one relaxed atomic load per block, after the DSP.
+- `prepare` resets the countdown only when the sample rate changes: hosts call `prepareToPlay` at every
+  transport start.
+- Compile the licensing into the shipped plugin target (for example `YOURPLUGIN_LICENSE_GATE=1`, defaulting to 0
+  in the header). Golden-reference, perf and editor-host targets build without it, so their outputs and CPU
+  figures are unaffected. Test the gate-on configuration separately ([Tests](#tests-and-evidence)).
 
 ## WebView Activation UI
 
@@ -254,88 +358,126 @@ Built on [native functions and events](webview-ui.md#native-functions-and-events
 
 | Native function | Returns |
 | --- | --- |
-| `getLicenseStatus()` | `{ state: "demo" \| "checking" \| "licensed", email, keyTail, message, lastChecked, offlineUntil }` (times in ms, 0 when absent) |
-| `activateLicense (key)` | The same object when the background call finishes |
+| `getLicenseStatus()` | `{ state: "demo" \| "checking" \| "pending" \| "licensed", email, keyTail, message, lastChecked, offlineUntil, entitledUntil }` (ms, 0 when absent) |
+| `activateLicense (key)` | The same object when the job finishes |
 | `claimLicensePrompt()` | `true` once per manager lifetime: the "open by itself once per session" switch |
-| `openLicenseLink ("buy" \| "lookup")` | Nothing; opens one of two fixed URLs with `URL::launchInDefaultBrowser`. Never let the page pass a URL |
+| `openLicenseLink ("buy" \| "lookup")` | Opens one of two fixed URLs with `URL::launchInDefaultBrowser`; the page never passes a URL |
 
-- The editor listens to the manager (`ChangeListener`) and sends `licenseStatus` through
-  `emitEventIfBrowserIsVisible`; the page re-reads the status on `visibilitychange`.
-- Complete an `activateLicense` promise only while the editor exists: guard the callback with a
-  `juce::Component::SafePointer` (JUCE's completion captures the browser). Without a manager (test builds),
-  report `licensed` with "Test build" and never claim the prompt.
-- The page makes no network requests, so the production CSP does not change.
-- Markup: a key-icon button in the header ("Demo" until licensed, icon only after) and a native `<dialog>` with
-  three states. Demo: one line explaining the dropouts, key field, error line, Activate, Cancel, Buy, Find my key.
-  Checking: all controls disabled. Licensed: licensed-to, key tail, last check, offline-until, Close. Use plain
-  `type="button"` buttons and handle Enter in the key field; inside a `<form>`, implicit submission picks the
-  first button (often Cancel).
-- Keep a browser mock behind the same API (for example keys starting `TEST` activate, `DISABLED` and `OFFLINE`
-  return the matching messages), so the dialog is built and checked without a host.
-- Check the header at the smallest editor size: the button must not clip the brand or the next control.
+- State precedence: `licensed` wins over `checking`, or a background re-check shows "Demo" to a paying customer.
+  `pending` is the uncertain activation of [Activation Accounting](#activation-accounting). Activating a
+  different key on a licensed machine replaces the license: ask before sending it.
+- The editor listens to the manager and sends `licenseStatus` via `emitEventIfBrowserIsVisible`; the page re-reads
+  on `visibilitychange`. Without a manager (builds without the gate) it reports `licensed`, "Test build".
+- The page makes no network requests; the CSP does not change.
+- Header key button ("Demo" until licensed) and a native `<dialog>`: key field, error line, Activate, Cancel,
+  Buy, Find my key; licensed-to, key tail, last check, offline-until or membership end. Plain `type="button"`
+  buttons and Enter in the key field: inside a `<form>`, implicit submission picks the first button.
+- A browser mock behind the same API (keys `TEST…`, `DISABLED`, `OFFLINE`, `PENDING`) builds the dialog without a
+  host. Check the header at the smallest editor size.
 
-## Tests And Validation
+## Tests And Evidence
 
-| Test | What it pins |
+| | Scope |
 | --- | --- |
-| `LicenseRules` table | Every reply in [The Verify Endpoint](#the-verify-endpoint), including a non-JSON 404 and a malformed 200 |
-| `LicenseFile` | Round trip through a second instance, malformed and missing fields, an unwritable folder |
-| `LicenseManager` with a fake `Verifier`, temp folder, injected clock and device id | Activation, key normalisation, empty key makes no call, seat limit, 29 vs 31 days, other device, due rule, revoke, offline keep, save failure, adopting another process's file, re-entering the held key costs no seat, licensed during a re-check, clock set back |
-| Blocking fake `Verifier` | A second activate while busy makes no call; the destructor returns within 2 s with a call stalled |
-| `DemoGate` | First dropout in 45-60 s, 2 s of zeros, 480-sample ramps at 48 kHz, bit-exact when inactive, ramp up on deactivate, same-rate `prepare` keeps the countdown |
-| Bridge | The four functions are registered; the test-build status |
-| Manual smoke mode (not a ctest entry) | One live verify with a fake key returns Gumroad's 404 |
-| pluginval / auval | Run on the gated plug-in: the unlicensed path must load, process and close |
+| Executed for this reference | `scripts/validate_skills.py`; before/after retrieval tests of the text. No licensing code was compiled or run for it |
+| Case-study implementation (another repository) | Tests for the decision rules of its first version, the file, the manager with a fake verifier (adoption, re-entry without a use, clock set back, status during re-check), the demo gate and the bridge. It does not implement the revision check, preflight, pending marker, membership `entitledUntil`, `imported_customer` verdict, deadline abort or full libcurl probe specified here |
+| Required in an implementation | The matrix below, in the normal headless suite, with fakes only |
+| Manual, needs a real purchase | Activation, offline restart, refund revoke, in each target host and platform |
 
-Tests built without the gate cannot see the dialog's demo and checking states inside the plug-in; cover them
-with the browser mock and the manual release check: a real purchase, activation, offline restart and a refund
-revoke in each target host and platform. Host validation in general:
-[production practices](production-plugin-practices.md#host-validation-and-release-gates).
+Required matrix (fake `Verifier`, temp folder, injected clock and device id; two independent `LicenseManager`
+instances on one folder for cross-process cases; a blocking fake makes interleavings deterministic):
 
-## Ways Activations Get Burned
+- Decision table: one case per row in table order, including `imported_customer`, partial refund (an ordinary
+  success reply, since partial refunds are not exposed), future and past
+  `subscription_cancelled_at`, `failed_at`, `ended_at`, unknown 404 message on activation and on re-check.
+- Stale revocation: A snapshots X; B activates Y; A's "disabled" arrives: file still Y, A adopts Y, no message.
+- Stale success: same, A's success arrives: file and revision still B's.
+- Replacement during verification: A and B re-check X; B's success writes a new revision; A's revocation is
+  discarded and A adopts the file.
+- Competing activations of different keys: last writer wins; both processes end on the same file.
+- Failed persistence: licensed for the session, warning kept in status, no pending marker left behind.
+- Uncertain activation: the incrementing call returns no answer, the marker exists, the next attempt (also in a
+  fresh manager) sends only non-incrementing requests and a licensed reply clears the marker.
+- Preflight: over the allowance is refused with no incrementing call.
+- Missing libcurl: an injected failing probe makes no request and returns the libcurl message.
+- Shutdown: with a blocking fake whose cancel releases it, destruction returns promptly and no callback runs
+  afterwards. With a fake that ignores cancel until released, destruction waits (it must not return early or
+  kill the thread). That bounds shutdown by the backend's abort time, not by a promise about networks.
+- Gate on, network off: a test target that defines the gate and swaps `ProductionLicenseManager`'s dependencies
+  for fakes (for example a test-only compile definition selecting a fake `Verifier` and a temp folder), so the
+  processor path is exercised: unlicensed output shows a dropout at the expected time, licensed
+  output is bit-identical to the gate-off build.
+- Audio thread: `DemoGate` has no heap or lock members (inspection or `static_assert` on its layout); the
+  processor reports the same latency with the gate on and off; add an allocation or lock detector only if the
+  project has one, and claim only what it checks.
 
-Every path that calls activate with `countUse=true` spends a Gumroad use the plugin cannot give back:
+No real purchases, seller API calls or Gumroad requests in CI. A manual smoke mode that sends one verify with a
+fake key and `increment_uses_count=false` is fine outside the suite.
 
-- Re-checks without the literal `increment_uses_count=false`.
-- A missing, corrupt or unsaveable license file, or an empty device id that makes the file unreadable.
-- Activating again in a second host process instead of adopting its file, or re-entering the key this machine
-  already holds.
-- A refused extra machine (its attempt still counts).
-- Rotating a key without first resetting its uses.
-- A device id that changes: on Linux JUCE hashes BIOS fields and `lscpu` output, so a BIOS update or locale change
-  asks for the key again.
-- A reply lost after Gumroad counted the use (timeout, cancellation at shutdown).
+## Support And Recovery
 
-Name the seat cost in the UI where it applies, and give support a short dashboard procedure for resetting uses.
+- **"Activation limit reached":** confirm the buyer (receipt email), open the sale in the Gumroad dashboard,
+  lower or reset **Uses** in its License key section, ask them to activate again.
+- **New computer or reinstall:** same procedure; the old machine keeps its file until removed.
+- **Pending activation that never resolves:** reset **Uses** if the count looks one high.
+- **Leaked key:** reset its **Uses**, then rotate it in the dashboard and send the buyer the new key; every
+  machine holding the old key falls to demo at its next re-check.
+- **Membership ended or cancelled:** nothing to do; restarting the membership clears the timestamps.
 
 ## Upgrade Path: A Signing Server
 
-Plugin → your endpoint with key and device id → server calls `verify` (`increment_uses_count=false`), keeps its own
-activation table (deactivate frees a seat), subscribes to Gumroad's Ping (`refund`, `dispute`, `cancellation`…,
-form-encoded, signed with `X-Gumroad-Signature: t=…,v1=<HMAC-SHA256 of "t.rawBody">`, retried on 499/500/502/503/504,
-5 s to answer) and returns a key file signed with your private key. The plug-in verifies offline with an embedded
-public key, through `OnlineUnlockStatus::applyKeyFile` or a small Ed25519 verifier. Only the `Verifier`
-implementation and the file format change.
+Boundaries:
+
+| Concern | Owner |
+| --- | --- |
+| Was this purchase made, is it refunded, charged back or ended | Gumroad (verify, Ping, `GET /v2/sales` with the seller token) |
+| Device registration, deactivation, seat policy | Your server |
+| Offline license | A token your server signs (key, device, expiry), verified with an embedded public key |
+| Refresh and revocation | The plugin refreshes before expiry; your server refuses refresh for revoked purchases |
+
+Gumroad Ping facts (Ping page and `post_to_individual_ping_endpoint_worker.rb`, `ping_signature.rb` at `f1a9c5b`):
+
+- Signing is off until the seller enables it in settings; until then the endpoint URL is the only credential.
+  Keep the secret on the server only.
+- Only the seller's own Ping endpoint is signed. Deliveries to OAuth resource subscriptions
+  (`/v2/resource_subscriptions`) are not.
+- `X-Gumroad-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of "t." + raw body>`. Verify on the raw bytes
+  before parsing, compare in constant time, reject `t` more than 5 minutes from your clock, and remember
+  accepted signatures for that window to refuse replays. Deduplicate on `sale_id` plus `resource_name`.
+- Delivery is best-effort: at least once, unordered, a few retries over about an hour, then dropped. The Ping
+  page says timeouts and connection errors are not retried; the worker at `f1a9c5b` retries them. Do not rely
+  on either: reconcile periodically against the API and re-verify on refresh.
+
+Moving from A to B changes more than the verifier: the activation and refresh protocol, the file format (a signed,
+expiring token), the UI (deactivate, device list), seat semantics (devices instead of uses), server operations
+(signing keys, Ping secret, reconciliation, uptime), the privacy policy (device ids leave the machine), the
+support procedure, and a migration that accepts licenses issued under A at first contact.
 
 ## Common Mistakes
 
-- Sending `product_permalink` for a new product, or leaving `increment_uses_count` at its default on re-checks.
-- Treating every 404 as revoked, or every 200 as licensed (chargebacks stay 200).
-- Calling the network from the processor constructor or the message thread.
-- Shipping a seller `access_token` to free seats.
-- Building the Linux plug-in with `JUCE_USE_CURL=0` (no HTTPS at all) or with lazy loading and no libcurl probe
-  (host crash).
+- Treating `success: true` as entitlement, or a cancelled membership as already ended.
+- Sending `product_permalink` for a new product, or anything but the literal `false` on re-checks.
+- Retrying an activation with `increment_uses_count=true` after a timeout.
+- Deleting or overwriting `license.json` from a result without checking that its key and revision are still on
+  disk.
+- Calling `cancel()` while holding a lock the worker needs, or freeing the stream another thread may cancel.
+- Shutting the worker down with `stopThread (timeout)` and relying on the force-kill path.
+- A libcurl probe that accepts any name with one symbol, when JUCE uses the first name that opens.
 - Showing "Demo" while a licensed customer's background re-check runs.
-- Resetting the demo countdown in every `prepareToPlay`.
-- Letting test targets construct the real manager (network calls and dropouts in golden tests).
+- Letting test targets construct the real manager, or never testing the gate-on configuration.
+- Trusting unsigned Ping deliveries, or treating Ping as guaranteed revocation.
 - Testing with the editor's sample key and concluding activation is broken.
-- Storing the license in plugin state.
 
 ## Sources
 
-- Gumroad API, Licenses: <https://gumroad.com/api#licenses>; Help Center, "License keys" (article 76); Ping:
-  <https://gumroad.com/ping>; source: <https://github.com/antiwork/gumroad>
-- JUCE 9.0.3: `juce_core/network/juce_WebInputStream.h`, `juce_core/native/juce_Network_curl.cpp`,
-  `juce_core/juce_core.h` (`JUCE_USE_CURL`, `JUCE_LOAD_CURL_SYMBOLS_LAZILY`), `juce_core/files/juce_File.cpp`
-  (`replaceWithText`, `moveFileTo`), `juce_core/memory/juce_SharedResourcePointer.h`,
-  `juce_product_unlocking/marketplace/juce_OnlineUnlockStatus.h`
+- Gumroad API, Licenses: <https://gumroad.com/api#licenses>; Help Center, "License keys" (article 76):
+  <https://gumroad.com/help/article/76-license-keys>; Ping: <https://gumroad.com/ping> (all read 2026-11-08)
+- Gumroad source, <https://github.com/antiwork/gumroad> at `f1a9c5b5ee938eed374012ec9937d8c7f1f26631`:
+  `app/controllers/api/v2/licenses_controller.rb`, `go_web/internal/licenses/purchase_json.go`,
+  `app/models/subscription.rb`, `app/models/imported_customer.rb`, `app/modules/purchase/refundable.rb`,
+  `app/models/license.rb`, `config/initializers/rack_attack.rb`, `app/services/ping_signature.rb`,
+  `app/sidekiq/post_to_individual_ping_endpoint_worker.rb`
+- JUCE 9.0.3 (<https://github.com/juce-framework/JUCE>): `juce_core/native/juce_Network_curl.cpp`,
+  `juce_Network_mac.mm`, `juce_Network_windows.cpp`, `juce_SystemStats_*`, `juce_core/threads/juce_Thread.cpp`
+  (`stopThread`), `juce_core/files/juce_File.cpp` and `juce_TemporaryFile.cpp`, `juce_core/juce_core.h`
+  (`JUCE_USE_CURL`, `JUCE_LOAD_CURL_SYMBOLS_LAZILY`), `juce_product_unlocking/marketplace/juce_OnlineUnlockStatus.h`

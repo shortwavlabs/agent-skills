@@ -128,7 +128,7 @@ skills/juce-plugin/
     ├── performance-investigation.md    CPU attribution, headless vs live callback, matrix, tooling, equivalence classes, gates, report
     ├── platform-builds.md      macOS vs Windows vs Linux: MSVC fixes, WebView2/WebKitGTK, glibc baseline, headless tests, x86 float differences, CI jobs
     ├── signing-and-notarization.md  macOS Developer ID, notarized .pkg, Windows Artifact Signing via GitHub OIDC
-    └── gumroad-licensing.md    Gumroad license keys: product set-up, MCP server, verify replies, LicenseManager, demo mode, WebView activation
+    └── gumroad-licensing.md    Gumroad license keys: entitlement table, activation accounting, license-file protocol, shutdown, demo mode, WebView activation
 ```
 
 #### What it covers
@@ -150,7 +150,7 @@ skills/juce-plugin/
 | **Production practices** | Separate plugin/test/measurement builds, asset/model loading, state restore, oversampled circuit-model plugins (rate policy, integer latency, bypass parameter, model revision), host validation, release gates |
 | **Platform builds** | What changes on Windows and Linux: per-platform formats and bundle layouts, MSVC portability fixes, WebView2 and WebKitGTK runtime behaviour, glibc baseline containers, headless editor tests, Intel-only snap-to-zero and other cross-CPU float differences, CI jobs |
 | **Signing and notarization** | macOS Developer ID signing, notarized and stapled `.pkg` with installer choices and Dark Mode branding; Windows Microsoft Artifact Signing with GitHub OIDC (identity validation, certificate profile, federated credential, verification); secrets on the GitHub Free plan |
-| **Licensing (Gumroad)** | Selling with per-sale license keys: product set-up with the Gumroad MCP server, verify-endpoint replies and the facts behind them (refunds disable keys, chargebacks do not, seat counting), a `LicenseManager` shared per host process with re-checks and offline grace, HTTPS on all platforms (lazy libcurl on Linux), realtime demo dropouts kept out of test builds, the WebView activation dialog, and a checklist of ways activations get burned |
+| **Licensing (Gumroad)** | Selling with per-sale license keys: product set-up with the Gumroad MCP server, an entitlement decision table (refunds, chargebacks, memberships, imported customers), activation accounting with a non-incrementing preflight, a revision-checked license file shared across host processes, cancellation and shutdown without force-killing threads, HTTPS on all platforms (lazy libcurl on Linux), realtime demo dropouts, the WebView activation dialog, a test matrix and support procedures |
 | **Performance investigation** | Where a plugin's CPU goes and how to prove a fix: attribution before optimization, headless versus live-callback measurement, equivalence classes, performance gates, and a report that keeps rejected candidates |
 
 #### Source documentation
