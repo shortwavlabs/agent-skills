@@ -25,8 +25,10 @@ How to model a BBD effect's feedback loop faithfully, and how to add sustained r
 **Rules:**
 - The extension has its **own switch** (or mode) and its **own reference set**.
 - With the extension off, the output is **bit-identical** to Classic. Gate it by hash, not by listening.
-- The extension changes nothing below its threshold, so approved presets and existing sessions are untouched.
-- Presets made for Classic load with the extension **off**; states saved before it existed restore it off.
+- The extension changes nothing below its threshold.
+- **The threshold alone does not protect approved presets and sessions:** some may sit above it. Protect them explicitly:
+  - presets load with the extension **off**;
+  - states saved before the extension existed restore it off.
 
 ## Measure the Classic Loop Gain
 
@@ -77,7 +79,7 @@ F2 extra return: (G − 1) · vs · tanh(x / vs)          x = the expandor outpu
 
 | Parameter | Meaning | How it was chosen |
 |---|---|---|
-| f0 | control value where the law starts (bit-for-bit Classic below it) | 0.85: above every approved preset's FEEDBACK (0.75) |
+| f0 | control value where the law starts (bit-for-bit Classic below it) | 0.85: above the three FEEDBACK-0.75 FILTER MATRIX programs, which stay untouched. Five approved programs sit at FEEDBACK ≥ 0.9; they stay Classic because every program selects the extension off, not because of f0 |
 | gMax | G at full FEEDBACK | a margin of 17–27 % over the highest measured G\* (1.885), so the loop sustains at full FEEDBACK at every TUNE: 2.2 |
 | vs | tanh scale in volts | swept 0.15 / 0.3 / 0.5 V (each doubling adds about 6 dB of sustained level): 0.3 V |
 
