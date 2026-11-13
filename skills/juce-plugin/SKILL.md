@@ -217,7 +217,7 @@ void MyPluginProcessor::setStateInformation (const void* data, int sizeInBytes)
 
 ### 7. Create the Editor
 
-The editor connects UI controls to APVTS parameters via attachments. Read `references/ui-patterns.md` for custom components, layout strategies, and LookAndFeel customization.
+The editor connects UI controls to APVTS parameters via attachments. Read `references/ui-patterns.md` for custom components, layout strategies, and LookAndFeel customization. The stock attachments below are fine for prototypes; for a product that must stay real-time safe while the host automates with the editor open, use polled attachments ([host-automation-and-editor-sync.md](references/host-automation-and-editor-sync.md)).
 
 ```cpp
 // PluginEditor.h
@@ -327,12 +327,13 @@ For interactive Blender-authored amps, pedals or rack gear, read [Three.js/WebVi
 Read these as needed based on what you're implementing:
 
 - **`references/plugin-lifecycle.md`** — Complete AudioProcessor contract: all overrides, bus configurations, double precision, Synthesiser framework for synths
-- **`references/parameter-management.md`** — APVTS patterns: parameter layout, attachments, raw pointers, non-parameter state, parameter groups
+- **`references/parameter-management.md`** — APVTS patterns: parameter layout, attachments, raw pointers, non-parameter state, parameter groups, AU parameter order and version hints (keeping Logic automation across releases)
 - **`references/dsp-patterns.md`** — DSP cookbook: ProcessorChain, filters, oscillators, waveshapers, convolution reverb, delay lines, wavetable synthesis, LFO at control rate, two-level chain architecture, per-sample vs block processing
 - **`references/ui-patterns.md`** — Editor patterns: component layout, custom widgets, LookAndFeel, meters, FFT spectrum analyser, responsive resize, binary data for assets
 - **`references/webview-ui.md`** — JUCE 9 WebBrowserComponent, WebView2, local resources, native functions, parameter bindings, frontend frameworks, explicit development mode, and streaming visual data (meter and repaint cost, idle acceptance)
 - **`references/threejs-webview-ui.md`** — Interactive guitar-gear GLBs, mock/JUCE bindings, physical controls, derived visual state, render-on-demand, shadow-map invalidation, redraw cadence, pixel ratio, draw calls and staged host validation
 - **`references/audio-thread-safety.md`** — Real-time safety rules: what you can/cannot do in processBlock, lock-free patterns, atomics, debugging audio glitches
+- **`references/host-automation-and-editor-sync.md`** — Host automation reaching parameter listeners on the audio thread; why stock APVTS attachments lock and allocate there with the editor open; the polled-attachment editor pattern; anti-patterns (never suppress `setValueNotifyingHost`); allocation-gate procedure (editor open/closed, audio-callback delivery, `malloc_logger`); residual JUCE wrapper allocations
 - **`references/cmake-reference.md`** — Full CMake API: all juce_add_plugin properties, SDK paths, binary data, CI/CD, platform specifics
 - **`references/platform-builds.md`** — macOS vs Windows vs Linux: formats and bundle layouts, copy folders, MSVC portability fixes, npm/CRLF/path plumbing, Linux packages and glibc baseline, test executables that compile a WebView editor, headless tests (Xvfb), Intel-only snap-to-zero and other cross-CPU float differences, CI jobs, local Linux reproduction
 - **`references/signing-and-notarization.md`** — macOS Developer ID certificates, `.p12`/`.p8` credentials, keychain, `codesign`, `pkgbuild`/`productbuild`, notarytool, stapler, installer branding; Windows Artifact Signing (identity validation, certificate profile, OIDC federated credential, signing action, verification); GitHub secrets on the Free plan

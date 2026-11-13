@@ -21,7 +21,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     return {
         // Float parameter with NormalisableRange (skew, snap, etc.)
         std::make_unique<juce::AudioParameterFloat>(
-            juce::ParameterID { "gain", 1 },      // ID + version hint
+            juce::ParameterID { "gain", 1 },      // ID + version hint (orders the AU parameter list: see below)
             "Gain",                                 // Display name
             juce::NormalisableRange<float> (0.0f, 1.0f, 0.001f),  // range
             0.5f),                                  // default
@@ -162,6 +162,42 @@ filterTypeAttachment (processor.apvts, "filterType", filterTypeCombo)
 
 Important: the Attachment must outlive the control it manages. Declare the control before the attachment in your class.
 
+**Real-time caveat.** These stock attachments are parameter listeners. When a host automates a parameter on the audio thread with the editor open, they post a message to the message queue from that thread (a lock, a run-loop wake-up and, on macOS, sometimes `malloc`). For a product that must be real-time safe under automation, use the polled-attachment pattern in [host-automation-and-editor-sync.md](host-automation-and-editor-sync.md#the-remedy-polled-editor-attachments).
+
+## AU Parameter Order and Version Hints
+
+**Stable parameter IDs are not enough to keep Logic automation working.** Logic Pro and GarageBand address AU v2 parameters by their **index in the AU parameter list**, not by ID (JUCE documents this on `AudioProcessorParameter`'s version-hint constructor). JUCE's AU wrapper builds that list in `GetParameterList`: sorted by hashed parameter ID, then **stable-sorted by version hint**. So the hosted order:
+
+- is **not** the declaration order in your `ParameterLayout`;
+- changes when you add a parameter whose version hint is not higher than every existing one: its hash can land it in the middle and shift every parameter after it by one index;
+- never safely survives removing a parameter.
+
+**Rules for a plug-in that has shipped:**
+
+1. Give every parameter a version hint (`juce::ParameterID { "id", 1 }`); debug AU builds assert when it is missing.
+2. Every parameter added in a later release gets a hint **higher than every hint in all earlier releases**. All parameters added in one release can share that hint.
+3. Never remove or re-hint a shipped parameter. Hide or deprecate it instead.
+4. Check the **hosted** list, not the source, for every release that adds parameters.
+
+**Regression test in the processor suite** (emulates the wrapper's sort with `JUCE_FORCE_USE_LEGACY_PARAM_IDS` off; the AU ID is the string ID's `hashCode()`, masked to 31 bits while `JUCE_USE_STUDIO_ONE_COMPATIBLE_PARAMETERS` is 1, its default in JUCE 9.0.3; without the mask, sort as unsigned):
+
+```cpp
+struct Entry { juce::String id; int hash, hint; };
+std::vector<Entry> v;
+for (auto* p : processor.getParameters())
+    if (auto* w = dynamic_cast<juce::AudioProcessorParameterWithID*> (p))
+        v.push_back ({ w->getParameterID(), w->getParameterID().hashCode() & 0x7fffffff, p->getVersionHint() });
+std::sort        (v.begin(), v.end(), [] (auto& a, auto& b) { return a.hash < b.hash; });
+std::stable_sort (v.begin(), v.end(), [] (auto& a, auto& b) { return a.hint < b.hint; });
+// compare v's ids, in order, with the order frozen from the previous release; new ids must come last
+```
+
+**Host-level check:** instantiate the built AU, read `kAudioUnitProperty_ParameterList` (global scope) and the names from `kAudioUnitProperty_ParameterInfo`, and compare them with the list saved from the previous release's installed AU. Restoring a ClassInfo saved by the previous release into the new build should leave every old value in place and the new parameters at their defaults.
+
+**Case study:** a plug-in added one boolean in its third release with hint 1, like its eleven original parameters. Its hash sorted it ninth, and three existing parameters moved one index. The processor's ID checks all passed, because no ID had changed; the defect showed only in the hosted AU list. Giving the new parameter hint 2 restored the eleven positions and listed it twelfth. The number 2 is that project's history; the rule is "higher than everything shipped before".
+
+VST3 does not use the version hint: its parameter IDs are the hashed string IDs and its order is the declaration order. AUv3 has no equivalent mechanism; JUCE advises not adding or removing parameters there if Logic and GarageBand must keep automation.
+
 ## Non-Parameter State
 
 For UI state (editor size, tab index) or non-automatable data:
@@ -287,4 +323,4 @@ void parameterChanged (const juce::String& parameterID, float newValue) override
 }
 ```
 
-Warning: `parameterChanged` may be called on the audio thread. Only do trivial, allocation-free work here. For heavier work, set an atomic flag and pick it up in `processBlock` or a timer.
+Warning: `parameterChanged` may be called on the audio thread. Only do trivial, allocation-free work here. For heavier work, set an atomic flag and pick it up in `processBlock` or a timer. Never post to the message thread from it (`AsyncUpdater`, `ChangeBroadcaster`, `callAsync`): [host-automation-and-editor-sync.md](host-automation-and-editor-sync.md#anti-patterns).

@@ -117,12 +117,13 @@ skills/juce-plugin/
 │   └── webview_gesture_check.cpp  JUCE 9.0.1 gesture teardown regression check
 └── references/
     ├── plugin-lifecycle.md     AudioProcessor contract: overrides, bus configs, Synthesiser framework
-    ├── parameter-management.md APVTS patterns: parameter layout, attachments, state, groups
+    ├── parameter-management.md APVTS patterns: parameter layout, attachments, state, groups, AU parameter order and version hints
     ├── dsp-patterns.md         DSP cookbook: ProcessorChain, filters, oscillators, wavetable synthesis, delay, distortion
     ├── ui-patterns.md          Editor patterns: layout, custom widgets, LookAndFeel, meters, FFT spectrum analyser
     ├── webview-ui.md           JUCE 9 WebView2, offline resources, relays, frontend integration
     ├── threejs-webview-ui.md   Interactive guitar-gear GLBs, physical controls, APVTS, idle rendering
     ├── audio-thread-safety.md  Real-time safety: processBlock rules, lock-free patterns, debugging
+    ├── host-automation-and-editor-sync.md  Host automation on the audio thread, stock-attachment hazard, polled attachments, allocation gate
     ├── cmake-reference.md      Full CMake API: juce_add_plugin, SDK paths, CI/CD, platform specifics
     ├── production-plugin-practices.md  Product plugin practices: validation, assets, state restore
     ├── performance-investigation.md    CPU attribution, headless vs live callback, matrix, tooling, equivalence classes, gates, report
@@ -136,13 +137,13 @@ skills/juce-plugin/
 | Area | Details |
 |------|---------|
 | **Plugin development** | AudioProcessor/AudioProcessorEditor pattern, processBlock(), CMake project setup |
-| **Parameter management** | APVTS: ParameterLayout, SliderAttachment, raw pointers, ParameterReferences struct |
+| **Parameter management** | APVTS: ParameterLayout, SliderAttachment, raw pointers, ParameterReferences struct; AU parameter-list order, version hints and the regression check that keeps Logic automation across releases |
 | **DSP module** | ProcessorChain, IIR/FIR/SVF filters, Oscillator, WaveShaper, Convolution, DelayLine, LadderFilter, wavetable synthesis, LFO at control rate, two-level chain architecture |
 | **Editor/GUI** | Component layout (FlexBox, Grid), custom widgets, LookAndFeel, meters, FFT spectrum analyser, binary data |
 | **WebView UIs (JUCE 9)** | Pinned compatibility guidance, WebView2, offline resources/CSP, relay lifetime, tested gesture cleanup, explicit dev mode |
 | **Interactive 3D gear** | Blender → GLB → Three.js → WebView; physical controls, APVTS authority, accessibility, state-space checks, render-on-demand |
 | **State serialization** | XML state save/load, non-parameter state via ValueTree children |
-| **Audio thread safety** | No-allocation rules, lock-free patterns, denormal prevention, debugging |
+| **Audio thread safety** | No-allocation rules, lock-free patterns, denormal prevention, debugging; host automation reaching listeners on the audio thread, the stock-attachment message-queue hazard (editor open), polled editor attachments, the allocation gate with AU automation delivered from the audio callback |
 | **Synths** | Synthesiser/SynthesiserVoice/SynthesiserSound framework, polyphonic MIDI, gain ramping |
 | **AudioProcessorGraph** | Processor chaining, graph nodes, dynamic rebuild, node bypass |
 | **Build system** | CMake: juce_add_plugin, SDK paths, binary data, cross-platform, GitHub Actions CI/CD |
@@ -240,7 +241,7 @@ skills/guitar-dsp/
 
 ### Circuit modeling skills (SPICE → KiCad → realtime DSP → JUCE)
 
-Two skills cover circuit-accurate modeling end to end, and route to the existing skills rather than duplicating them. Each area has exactly one owner:
+Two skills cover circuit-accurate modeling end to end, and a third adds what bucket-brigade delay circuits need. They route to the existing skills rather than duplicating them. Each area has exactly one owner:
 
 | Area | Owner |
 |------|-------|
@@ -248,11 +249,37 @@ Two skills cover circuit-accurate modeling end to end, and route to the existing
 | Circuit reduction, state inventory, reduced op-amps, nonlinear solvers and table proofs, integrator/rate/oversampling evidence, exact reset, automation, validation-gate design, end-to-end playbook | [circuit-to-dsp](skills/circuit-to-dsp/SKILL.md) |
 | Reference-circuit verification and comparing DSP against a circuit reference: claim-specific source hierarchy, result axes, measurement contract (digital ↔ volts calibration, electrical vs panel pot position), stage comparison, golden captures, drift, release integrity | [circuit-to-dsp](skills/circuit-to-dsp/SKILL.md) ([circuit-reference-validation.md](skills/circuit-to-dsp/references/circuit-reference-validation.md)) |
 | Guitar-specific signal chain, drive and control feel, tone and product decisions (the digital ↔ volts calibration contract itself lives in circuit-reference-validation) | [guitar-dsp](skills/guitar-dsp/SKILL.md) |
+| Bucket-brigade (BBD) delay circuits: clock-to-delay conventions, two-phase transfer semantics, variable-clock rendering, OUT1/OUT2 summing, emphasis/anti-alias/reconstruction filters and compander around the BBD, feedback loop gain, controlled regeneration, BBD-specific verification | [bbd-modeling](skills/bbd-modeling/SKILL.md) |
 | Measurement methodology: spectra, windows, coherent tones, sub-sample phase ensembles, error metrics | [dsp-engineer](skills/dsp-engineer/SKILL.md) |
 | Realtime filter and numerical building blocks | [dsp](skills/dsp/SKILL.md) |
 | AudioProcessor/APVTS, lifecycle, latency/bypass APIs, CMake, formats, host validation | [juce-plugin](skills/juce-plugin/SKILL.md) |
 | Making a validated circuit model cheaper without changing it: identical-channel sharing, interleaving independent channels (true stereo), settled-state hold, composing shortcuts, call boundaries and code generation, what forces re-validation | [circuit-to-dsp](skills/circuit-to-dsp/SKILL.md) ([model-performance.md](skills/circuit-to-dsp/references/model-performance.md)) |
 | Plugin CPU investigation: audio-thread versus editor attribution, headless versus live-callback measurement, tooling, harness build parity and measurement noise, generated code as evidence, performance gates, reporting | [juce-plugin](skills/juce-plugin/SKILL.md) ([performance-investigation.md](skills/juce-plugin/references/performance-investigation.md)) |
+
+### bbd-modeling
+
+Bucket-brigade device circuit modeling and real-time DSP: model BBD chorus, flanger, vibrato, analog delay, double-tracking and filter-matrix circuits as validated real-time engines. Covers BBD operation and the conventions to fix before any delay equation, clock oscillators and CV laws, variable-clock rendering as transfer events, OUT1/OUT2 image cancellation, clock drive compliance, bias and headroom, which non-idealities are identifiable, the emphasis / anti-alias / reconstruction / compander chain, feedback loop gain, controlled regeneration and self-oscillation as a separate contract, mode transitions, real-time architecture and CPU, golden references and bit-identity gates. Includes a labelled case study with failed experiments.
+
+**Triggers on:** BBD, bucket brigade, MN3007/MN3008/MN3009/MN3207, SAD1024, analog chorus, flanger, vibrato, analog delay emulation, Polychorus-style multi-mode pedals, clock-to-delay, NE570/compander around a delay, feedback regeneration or self-oscillation in a delay loop.
+
+#### Structure
+
+```
+skills/bbd-modeling/
+├── SKILL.md                         Scope, routing, principles, twelve-step workflow, reference map, common mistakes
+└── references/
+    ├── bbd-fundamentals.md          Operation, conventions, delay/sampling/bandwidth, OUT1/OUT2, clock drive, bias/headroom, non-idealities, datasheets
+    ├── circuit-to-dsp-workflow.md   Fact classification, twelve steps, gate discipline, functional BBD reference
+    ├── clock-and-modulation.md      Clock laws, LFO and control network, variable-clock rendering, internal rate, pitch, control grid, transitions
+    ├── filtering-and-companding.md  Emphasis, anti-alias/reconstruction, discretization, NE570-family compander, calibration, program dependence
+    ├── feedback-and-regeneration.md Classic vs enhanced contracts, loop gain, regeneration law, bounding, per-mode laws, onset/sustain/recovery, mode changes
+    ├── realtime-implementation.md   Engine shape, CPU, allocation/locks, block size and rates, precision, low-rank pot updates, lifecycle, tail
+    ├── verification-and-golden-references.md  Identity tiers, goldens, freezing, equivalence matrices, regeneration measurements, hosted = offline
+    ├── analog-character-research.md Hiss, clock instability, component variation: evidence needed (research agenda)
+    └── prismatica-case-study.md     Labelled case study: phases, decisions, failed experiments, evidence, limitations
+```
+
+**Relationship:** uses `spice-circuit-modeling` for the oracle and `circuit-to-dsp` for reduction, solvers and gate design; plug-in integration and host real-time hazards are `juce-plugin`'s.
 
 ### spice-circuit-modeling
 
