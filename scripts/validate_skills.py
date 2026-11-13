@@ -5,7 +5,10 @@ Checks:
   1. every skills/*/scripts/*.py that offers --self-test passes it, normally and under `python -O`;
   2. every relative Markdown link in README.md and skills/**/*.md resolves, including #anchors;
   3. every skills/*/SKILL.md has YAML frontmatter with `name` (equal to its directory, [a-z0-9-]) and a
-     non-empty `description` of at most 1024 characters;
+     non-empty `description` of at most 1024 characters, written as a one-line YAML scalar (plain, 'single'- or
+     "double"-quoted) that parses as the complete intended string: a plain scalar must not contain ": " or " #",
+     end with ":", or start with an indicator character (YAML would fail or truncate it). `--self-test` checks
+     this parser against fixtures; the full run includes it, normally and under `python -O`;
   4. every skill has agents/openai.yaml with interface.display_name, short_description and a
      default_prompt that names the skill as $<skill-name>;
   5. no absolute user-home paths (/Users/<name>, C:\\Users\\<name>) or project checkout paths leak into the skills;
@@ -57,6 +60,107 @@ def check_links(problems: list[str]) -> int:
     return count
 
 
+DQ_ESCAPES = {"0": "\0", "a": "\a", "b": "\b", "t": "\t", "\t": "\t", "n": "\n", "v": "\v", "f": "\f", "r": "\r", "e": "\x1b",
+              " ": " ", '"': '"', "/": "/", "\\": "\\", "N": "\x85", "_": "\xa0", "L": "\u2028", "P": "\u2029"}
+
+
+def parse_scalar(raw: str) -> tuple[str | None, str | None]:
+    """The value of a one-line YAML scalar as YAML would read it, or (None, reason) when it would not parse as the
+    complete intended string. Plain, 'single'- and "double"-quoted forms; block (| >) and multi-line scalars are refused."""
+    text = raw.strip()
+    if not text:
+        return None, "empty"
+    if text[0] in "|>":
+        return None, "block scalars (| or >) are not supported here: write the description on one line"
+    if text[0] in "'\"":
+        q, i, out = text[0], 1, []
+        while i < len(text):
+            c = text[i]
+            if q == "'" and c == "'":
+                if text[i + 1:i + 2] == "'":
+                    out.append("'")
+                    i += 2
+                    continue
+                break
+            if q == '"' and c == "\\":
+                esc = text[i + 1:i + 2]
+                if esc in DQ_ESCAPES:
+                    out.append(DQ_ESCAPES[esc])
+                    i += 2
+                    continue
+                width = {"x": 2, "u": 4, "U": 8}.get(esc)
+                digits = text[i + 2:i + 2 + width] if width else ""
+                if not width or not re.fullmatch(r"[0-9A-Fa-f]+", digits) or len(digits) != width:
+                    return None, f"invalid escape \\{esc} in a double-quoted scalar"
+                out.append(chr(int(digits, 16)))
+                i += 2 + width
+                continue
+            if q == '"' and c == '"':
+                break
+            out.append(c)
+            i += 1
+        else:
+            return None, f"unterminated {q}-quoted scalar"
+        rest = text[i + 1:]
+        if rest.strip() and not re.match(r"\s+#", rest):
+            return None, f"text after the closing quote: {rest.strip()[:30]!r}"
+        return "".join(out), None
+    if text[0] in ",[]{}#&*!%@`" or (text[0] in "-?:" and (len(text) == 1 or text[1] == " ")):
+        return None, f"a plain scalar cannot start with {text[0]!r}: quote the description"
+    if ": " in text or text.endswith(":"):
+        return None, "a plain scalar cannot contain ': ' or end with ':' (YAML reads a mapping): quote it or rephrase"
+    if " #" in text or "\t#" in text:
+        return None, "' #' starts a YAML comment and would truncate a plain scalar: quote it or rephrase"
+    return text, None
+
+
+def frontmatter_description(frontmatter: str) -> tuple[str | None, str | None]:
+    lines = frontmatter.split("\n")
+    for i, line in enumerate(lines):
+        m = re.match(r"^description:(.*)$", line)
+        if m:
+            if m.group(1).strip()[:1] in ("|", ">"):
+                return parse_scalar(m.group(1))   # refused with the block-scalar message
+            if i + 1 < len(lines) and lines[i + 1][:1] in (" ", "\t") and lines[i + 1].strip():
+                return None, "multi-line description: write it on one line"
+            return parse_scalar(m.group(1))
+    return None, "missing"
+
+
+# (frontmatter text, expected description or None, a fragment of the expected error)
+DESCRIPTION_FIXTURES = [
+    ("name: x\ndescription: Build plugins with CMake, covering lifecycle and state.", "Build plugins with CMake, covering lifecycle and state.", None),
+    ("description: Model BBD circuits (MN3xxx) as DSP; use for chorus, flanger.", "Model BBD circuits (MN3xxx) as DSP; use for chorus, flanger.", None),
+    ("description: A URL https://example.com/a:b and C:\\path stay plain", "A URL https://example.com/a:b and C:\\path stay plain", None),
+    ("description: 'Use it: quoted, with it''s apostrophe'", "Use it: quoted, with it's apostrophe", None),
+    ('description: "Use it: quoted, with a \\"quote\\" and C:\\\\path"', 'Use it: quoted, with a "quote" and C:\\path', None),
+    ("description: 'Trailing comment allowed' # note", "Trailing comment allowed", None),
+    ("description: Build JUCE plugins with CMake: lifecycle, APVTS", None, "': '"),
+    ("description: Covers delay and #hash but also tone # truncated here", None, "' #'"),
+    ("description: Ends with a colon:", None, "': '"),
+    ("description: - starts like a list item", None, "cannot start with '-'"),
+    ("description: *alias-looking start", None, "cannot start with '*'"),
+    ("description: 'unterminated", None, "unterminated"),
+    ('description: "bad escape \\q"', None, "invalid escape"),
+    ("description: 'closed' and more", None, "after the closing quote"),
+    ("description: >\n  folded text", None, "block scalars"),
+    ("description: first line\n  continued line", None, "multi-line"),
+    ("name: x", None, "missing"),
+]
+
+
+def self_test() -> list[str]:
+    """Description-parser fixtures. Uses explicit checks, not assert, so it also runs under python -O."""
+    failures = []
+    for text, want, error in DESCRIPTION_FIXTURES:
+        got, why = frontmatter_description(text)
+        if want is not None and (got != want or why is not None):
+            failures.append(f"{text!r}: expected {want!r}, got {got!r} ({why})")
+        if want is None and (got is not None or why is None or error not in why):
+            failures.append(f"{text!r}: expected an error containing {error!r}, got {got!r} ({why})")
+    return failures
+
+
 def check_frontmatter(skill: Path, problems: list[str]) -> None:
     text = (skill / "SKILL.md").read_text(encoding="utf-8")
     m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
@@ -66,8 +170,10 @@ def check_frontmatter(skill: Path, problems: list[str]) -> None:
     fields = dict(re.findall(r"^([a-z_]+):\s*(.*)$", m.group(1), re.M))
     if fields.get("name") != skill.name or not re.fullmatch(r"[a-z0-9-]+", fields.get("name", "")):
         problems.append(f"{skill.name}/SKILL.md: name {fields.get('name')!r} must equal the directory name")
-    desc = fields.get("description", "").strip()
-    if not desc:
+    desc, why = frontmatter_description(m.group(1))
+    if why:
+        problems.append(f"{skill.name}/SKILL.md: description does not parse as one complete YAML string: {why}")
+    elif not desc.strip():
         problems.append(f"{skill.name}/SKILL.md: empty description")
     elif len(desc) > 1024:
         problems.append(f"{skill.name}/SKILL.md: description is {len(desc)} characters (max 1024)")
@@ -134,7 +240,16 @@ def run_self_tests(problems: list[str]) -> list[str]:
 
 
 def main() -> int:
-    problems: list[str] = []
+    if "--self-test" in sys.argv[1:]:
+        failures = self_test()
+        for f in failures:
+            print("FAIL:", f)
+        print(f"description parser: {len(DESCRIPTION_FIXTURES)} fixtures, " + ("PASS" if not failures else f"{len(failures)} FAILED"))
+        return 1 if failures else 0
+    problems: list[str] = [f"validator self-test: {f}" for f in self_test()]
+    run = subprocess.run([sys.executable, "-O", str(Path(__file__).resolve()), "--self-test"], capture_output=True, text=True, timeout=120)
+    if run.returncode != 0:
+        problems.append("validator self-test failed under python -O: " + " | ".join((run.stdout + run.stderr).strip().split("\n")[-5:]))
     skills = sorted(p for p in SKILLS.iterdir() if (p / "SKILL.md").is_file())
     for skill in skills:
         check_frontmatter(skill, problems)

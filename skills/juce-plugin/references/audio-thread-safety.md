@@ -141,6 +141,8 @@ private:
 | `repaint()` from audio thread | Random crashes | Use atomic flag + timer instead |
 | Creating objects in `processBlock` | Periodic glitches (GC/malloc pressure) | Create in `prepareToPlay()` or constructor |
 | `parameterChanged` doing heavy work | Audio glitches when twisting knobs | Flag + defer to `processBlock` |
+| Stock APVTS / `ParameterAttachment` editor attachments under host automation | Audio-thread locks and `malloc` in `MessageQueue::post`, **only with the editor open** | Polled attachments: atomic flag + editor timer ([host-automation-and-editor-sync.md](host-automation-and-editor-sync.md)) |
+| Any parameter listener calling `AsyncUpdater`, `ChangeBroadcaster` or `callAsync` | Same as above | Set an atomic flag; publish from a message-thread timer |
 
 ## Denormal Prevention
 
@@ -204,3 +206,5 @@ The audit finds **risks**; a profile sets **priority**. Fix an item at once when
    ```
 
 4. **Test at small buffer sizes** — 32 or 64 samples. This stresses real-time behavior more than large buffers.
+
+5. **Count allocations on the audio thread, with the editor open and closed, under host automation.** Hook `malloc` itself (on macOS, `malloc_logger`), not only `operator new`: JUCE containers grow with `realloc`. Deliver the automation from the audio callback, as a DAW does; a test host that sets AU parameters on its message thread hides listener problems. Procedure: [host-automation-and-editor-sync.md](host-automation-and-editor-sync.md#regression-tests).

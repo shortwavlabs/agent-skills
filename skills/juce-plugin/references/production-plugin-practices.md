@@ -69,7 +69,9 @@ Useful patterns:
 - Persist loaded model, package, preset, IR, or sample paths in `getStateInformation()`.
 - On restore, load missing files safely and report visible warnings instead of failing the processor.
 
-Do not do message-thread work from parameter callbacks. If parameter changes need preset-dirty tracking or UI notification, set an atomic flag in the listener and publish from a `juce::Timer` or message-thread path.
+Do not do message-thread work from parameter callbacks. If parameter changes need preset-dirty tracking or UI notification, set an atomic flag in the listener and publish from a `juce::Timer` or message-thread path. This includes the editor: JUCE's stock attachments post from the audio thread under host automation ([host-automation-and-editor-sync.md](host-automation-and-editor-sync.md)).
+
+Once a version has shipped, adding a parameter can move existing AU parameters in Logic and GarageBand even when every ID is unchanged; follow [the version-hint rules](parameter-management.md#au-parameter-order-and-version-hints) and check the hosted list.
 
 For user-facing controls that can click or zipper, smooth values with `juce::SmoothedValue` or a DSP-block-local smoother. Current JUCE docs expose `SmoothedValue` helpers for applying smoothly interpolated gain; use the concept for gain and adapt it carefully for filters.
 
@@ -177,6 +179,8 @@ JUCE-specific practices for plugins whose DSP runs an oversampled circuit model 
 Before wider testing:
 
 - Configure and build Release plugin artifacts.
+- Run the audio-thread allocation gate under host automation with the editor **open and closed**, AU automation delivered from the audio callback ([host-automation-and-editor-sync.md](host-automation-and-editor-sync.md#regression-tests)).
+- For a release that adds parameters: compare the hosted AU parameter list with the previous release's, and restore a previous release's state ([parameter-management.md](parameter-management.md#au-parameter-order-and-version-hints)).
 - Build and run Release tests.
 - Run the measurement harness.
 - Validate AU with `auval` on macOS.

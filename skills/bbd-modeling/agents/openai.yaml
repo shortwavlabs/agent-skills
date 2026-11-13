@@ -1,0 +1,4 @@
+interface:
+  display_name: "BBD Modeling"
+  short_description: "Bucket-brigade delay circuits to validated realtime DSP"
+  default_prompt: "Use $bbd-modeling to turn a BBD chorus, flanger or analog-delay circuit into a validated realtime DSP model."
