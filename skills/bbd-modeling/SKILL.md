@@ -41,7 +41,7 @@ Not this skill: digital delay lines that do not model a BBD (use `dsp`), or tape
 4. **Classify every fact:** circuit-derived, datasheet-derived, tolerance or trim, inferred, assumption, or deliberate extension. Never present an assumption as a measurement.
 5. **Do not add structure nothing constrains.** Charge-transfer inefficiency, leakage, feedthrough, noise and phase overlap are usually non-identifiable from datasheets. Record them as not modelled, and plan measurements.
 6. **Classic fidelity and enhanced behaviour are separate contracts.** A regeneration law beyond the circuit's own loop gain is an extension: its own switch, its own references, and bit-identical Classic behaviour when it is off.
-7. **Freeze references by hash and re-run them every phase.** Bit-identity is the default bar for a refactor; "sounds the same" is not evidence.
+7. **Freeze references by hash and re-run them every phase.** When the project's approved DSP contract mandates bit-identity (as Prismatica's does), a refactor must reproduce the frozen output exactly; "sounds the same" is not evidence. An authorized numerical change or optimization may instead use a newly approved, measured error budget and revised golden references, made explicit, justified, validated and documented as a new revision, never silently treated as equivalent ([verification](references/verification-and-golden-references.md#two-identity-tiers)).
 8. **Real time is part of correctness:** allocation-free, lock-free processing, block-size invariance, bounded state, a valid tail contract, and host qualification with the editor open.
 
 ## Workflow
@@ -91,5 +91,5 @@ Stage counts, clock ranges, trimmer positions, regeneration coefficients, onset 
 | Reading levels from a power-up simulation | Compander servos and DC blocks settle over seconds; use quiescent starts for level claims |
 | Treating "self-oscillates" as one number | Report onset per mode and settings, sustained level, recovery time and idle behaviour |
 | Letting an enhanced feedback mode change Classic output | Keep Classic bit-identical with the extension off, and gate it by hash |
-| Declaring a refactor "inaudible" | Bit-identity against frozen references, or a documented new revision |
+| Declaring a refactor "inaudible" | Bit-identity against frozen references where the contract requires it; otherwise an explicitly approved, measured error budget with revised references, documented as a new revision |
 | Qualifying the plug-in only with the editor closed | Run allocation and deadline gates with the editor open and host automation delivered on the audio thread (`juce-plugin`) |

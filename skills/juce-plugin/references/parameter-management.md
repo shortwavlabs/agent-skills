@@ -160,7 +160,7 @@ bypassAttachment (processor.apvts, "bypass",    bypassButton),
 filterTypeAttachment (processor.apvts, "filterType", filterTypeCombo)
 ```
 
-Important: the Attachment must outlive the control it manages. Declare the control before the attachment in your class.
+Important: the control must outlive its attachment. Declare the control before the attachment in your class: members are destroyed in reverse declaration order, so the attachment is destroyed first and never touches a control that no longer exists.
 
 **Real-time caveat.** These stock attachments are parameter listeners. When a host automates a parameter on the audio thread with the editor open, they post a message to the message queue from that thread (a lock, a run-loop wake-up and, on macOS, sometimes `malloc`). For a product that must be real-time safe under automation, use the polled-attachment pattern in [host-automation-and-editor-sync.md](host-automation-and-editor-sync.md#the-remedy-polled-editor-attachments).
 

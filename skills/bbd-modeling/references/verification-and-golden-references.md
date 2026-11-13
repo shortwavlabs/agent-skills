@@ -20,7 +20,20 @@ How to prove a BBD model matches its reference, keep it matching through later w
 | Comparison | Bar | Why |
 |---|---|---|
 | Offline reference (Python, float64) → real-time engine (C++) | **residual-bounded**, per metric, with stated bounds | different arithmetic; sample identity is not expected |
-| Approved real-time build → any later build | **exact float32 equality** (`array_equal`) | a refactor, a JUCE upgrade or a new feature must not change approved audio; "sounds the same" is not evidence |
+| Approved real-time build → any later build, **when the approved DSP contract mandates bit-identity** | **exact float32 equality** (`array_equal`) | a refactor, a JUCE upgrade or a new feature must not change approved audio; "sounds the same" is not evidence |
+| Approved real-time build → a build with an **authorized** numerical change or optimization | **a newly approved, measured error budget** (per metric, on the frozen inputs) and **revised golden references** | some changes (reordered sums, a different integrator, float instead of double) cannot be bit-identical; they are allowed only as explicit revisions |
+
+**Bit-identity is a contract choice, not a law of nature.** Where the project's approved DSP contract requires it, it is the preservation standard: any difference is a failure to investigate, not to explain away. A project may instead authorize a numerical change, for example an optimization that reorders floating-point sums. Then:
+1. **say so explicitly:** a new model revision, with the reason;
+2. **justify it:** what it buys (CPU, portability) against what it costs;
+3. **measure the difference** against the frozen references, and have the owner approve the error budget, per metric, before the result counts;
+4. **validate** with the full gate set, listening where the budget allows audible change;
+5. **re-freeze:** generate revised golden references from the approved build, and keep the old set labelled as superseded;
+6. **document** it in the phase report and the references' manifest.
+
+It is never silently treated as equivalent.
+
+*Case study:* Prismatica's approved contract requires bit-identity for Classic and Extended audio across later builds. Optimizations that would have changed the bits were rejected rather than re-budgeted ([realtime-implementation.md](realtime-implementation.md#cpu-budget)).
 
 *Case study residuals, reference → engine:*
 - static cases reached −150 dB (the float32 floor);
