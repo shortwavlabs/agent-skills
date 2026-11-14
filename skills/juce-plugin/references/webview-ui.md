@@ -155,6 +155,9 @@ private:
 
     juce::WebSliderRelay gainRelay { "gain" };
     Browser browser { makeOptions() };
+    // PROTOTYPE ONLY: stock JUCE web attachments must not be used for a production editor
+    // receiving audio-thread host automation without validating their real-time behaviour.
+    // Production: "Real-time-safe relay attachments" below (#real-time-safe-relay-attachments).
     juce::WebSliderParameterAttachment gainAttachment;
 };
 ```
@@ -207,7 +210,7 @@ With [polled attachments](#real-time-safe-relay-attachments) the slider attachme
 ```cpp
 juce::WebSliderRelay gainRelay { "gain" };
 juce::WebBrowserComponent browser { makeOptions() };
-juce::WebSliderParameterAttachment gainAttachment;
+juce::WebSliderParameterAttachment gainAttachment;   // PROTOTYPE ONLY: see #real-time-safe-relay-attachments
 WebGestureGuard gainGestureGuard;
 ```
 
@@ -355,9 +358,9 @@ It depends on a JUCE implementation detail (the child component that hosts the n
 An in-process editor test creates no window, so it cannot see window, compositor or WebKit helper-process behaviour. Qualify a WebView editor in a host that opens real windows as well.
 
 - **Record the session state with every row.** Screen lock and display sleep can be read without privileges (`CGSessionCopyCurrentDictionary`, `CGDisplayIsAsleep`). Record the page's own `document.hidden` too.
-  - With the display asleep or the screen locked, WKWebView treats the page as hidden: `requestAnimationFrame` stops and no frame is presented.
+  - With the display asleep **and** the screen locked, WKWebView treated the page as hidden: `document.hidden` was true, `requestAnimationFrame` stopped and no frame was presented. Every hidden run in testing had both conditions; display sleep alone and lock alone were not isolated.
   - Such runs still qualify audio-thread allocation, because the audio path does not depend on visibility. They do **not** qualify rendering, input or presentation.
-  - A window covered by another window, or moved off screen, was **not** reported hidden in testing. Only display sleep and screen lock were.
+  - A window covered by another window, or moved off screen, was **not** reported hidden in testing. Only the combined display-asleep-and-locked state was.
 - **Presentation.** Neither a frame callback nor a GPU fence proves that pixels were displayed: in WKWebView a fence placed after the first render signalled at the next frame boundary, and `gl.finish()` did not time GPU work. Bound the first visible frame from outside the page instead:
   - capture the plug-in window repeatedly from launch (`screencapture -l <window id>`, unlocked session);
   - find the first capture showing the content;
@@ -367,16 +370,16 @@ An in-process editor test creates no window, so it cannot see window, compositor
   - Separate the one-time framework load (WebKit and JavaScriptCore in the host, ~20 MB in testing) from per-cycle growth.
   - Test both a rapid and a normal cadence, each with more than ~90 openings (150 is enough).
 
-**WebKit behaviour while the display is asleep and locked.**
+**WebKit behaviour while the display is asleep and the screen locked.** Every observation below comes from runs in which both conditions held at the start and end (macOS 26.6, WebKit 21624.5, one machine). Which of the two drives the behaviour was not isolated.
 
 **Visible sessions.** 150 rapid open / close cycles (window open 120 ms each) left:
 - at most 4 helpers;
 - no WebContent process after the drain;
 - a flat host-footprint slope.
 
-**Display asleep and screen locked.** On macOS 26.6 (WebKit 21624.5), for the first ~90 views opened in a process, WebKit retires each closed view's WebContent process normally (2–3 helpers). After that, it keeps every closed view's WebContent process alive, about 28 MB each.
+**Display asleep and screen locked (both).** On macOS 26.6 (WebKit 21624.5), for the first ~90 views opened in a process, WebKit retires each closed view's WebContent process normally (2–3 helpers). After that, it keeps every closed view's WebContent process alive, about 28 MB each.
 - **No ceiling observed:** 60 kept after 150 openings, 210 (5.9 GB) after 300.
-- **Released only when the process exits.**
+- **Released when the process exits.**
 - **The cadence does not matter:** windows open for 120 ms or for 3 s reach the same onset.
 - **Other macOS versions:** the onset count may differ. Measure it rather than assuming ~90.
 
@@ -385,14 +388,23 @@ An in-process editor test creates no window, so it cannot see window, compositor
 - a bare `WebBrowserComponent` on `about:blank`;
 - every intermediate configuration.
 
-**Who hits it.** In the conditions tested, a user cannot, since nobody can open an editor on a locked screen. Automated tooling can: scripted hosts, validators or batch jobs left running on a locked Mac, which would grow without limit.
-
-**Untested:** a host left open across a lock and an unlock, which is the ordinary DAW case. Do openings made while visible count toward the onset? Does the accumulation continue after the unlock?
+**Exposure.**
+- **Demonstrated:** automated editor creation while the session was locked and the display asleep (scripted host, plain Cocoa control). Tooling left running on a locked Mac accumulates with no ceiling observed (210 processes, 5.9 GB, after 300 openings).
+- **Not reproduced:** normal interactive editor use in a visible session.
+- **Not qualified:** a DAW left running through a lock and unlock, which is ordinary. Editor openings before, during or after that transition have not been fully tested: whether visible openings count toward the onset, whether an editor left open across the lock behaves differently, and whether the accumulation continues or is reclaimed after the unlock.
+- So ordinary-user exposure cannot be ruled out categorically, and it is not shown either. Treat it as an open release risk until the transition is tested.
 
 A short normal-cadence run (30 cycles) stays below the onset and proves nothing. Lifecycle runs need more than ~90 openings.
 
 **What to do.**
-- Do not try to fix it in the plug-in. In particular, never terminate helper processes.
+- **No plug-in-level remediation has been validated for this WebKit behaviour.** Avoid speculative lifecycle workarounds unless a reproducible, plug-in-specific failure is established and the proposed fix passes controlled regression tests (the bare-WebView and plain-`WKWebView` controls, visible and hidden, past the onset).
+- **Never terminate WebKit helper processes** as a production cleanup strategy.
+- **A persistent web view per plug-in instance** (kept alive while the editor is closed, so no new view is created) is not recommended at present:
+  - it has not been validated against this behaviour;
+  - it moves the web view's lifetime from the editor to the processor, changing editor lifecycle ownership;
+  - it may retain substantial helper memory while the editor is closed (a rendered editor measured ~600 MB with a heavy GLB);
+  - it could introduce new host compatibility problems (reparenting across editor windows, hosts that destroy editors in unusual orders).
+- **Keep the confirmed teardown fix separate.** The JUCE 9.0.3 native-integration retention [above](#wkwebview-teardown-on-macos-juce-903) is small, in-process and fixed; removing the fix did not change this helper-process behaviour, and the fix does not address it.
 - Record the session state, so that a locked run's lifecycle numbers are not read as a plug-in defect.
 - Qualify reopening in a visible session, against a bare-WebView control under the same conditions.
 
