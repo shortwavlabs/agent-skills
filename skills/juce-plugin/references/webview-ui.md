@@ -379,7 +379,7 @@ An in-process editor test creates no window, so it cannot see window, compositor
 
 **Display asleep and screen locked (both).** On macOS 26.6 (WebKit 21624.5), for the first ~90 views opened in a process, WebKit retires each closed view's WebContent process normally (2–3 helpers). After that, it keeps every closed view's WebContent process alive, about 28 MB each.
 - **No ceiling observed:** 60 kept after 150 openings, 210 (5.9 GB) after 300.
-- **Released when the display wakes or the process exits**, whichever comes first. In one owner-driven run, 30 processes kept during a six-minute lock were released within about a second of the display waking, before the unlock.
+- **Released at process exit.** Observed once besides: in an owner-driven lock and unlock with the host kept running, the 30 processes kept during a six-minute lock were released about a second after the display woke, with the screen still locked. The trigger (the display waking, the owner's input, the lock screen appearing) was not isolated.
 - **The cadence does not matter:** windows open for 120 ms or for 3 s reach the same onset.
 - **Other macOS versions:** the onset count may differ. Measure it rather than assuming ~90.
 
@@ -389,12 +389,12 @@ An in-process editor test creates no window, so it cannot see window, compositor
 - every intermediate configuration.
 
 **Exposure.**
-- **Demonstrated:** automated editor creation while the session was locked and the display asleep (scripted host, plain Cocoa control). Tooling left running on a locked Mac accumulates, with no ceiling observed, until the display wakes (210 processes, 5.9 GB, after 300 openings).
+- **Demonstrated:** automated editor creation while the session was locked and the display asleep (scripted host, plain Cocoa control). Tooling left running on a locked Mac accumulates with no ceiling observed (210 processes, 5.9 GB, after 300 openings) until the process exits, or, as observed once, until the display wakes.
 - **Not reproduced:** normal interactive editor use in a visible session.
 - **Tested once** (one machine, a test host rather than a DAW, one valid run of each kind): a host kept running through the owner's own lock and unlock.
   - 100 visible openings before the lock and 150 after the unlock kept nothing.
   - Visible openings did not count toward the onset: a fresh count started at the lock, and the onset came after ~92 locked openings.
-  - The processes kept while locked were released when the display woke.
+  - The 30 processes kept while locked were released about a second after the display woke, still locked (observed once; the trigger was not isolated).
 - **Not tested:** display sleep without the lock and the lock without display sleep, separately; many lock cycles in one host session; an editor held open across the lock; other macOS versions and hosts.
 - So, in the conditions tested, ordinary use across a lock and unlock did not accumulate. Beyond them, exposure is not ruled out categorically; re-measure on each macOS version you support.
 
