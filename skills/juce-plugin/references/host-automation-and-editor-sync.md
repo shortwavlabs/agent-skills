@@ -160,7 +160,7 @@ Report a plug-in as "no allocation in the editor path", not "real-time safe", un
 ## Custom and WebView Interfaces
 
 The rule applies to every interface, not only stock components:
-- A custom or 3D (WebView / Three.js) editor must not attach parameter listeners that post to the message thread. Set a flag; publish from the editor's timer or frame loop. WebView relays have their own listener paths: check what they do off the message thread.
+- A custom or 3D (WebView / Three.js) editor must not attach parameter listeners that post to the message thread. Set a flag; publish from the editor's timer or frame loop. JUCE 9's web attachments (`WebSliderParameterAttachment` and the toggle and combo-box ones) wrap `juce::ParameterAttachment` and post from the changing thread: use the [polled web attachments](webview-ui.md#real-time-safe-relay-attachments) instead.
 - Keep the message-thread synchronous path, so state restores and program changes are visible immediately.
 - Re-run the editor-open allocation gate whenever the interface is replaced.
 
