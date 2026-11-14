@@ -15,6 +15,8 @@ All concrete API examples below target JUCE 9.0.1, not an unversioned promise. I
 | Linux | Backend uses WebKitGTK 4.1 (4.0 fallback), loaded with `dlopen` and run in a helper process; X11/XWayland only (see [Linux (WebKitGTK)](#linux-webkitgtk)) | Required development/runtime packages for the pinned release/distribution |
 | Frontend | `@juce-framework/webview`; bundled source under `modules/juce_gui_extra/native/typescript/webview-interop` | Matching frontend/backend protocol; older releases may use `native/javascript` |
 | Slider teardown | WebSliderParameterAttachment destructor removes its listener without ending an active gesture | Destructor and relay-listener behavior before reusing the guard below |
+| Parameter attachments | `WebSliderParameterAttachment`, `WebToggleButtonParameterAttachment` and `WebComboBoxParameterAttachment` wrap `juce::ParameterAttachment`: off the message thread its listener takes a lock and posts to the message queue (verified in 9.0.3) | Whether the attachment's parameter listener still posts from the changing thread; until it does not, use [polled attachments](#real-time-safe-relay-attachments) in products |
+| macOS teardown | 9.0.3 `WKWebViewImpl` does not remove the `__JUCE__` script message handler or the injected user script when it is destroyed | Whether the destructor removes them; until it does, apply the [teardown note](#wkwebview-teardown-on-macos-juce-903) |
 
 These are source-verified compatibility facts, not claims that every platform was runtime-tested. JUCE 8 introduced modern integration; copy signatures from the pinned release, not historical tutorials.
 
@@ -92,7 +94,7 @@ Embed the `.woff2` with the other assets, serve it as `font/woff2`, keep the lic
 
 Relays take an identifier, not a browser argument. Declare them before the browser that consumes their options; attachments follow the browser and are destroyed before it. APVTS belongs to the longer-lived processor. One host parameter has one relay/attachment in an editor, even if multiple visual objects represent it.
 
-Minimal embedded editor, assuming processor-owned `gain` and generated `BinaryData.h` containing `index.html` and `bundle.js`:
+Minimal embedded editor, assuming processor-owned `gain` and generated `BinaryData.h` containing `index.html` and `bundle.js`. It uses JUCE's own `WebSliderParameterAttachment`, which is fine for a prototype. **A product that a host automates on its audio thread must replace it with a [polled attachment](#real-time-safe-relay-attachments)**: the relays, browser and member order stay as below.
 
 ```cpp
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -153,6 +155,9 @@ private:
 
     juce::WebSliderRelay gainRelay { "gain" };
     Browser browser { makeOptions() };
+    // PROTOTYPE ONLY: stock JUCE web attachments must not be used for a production editor
+    // receiving audio-thread host automation without validating their real-time behaviour.
+    // Production: "Real-time-safe relay attachments" below (#real-time-safe-relay-attachments).
     juce::WebSliderParameterAttachment gainAttachment;
 };
 ```
@@ -161,16 +166,51 @@ Validate IDs before dereferencing parameters registered from metadata. Add route
 
 Other controls use the same order: declare `juce::WebToggleButtonRelay bypassRelay { "bypass" };` or `juce::WebComboBoxRelay filterRelay { "filterType" };`, register with `withOptionsFrom()`, then construct `WebToggleButtonParameterAttachment` or `WebComboBoxParameterAttachment` from the matching parameter and relay. A choice can also use WebSliderRelay for a shared normalized 3D binding, with explicit quantization; never reduce three states to a boolean.
 
+## Real-time-safe relay attachments
+
+JUCE 9's web attachments are parameter listeners built on `juce::ParameterAttachment`. Hosts deliver automation with `setValueNotifyingHost()` on their audio thread (the VST3 wrapper inside `process()`; AU too when automation is applied in the render callback). The listener then runs on that thread:
+- it checks the message thread (a mutex);
+- it posts an `AsyncUpdater` to the message queue, which allocates whenever the queue's array has no spare capacity.
+
+That is the editor-open audio-thread allocation the [host automation reference](host-automation-and-editor-sync.md) describes for the stock APVTS attachments, and the web attachments repeat it.
+
+**Measured** (a JUCE 9.0.3 pedal with 12 relays, 12 parameters changed 200 times each from a non-message thread with the editor open):
+- JUCE's web attachments: 2 mallocs on the automation thread;
+- polled attachments: 0.
+
+The same polled editor then passed a live allocation gate with AU automation in the IO callback, 28 / 28 rows.
+
+**Pattern.** Keep JUCE's relays, browser, member order and page protocol. Replace each attachment with one built on the polled link of the host automation reference:
+- **Host → page.** The parameter listener sets one atomic flag when it runs off the message thread. The editor's message-thread timer (60 Hz) calls `poll()`, which pushes the latest value to the relay; any number of changes coalesce. On the message thread (state restore, programs, the page's own edits) it updates the relay at once. The relay is touched only on the message thread.
+- **Page → host.** The same calls as the stock attachments: `beginChangeGesture` / `setValueNotifyingHost` / `endChangeGesture`.
+  - A slider value is one `setValueNotifyingHost` within the page's drag gesture.
+  - A toggle or combo-box change is one complete gesture.
+  - Reject non-finite values and put the page back on the parameter's value.
+  - Clamp sliders to the range. Snap combo values to an index and show the index taken.
+- **Initial state.** Reproduce what the stock attachment's `sendInitialUpdate()` emits:
+  - sliders: a `propertiesChanged` event with `start`, `end`, `skew`, `interval`, `numSteps`, `label`, `name` and `parameterIndex`;
+  - combo boxes: `choices`;
+  - then the value.
+  Respond to the relay's `initialUpdateRequested`, to a page sync function and to `visibilityChanged()`: events emitted while the browser is hidden are dropped.
+- **Teardown.** The slider attachment remembers an open drag and ends that host gesture in its destructor. This replaces the separate gesture guard below.
+
+**Concrete implementation:** Prismatica's `PolledWebAttachments.h` (Shortwav Labs; slider, toggle and combo box on the K3-J `ParameterLink`). Its tests drive the editor at the page boundary, with no page loaded:
+- deliver relay events as the page sends them;
+- call native functions;
+- read what each relay last showed.
+
+**Make the discrimination visible.** Keep a build option that maps the editor back to JUCE's web attachments, and confirm the allocation check fails with it. A check that passes either way tests nothing.
+
 ## Gesture cleanup on editor destruction
 
 This applies to any WebSliderRelay-backed web control, including flat sliders and discrete controls that use slider gestures. JS pointer/keyboard cancellation remains the primary cleanup path, but editor destruction can prevent JS unload from completing. The compatibility baseline requires an explicit native fallback.
 
-Use the small `WebGestureGuard` in [the runnable gesture check](../scripts/webview_gesture_check.cpp). It observes relay starts/ends without sending a second begin/end during normal interaction; destruction ends only an outstanding gesture. Declare members in this order:
+With [polled attachments](#real-time-safe-relay-attachments) the slider attachment closes an open gesture itself. With JUCE's attachments (prototypes), use the small `WebGestureGuard` in [the runnable gesture check](../scripts/webview_gesture_check.cpp). It observes relay starts/ends without sending a second begin/end during normal interaction; destruction ends only an outstanding gesture. Declare members in this order:
 
 ```cpp
 juce::WebSliderRelay gainRelay { "gain" };
 juce::WebBrowserComponent browser { makeOptions() };
-juce::WebSliderParameterAttachment gainAttachment;
+juce::WebSliderParameterAttachment gainAttachment;   // PROTOTYPE ONLY: see #real-time-safe-relay-attachments
 WebGestureGuard gainGestureGuard;
 ```
 
@@ -290,6 +330,87 @@ For a **static** editor, one with no intentionally continuous visual behaviour, 
 Intentional activity is not a failure: a meter while audio flows, a tuner, a scope or spectrum, an animated visualization. Each should have an explicit rate, a measured cost, throttling when not visible and no unnecessary 3D redraws. "Zero frames at all times" is not a universal gate.
 
 Whether this activity shows in a host's own performance meter depends on the host; attribute it by thread and process as described in [performance-investigation.md](performance-investigation.md).
+
+## WKWebView teardown on macOS (JUCE 9.0.3)
+
+**What happens.**
+- With native integration enabled, JUCE 9.0.3 registers a `__JUCE__` script message handler on the WKWebView's user content controller and injects one user script.
+- `~WKWebViewImpl` clears the navigation and UI delegates, but removes neither.
+- WebKit's content controller retains both, and each closed editor left about 14 kB in the plug-in's process.
+
+**Controls** (in-process, 400 create / destroy cycles each, each in an autorelease pool and followed by a run-loop pass):
+- bare `WebBrowserComponent` on `about:blank`: flat;
+- resource provider only: flat;
+- native integration: +2.5 MB;
+- native integration with the handler and script removed before destruction: flat.
+
+**Workaround.** In the editor's destructor, before the browser member is destroyed:
+- find the browser's child `NSViewComponent`;
+- take its `WKWebView`;
+- call `removeScriptMessageHandlerForName:@"__JUCE__"` and `removeAllUserScripts` on `configuration.userContentController`.
+
+It depends on a JUCE implementation detail (the child component that hosts the native view). Re-run the controls above on every JUCE upgrade, and drop the workaround when JUCE's destructor removes them itself.
+
+**Do not credit this fix with other lifecycle effects.** It explains a small, steady native-integration retention, nothing more (next section).
+
+## Windowed lifecycle and visible-window testing
+
+An in-process editor test creates no window, so it cannot see window, compositor or WebKit helper-process behaviour. Qualify a WebView editor in a host that opens real windows as well.
+
+- **Record the session state with every row.** Screen lock and display sleep can be read without privileges (`CGSessionCopyCurrentDictionary`, `CGDisplayIsAsleep`). Record the page's own `document.hidden` too.
+  - With the display asleep **and** the screen locked, WKWebView treated the page as hidden: `document.hidden` was true, `requestAnimationFrame` stopped and no frame was presented. Every hidden run in testing had both conditions; display sleep alone and lock alone were not isolated.
+  - Such runs still qualify audio-thread allocation, because the audio path does not depend on visibility. They do **not** qualify rendering, input or presentation.
+  - A window covered by another window, or moved off screen, was **not** reported hidden in testing. Only the combined display-asleep-and-locked state was.
+- **Presentation.** Neither a frame callback nor a GPU fence proves that pixels were displayed: in WKWebView a fence placed after the first render signalled at the next frame boundary, and `gl.finish()` did not time GPU work. Bound the first visible frame from outside the page instead:
+  - capture the plug-in window repeatedly from launch (`screencapture -l <window id>`, unlocked session);
+  - find the first capture showing the content;
+  - set its time against the page's marks through `performance.timeOrigin`.
+- **Frame cost.** Report frame pacing under continuous rendering (intervals, stalls), the editor's own render count while idle (expect 0), and the WebKit helper processes' CPU. Do not report forced-completion timings as GPU time.
+- **Open / close cycles.** Count the WebKit helper processes (WebContent, GPU, Networking, by process id) through the cycles, after a drain with the host still running, and after the host exits. Compare the host footprint's per-cycle slope with a native-editor baseline under identical conditions.
+  - Separate the one-time framework load (WebKit and JavaScriptCore in the host, ~20 MB in testing) from per-cycle growth.
+  - Test both a rapid and a normal cadence, each with more than ~90 openings (150 is enough).
+
+**WebKit behaviour while the display is asleep and the screen locked.** Every observation below comes from runs in which both conditions held at the start and end (macOS 26.6, WebKit 21624.5, one machine). Which of the two drives the behaviour was not isolated.
+
+**Visible sessions.** 150 rapid open / close cycles (window open 120 ms each) left:
+- at most 4 helpers;
+- no WebContent process after the drain;
+- a flat host-footprint slope.
+
+**Display asleep and screen locked (both).** On macOS 26.6 (WebKit 21624.5), for the first ~90 views opened in a process, WebKit retires each closed view's WebContent process normally (2–3 helpers). After that, it keeps every closed view's WebContent process alive, about 28 MB each.
+- **No ceiling observed:** 60 kept after 150 openings, 210 (5.9 GB) after 300.
+- **Released at process exit.** Observed once besides: in an owner-driven lock and unlock with the host kept running, the 30 processes kept during a six-minute lock were released about a second after the display woke, with the screen still locked. The trigger (the display waking, the owner's input, the lock screen appearing) was not isolated.
+- **The cadence does not matter:** windows open for 120 ms or for 3 s reach the same onset.
+- **Other macOS versions:** the onset count may differ. Measure it rather than assuming ~90.
+
+**It is WebKit's, not JUCE's or the plug-in's.** All of these reproduce it identically:
+- a plain `WKWebView` in a plain `NSWindow` (no JUCE);
+- a bare `WebBrowserComponent` on `about:blank`;
+- every intermediate configuration.
+
+**Exposure.**
+- **Demonstrated:** automated editor creation while the session was locked and the display asleep (scripted host, plain Cocoa control). Tooling left running on a locked Mac accumulates with no ceiling observed (210 processes, 5.9 GB, after 300 openings) until the process exits, or, as observed once, until the display wakes.
+- **Not reproduced:** normal interactive editor use in a visible session.
+- **Tested once** (one machine, a test host rather than a DAW, one valid run of each kind): a host kept running through the owner's own lock and unlock.
+  - 100 visible openings before the lock and 150 after the unlock kept nothing.
+  - Visible openings did not count toward the onset: a fresh count started at the lock, and the onset came after ~92 locked openings.
+  - The 30 processes kept while locked were released about a second after the display woke, still locked (observed once; the trigger was not isolated).
+- **Not tested:** display sleep without the lock and the lock without display sleep, separately; many lock cycles in one host session; an editor held open across the lock; other macOS versions and hosts.
+- So, in the conditions tested, ordinary use across a lock and unlock did not accumulate. Beyond them, exposure is not ruled out categorically; re-measure on each macOS version you support.
+
+A short normal-cadence run (30 cycles) stays below the onset and proves nothing. Lifecycle runs need more than ~90 openings.
+
+**What to do.**
+- **No plug-in-level remediation has been validated for this WebKit behaviour.** Avoid speculative lifecycle workarounds unless a reproducible, plug-in-specific failure is established and the proposed fix passes controlled regression tests (the bare-WebView and plain-`WKWebView` controls, visible and hidden, past the onset).
+- **Never terminate WebKit helper processes** as a production cleanup strategy.
+- **A persistent web view per plug-in instance** (kept alive while the editor is closed, so no new view is created) is not recommended at present:
+  - it has not been validated against this behaviour;
+  - it moves the web view's lifetime from the editor to the processor, changing editor lifecycle ownership;
+  - it may retain substantial helper memory while the editor is closed (a rendered editor measured ~600 MB with a heavy GLB);
+  - it could introduce new host compatibility problems (reparenting across editor windows, hosts that destroy editors in unusual orders).
+- **Keep the confirmed teardown fix separate.** The JUCE 9.0.3 native-integration retention [above](#wkwebview-teardown-on-macos-juce-903) is small, in-process and fixed; removing the fix did not change this helper-process behaviour, and the fix does not address it.
+- Record the session state, so that a locked run's lifecycle numbers are not read as a plug-in defect.
+- Qualify reopening in a visible session, against a bare-WebView control under the same conditions.
 
 ## Sources and verification
 

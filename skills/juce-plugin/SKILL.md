@@ -318,7 +318,7 @@ The 24 JUCE modules are: `juce_analytics`, `juce_animation`, `juce_audio_basics`
 
 ## WebView UIs (JUCE 9)
 
-For web-based editors, enable the browser module and use the current [WebView integration reference](references/webview-ui.md) for CMake/WebView2, relay lifetime, frontend package compatibility, offline resources and gestures. The native editor example's `JUCE_WEB_BROWSER=0` must become `1`. Verify API signatures against the installed JUCE version.
+For web-based editors, enable the browser module and use the current [WebView integration reference](references/webview-ui.md) for CMake/WebView2, relay lifetime, frontend package compatibility, offline resources and gestures. In a product, use its [polled relay attachments](references/webview-ui.md#real-time-safe-relay-attachments) rather than JUCE's web attachments, which post from the audio thread when a host automates there; on macOS see its [WKWebView teardown](references/webview-ui.md#wkwebview-teardown-on-macos-juce-903) and [windowed lifecycle testing](references/webview-ui.md#windowed-lifecycle-and-visible-window-testing) notes. The native editor example's `JUCE_WEB_BROWSER=0` must become `1`. Verify API signatures against the installed JUCE version.
 
 For interactive Blender-authored amps, pedals or rack gear, read [Three.js/WebView UI](references/threejs-webview-ui.md). It covers the staged Blender → semantic GLB → mock Three.js → JUCE WebView → APVTS workflow, absolute and pull/rotate controls, switches, input jacks, coupled visible state, plugin-only utility chrome, render-on-demand and host acceptance. Keep APVTS authoritative, construct relays before the browser and attachments after it, and keep all WebView work off the audio thread.
 
