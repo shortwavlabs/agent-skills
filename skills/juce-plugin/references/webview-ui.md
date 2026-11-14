@@ -381,7 +381,7 @@ An in-process editor test creates no window, so it cannot see window, compositor
 - a bare `WebBrowserComponent` on `about:blank`;
 - every intermediate configuration.
 
-**When it does not happen:** a normal cadence (windows open for seconds) does not trigger it, even while locked.
+**Cadence.** A normal cadence (windows open for seconds) stayed clean for 30 cycles while locked. That is below the onset, so whether it avoids the accumulation over more cycles is untested.
 
 **What to do.**
 - Do not try to fix it in the plug-in. In particular, never terminate helper processes.
