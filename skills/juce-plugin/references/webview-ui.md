@@ -374,17 +374,20 @@ An in-process editor test creates no window, so it cannot see window, compositor
 - no WebContent process after the drain;
 - a flat host-footprint slope.
 
-**Display asleep and screen locked.** For the first ~90 views opened in a process, WebKit retires each closed view's WebContent process normally (2–3 helpers). After that, it keeps every closed view's WebContent process alive, about 28 MB each.
+**Display asleep and screen locked.** On macOS 26.6 (WebKit 21624.5), for the first ~90 views opened in a process, WebKit retires each closed view's WebContent process normally (2–3 helpers). After that, it keeps every closed view's WebContent process alive, about 28 MB each.
 - **No ceiling observed:** 60 kept after 150 openings, 210 (5.9 GB) after 300.
 - **Released only when the process exits.**
 - **The cadence does not matter:** windows open for 120 ms or for 3 s reach the same onset.
+- **Other macOS versions:** the onset count may differ. Measure it rather than assuming ~90.
 
 **It is WebKit's, not JUCE's or the plug-in's.** All of these reproduce it identically:
 - a plain `WKWebView` in a plain `NSWindow` (no JUCE);
 - a bare `WebBrowserComponent` on `about:blank`;
 - every intermediate configuration.
 
-**Who hits it.** A user cannot open an editor on a locked screen. Automated tooling can: scripted hosts, validators or batch jobs left running on a locked Mac, which would grow without limit.
+**Who hits it.** In the conditions tested, a user cannot, since nobody can open an editor on a locked screen. Automated tooling can: scripted hosts, validators or batch jobs left running on a locked Mac, which would grow without limit.
+
+**Untested:** a host left open across a lock and an unlock, which is the ordinary DAW case. Do openings made while visible count toward the onset? Does the accumulation continue after the unlock?
 
 A short normal-cadence run (30 cycles) stays below the onset and proves nothing. Lifecycle runs need more than ~90 openings.
 
