@@ -365,7 +365,7 @@ An in-process editor test creates no window, so it cannot see window, compositor
 - **Frame cost.** Report frame pacing under continuous rendering (intervals, stalls), the editor's own render count while idle (expect 0), and the WebKit helper processes' CPU. Do not report forced-completion timings as GPU time.
 - **Open / close cycles.** Count the WebKit helper processes (WebContent, GPU, Networking, by process id) through the cycles, after a drain with the host still running, and after the host exits. Compare the host footprint's per-cycle slope with a native-editor baseline under identical conditions.
   - Separate the one-time framework load (WebKit and JavaScriptCore in the host, ~20 MB in testing) from per-cycle growth.
-  - Test both a rapid and a normal cadence.
+  - Test both a rapid and a normal cadence, each with more than ~90 openings (150 is enough).
 
 **WebKit behaviour while the display is asleep and locked.**
 
@@ -374,14 +374,19 @@ An in-process editor test creates no window, so it cannot see window, compositor
 - no WebContent process after the drain;
 - a flat host-footprint slope.
 
-**Display asleep and screen locked.** WebKit keeps 2–3 helpers for ~100 cycles. Then it stops retiring the WebContent processes of closed views, about one per cycle, up to **60 WebContent processes (~1.7 GB)**. They stay alive while the process runs and are released only when it exits.
+**Display asleep and screen locked.** For the first ~90 views opened in a process, WebKit retires each closed view's WebContent process normally (2–3 helpers). After that, it keeps every closed view's WebContent process alive, about 28 MB each.
+- **No ceiling observed:** 60 kept after 150 openings, 210 (5.9 GB) after 300.
+- **Released only when the process exits.**
+- **The cadence does not matter:** windows open for 120 ms or for 3 s reach the same onset.
 
 **It is WebKit's, not JUCE's or the plug-in's.** All of these reproduce it identically:
 - a plain `WKWebView` in a plain `NSWindow` (no JUCE);
 - a bare `WebBrowserComponent` on `about:blank`;
 - every intermediate configuration.
 
-**Cadence.** A normal cadence (windows open for seconds) stayed clean for 30 cycles while locked. That is below the onset, so whether it avoids the accumulation over more cycles is untested.
+**Who hits it.** A user cannot open an editor on a locked screen. Automated tooling can: scripted hosts, validators or batch jobs left running on a locked Mac, which would grow without limit.
+
+A short normal-cadence run (30 cycles) stays below the onset and proves nothing. Lifecycle runs need more than ~90 openings.
 
 **What to do.**
 - Do not try to fix it in the plug-in. In particular, never terminate helper processes.
