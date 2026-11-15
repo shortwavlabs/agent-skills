@@ -51,7 +51,7 @@ Two accepted changes that are easy to misclassify:
 - **Cached shadow maps** are pixel-identical while their stated preconditions hold. Verify that the shadow result matches the uncached one and that a moving caster invalidates the cache.
 - **Coalesced host-driven redraws** are visual-equivalent and temporally coalesced, not pixel-identical as a motion sequence: fewer intermediate frames are drawn. Verify that every state update is applied and the latest value wins; that the motion is acceptably smooth and no transition the product needs shown is skipped; that a trailing frame is drawn and the final pose matches the authoritative state; and that the scheduler returns to idle.
 
-Record the class of each accepted change ([equivalence classes](../../juce-plugin/references/performance-investigation.md#equivalence-classes)).
+Record the class of each accepted change ([equivalence classes](../../juce-plugin/references/performance-investigation.md#equivalence-classes)). A worked set of rejected candidates (texture resolution, shadow maps, transmission resolution, geometry reduction that kept positions but broke shading normals, a timing harness artefact) is recorded in [rejected approaches](../../juce-plugin/references/webview-gpu-memory-and-context-recovery.md#rejected-approaches-and-attribution-lessons).
 
 ## State-space integrity tests
 

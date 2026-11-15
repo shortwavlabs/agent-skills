@@ -122,6 +122,7 @@ skills/juce-plugin/
     ├── ui-patterns.md          Editor patterns: layout, custom widgets, LookAndFeel, meters, FFT spectrum analyser
     ├── webview-ui.md           JUCE 9 WebView2, offline resources, relays, frontend integration
     ├── threejs-webview-ui.md   Interactive guitar-gear GLBs, physical controls, APVTS, idle rendering
+    ├── webview-gpu-memory-and-context-recovery.md  WebKit footprint measurement, releasing upload-only CPU copies, guarded-reload context recovery
     ├── audio-thread-safety.md  Real-time safety: processBlock rules, lock-free patterns, debugging
     ├── host-automation-and-editor-sync.md  Host automation on the audio thread, stock-attachment hazard, polled attachments, allocation gate
     ├── cmake-reference.md      Full CMake API: juce_add_plugin, SDK paths, CI/CD, platform specifics
