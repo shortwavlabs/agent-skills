@@ -19,6 +19,7 @@ and action releases are vendor facts checked 2026-10: confirm them on the vendor
 - [Windows: GitHub Access Without A Password](#windows-github-access-without-a-password)
 - [Windows: Release Workflow](#windows-release-workflow)
 - [GitHub Secrets On A Free Plan](#github-secrets-on-a-free-plan)
+- [Second Product, Rehearsal And Install Checks](#second-product-rehearsal-and-install-checks) (implemented, not yet qualified)
 - [Linux](#linux)
 - [Common Mistakes](#common-mistakes)
 - [Sources](#sources)
@@ -286,6 +287,117 @@ restrictions or protection rules (those need Pro, Team or Enterprise). Therefore
 - On a paid plan, move the secrets to a protected environment (main only, reviewers) and delete the repository
   copies; for Windows OIDC, change the federated credential's entity type to Environment.
 
+## Second Product, Rehearsal And Install Checks
+
+> **Status: implemented, not yet qualified (2026-11).** These procedures were written for a second product that
+> reuses the first product's signing identities (the process above). No signed run has happened yet: the second
+> repository's secrets and federated credential were not configured, and its release workflows were not yet on
+> the default branch. Steps marked *rehearsed* ran without credentials. Everything else is unexecuted procedure,
+> the Windows packaging and install steps most of all. Requalify each step in a real signed run before calling
+> it proven.
+
+**Reusing the identities.**
+- **macOS.** The same Developer ID Application and Installer `.p12` files, and the same Team `.p8`, sign every
+  product. Each repository needs its own copies of the secrets.
+  - Send each value straight from its file to GitHub, so it never reaches the clipboard or the screen:
+    `base64 -i <file> | tr -d '\n' | gh secret set <NAME> --repo <owner>/<repo>`.
+  - `gh secret set <NAME> --repo <owner>/<repo>` without input prompts for a password with hidden input.
+- **Windows.** Add one federated credential for the new repository on the existing app registration
+  ([item 5 above](#windows-github-access-without-a-password)), using the new repository's numeric ID in an
+  immutable subject. Set the three `AZURE_*` secrets in it. The account, profile and signer role are shared.
+- **Product identifiers are not shared.** Each product needs its own bundle IDs, AU subtype, package identifiers,
+  installer title, artifact names and README. After copying another product's workflows and packaging, grep
+  them for that product's name and codes.
+
+**Check a `.p12` password the way CI imports it.** The `openssl` check in
+[macOS: Credentials](#macos-credentials) reads the file. This one imports the file into a throwaway keychain, as
+the release job does, and lists the identities:
+
+```bash
+check_p12() {
+  local kc; kc="$(mktemp -d)/p12-check.keychain-db"
+  security create-keychain -p check "$kc" >/dev/null
+  printf 'Password for %s: ' "$1"; IFS= read -rs P12_PASS; echo
+  if security import "$1" -k "$kc" -f pkcs12 -P "$P12_PASS" >/dev/null; then
+    security find-identity -v "$kc"
+  else
+    echo "IMPORT FAILED: wrong password or damaged file"
+  fi
+  unset P12_PASS
+  security delete-keychain "$kc"
+}
+```
+
+- **Expected:** `1 valid identities found` for each Developer ID `.p12`.
+- **`0 valid identities found`:** the file holds no private key, or the certificate is not trusted.
+- **Wrong password:** `security: SecKeychainItemImport: The user name or passphrase you entered is not
+  correct.` *Rehearsed* with a throwaway self-signed `.p12`, never with real credentials.
+
+**Rehearse before the credentials exist.**
+- **Lint the workflows.** Run actionlint from its container image, so nothing is installed:
+  `docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:<version> -color`. The image bundles shellcheck, so
+  every `run:` script is checked too. Declare runner labels newer than the linter in `.github/actionlint.yaml`.
+  *Rehearsed* (actionlint 1.7.7):
+
+  ```yaml
+  self-hosted-runner:
+    labels: [macos-26]
+  ```
+- **macOS.** Build the `.pkg` locally from the release job's own staging and `productbuild` commands, with the
+  signing steps skipped. Check its choices (`installer -showChoicesXML`), its payloads (`pkgutil
+  --payload-files`) and both logos (`xar -tf`). *Rehearsed.*
+- **Linux.** In a container with an empty `HOME`, unpack the archive and run `install.sh`, then `install.sh`
+  again (a reinstall), then `install.sh --system`. An unknown option must exit non-zero and install nothing.
+  *Rehearsed* in Docker.
+- **Windows.** Nothing can be rehearsed without a Windows machine: the first dispatched run is the first run.
+
+**Release-job guards** (implemented):
+- dispatch only;
+- a first step that fails unless `GITHUB_REF` is `refs/heads/main` and the version input is numeric. Once a
+  workflow is on the default branch, a dispatch can name any branch, and repository secrets reach every branch;
+- a step that asserts every development variant option is `OFF` in `CMakeCache.txt` (strip `\r` on Windows,
+  [platform-builds.md](platform-builds.md#ci-evidence-and-test-portability)).
+
+**Install qualification on the runner** (implemented, not yet run signed):
+1. Before installing, write a sentinel file into the product's user-data folder (for example a user preset).
+   Record its hash.
+2. Install twice: a fresh install, then a reinstall.
+3. After each pass, check:
+   - the installed binary's SHA-256 equals the signed staged binary's;
+   - the sentinel is unchanged;
+   - the expected files are present (the notices).
+4. **macOS:** `sudo installer -pkg`. Then `codesign --verify --strict` on the installed bundles and
+   `pkgutil --pkgs` for the package IDs. Reset the AU registrar, then run `auval` on the installed AU (and
+   `arch -x86_64 auval`, [platform-builds.md](platform-builds.md#macos)).
+5. **Windows:** unpack the zip into the per-user VST3 folder, `%LOCALAPPDATA%\Programs\Common\VST3`, which
+   needs no administrator rights. Check `Get-AuthenticodeSignature` on the **installed** DLL, not only on the
+   staged one.
+6. **Linux:** `install.sh` with an empty `HOME`, a reinstall, then `--system`.
+7. Run pluginval on the installed copy.
+
+**Installing on a developer's own Mac.** A `.pkg` installs into `/Library/Audio/Plug-Ins`. If a development
+copy of the same plug-in sits in `~/Library/Audio/Plug-Ins`, macOS has two components with the same type,
+subtype and manufacturer, and nothing defines which one a host loads. Before installing:
+1. Move the user-folder copies to a backup folder.
+2. Write the rollback down:
+   - remove the system copies;
+   - run `sudo pkgutil --forget <package-id>` for each component package;
+   - move the backups back;
+   - run `killall -9 AudioComponentRegistrar`.
+
+User data, such as presets in Application Support, is untouched by either step.
+
+**People's acceptance checklist.** Automation does not cover:
+- Gatekeeper and the installer's dialogs, with branding in Light and Dark Mode;
+- the Customize choices;
+- the signer shown in the file's properties (Windows);
+- a host rescan;
+- **the editor rendered in WebView2 and WebKitGTK**: pluginval opens the editor but does not look at the page;
+- presets surviving a reinstall;
+- uninstalling.
+
+Write these as a pass/fail table per platform and keep the phase open until a person fills it in.
+
 ## Linux
 
 No signing is customary for plugin binaries. Publish `SHA256SUMS` next to the archive; a detached GPG signature
@@ -301,6 +413,10 @@ is optional.
 - A federated credential in the old `repo:<owner>/<repo>:…` form when GitHub issues immutable-ID subjects.
 - Assigning the signer role to your user instead of the app, or forgetting it: the signing step then fails 403.
 - Expecting `workflow_dispatch` on a feature branch: the workflow file must be on the default branch first.
+- A release workflow that a dispatch can run from any branch: guard it to `refs/heads/main`.
+- Checking the signature on the staged file only, not on the installed copy.
+- Installing a release `.pkg` over a machine that also has a development copy in `~/Library/Audio/Plug-Ins`.
+- Copying another product's packaging and keeping its package identifiers or AU codes.
 
 ## Sources
 

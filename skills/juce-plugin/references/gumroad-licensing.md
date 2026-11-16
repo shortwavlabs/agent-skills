@@ -306,9 +306,15 @@ nothing before writing or deleting):
 1. **One lock for every change.** Each write, delete and pending-marker change happens inside one
    `juce::InterProcessLock` named for the product, held only for the file read-compare-write: never across a
    network call, never on the audio thread.
-2. **Atomic replacement.** Write with `File::replaceWithText`: a temporary file then `replaceFileIn`, which is
-   `rename()` on POSIX and `ReplaceFile` on Windows in JUCE 9.0.3. This prevents torn reads; it does not prevent
-   lost updates or stale deletes, which is what rules 3-5 are for. `File::moveFileTo` deletes the target first.
+2. **Atomic replacement.** Write a `TemporaryFile` through a `FileOutputStream`, check `openedOk()`, the write
+   and `getStatus()` after `flush()`, then call `overwriteTargetFileWithTemporary()`. That call uses `replaceFileIn`,
+   which is `rename()` on POSIX and `ReplaceFile` on Windows in JUCE 9.0.3. Do not rely on `File::replaceWithText`:
+   it ignores the result of writing the temporary file. A temporary file that cannot be created, or a replacement
+   that fails (the failed-write test below fails at the replacement), returns `false`; but a short write after a
+   successful open (a full disk) returns `true` and installs the truncated file
+   ([code](user-presets.md#writing-a-file-safely)). Replacement prevents torn reads; it does not
+   prevent lost updates or stale deletes, which is what rules 3-5 are for. `File::moveFileTo` deletes the target
+   first.
 3. **Every job carries the identity it checked.** A re-check snapshots `(key, revision)` when it starts.
 4. **Apply a result only if that identity is still on disk.** Under the lock, re-read the file. Same key and
    revision: apply (refresh `lastChecked` with a new revision, or delete on a revocation). Anything else (another

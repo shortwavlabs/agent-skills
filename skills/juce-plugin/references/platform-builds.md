@@ -16,6 +16,8 @@ are in [signing-and-notarization.md](signing-and-notarization.md).
 - [Linux](#linux)
 - [Floating-Point Results Differ Between CPUs](#floating-point-results-differ-between-cpus)
 - [CI Jobs](#ci-jobs)
+- [CI Evidence And Test Portability](#ci-evidence-and-test-portability)
+- [GitHub Actions Behaviour](#github-actions-behaviour)
 - [Reproducing Linux Locally](#reproducing-linux-locally)
 - [Common Mistakes](#common-mistakes)
 - [Sources](#sources)
@@ -57,6 +59,9 @@ are in [signing-and-notarization.md](signing-and-notarization.md).
   `~/Library/Caches/AudioUnitCache` (and `/Library/Caches/AudioUnitCache` with `sudo` after a system-wide install), `killall -9 AudioComponentRegistrar`, wait a moment, run
   `auval -v <type> <subtype> <manufacturer>`, then pluginval on the installed path. VST3 can be validated in
   place.
+- Validate the universal AU's Intel slice too: `arch -x86_64 auval -v <type> <subtype> <manufacturer>` runs it
+  through Rosetta on an Apple-silicon runner (*tested* on `macos-26`). Guard the step with
+  `arch -x86_64 /usr/bin/true` so that a runner without Rosetta reports the check as not run, not passed.
 - A universal build's x86_64 slice runs the Intel code paths described in
   [Floating-Point Results Differ Between CPUs](#floating-point-results-differ-between-cpus), which Apple-silicon
   CI never exercises.
@@ -133,6 +138,17 @@ if(TARGET juce::pkgconfig_JUCE_BROWSER_LINUX_DEPS)   # created by JUCE on Linux/
 endif()
 ```
 
+**Static libraries inside the plug-in.** A project static library (a DSP core shared by the plug-in and its
+tests) linked into the Linux `.so` must be position-independent. Without it, the link fails with
+`relocation R_X86_64_PC32 against symbol … can not be used when making a shared object; recompile with -fPIC`
+(*tested*). macOS and Windows do not need this.
+
+```cmake
+if(UNIX AND NOT APPLE)
+    set_target_properties(my_dsp PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
+```
+
 The Windows counterpart (the WebView2 loader) and the alternative of creating the test runner with
 `juce_add_console_app (... NEEDS_WEB_BROWSER TRUE NEEDS_WEBVIEW2 TRUE)` are in
 [webview-ui.md](webview-ui.md#cmake-and-webview2).
@@ -197,6 +213,84 @@ release (extract with `7z`). Name each job's uploaded artifact uniquely (`plugin
 Cost: GitHub-hosted minutes are priced per OS (in 2026 about $0.006 Linux, $0.010 Windows and $0.062 macOS per
 minute); a macOS job of a few minutes costs more than Linux and Windows jobs several times longer.
 
+## CI Evidence And Test Portability
+
+A port is qualified by what each platform's CI actually ran, not by green jobs. *Tested* in a JUCE 9.0.3 product
+whose suite started macOS-only and was ported to Windows and Linux CI.
+
+**Tests that need one platform's facilities.**
+- Replace macOS-only facilities with JUCE equivalents where one exists:
+  - CommonCrypto → `juce::SHA256`;
+  - a CFRunLoop wait → `MessageManager::runDispatchLoopUntil`. Off macOS this needs
+    `JUCE_MODAL_LOOPS_PERMITTED=1` on the test target.
+- Where no equivalent exists, report the check as `NOT MEASURED` or `NOT RUN` with the reason, never as a pass.
+  Examples: an allocation counter hooked into libmalloc, or the `mach` memory footprint. A check that depends on
+  an instrument (an allocation count) needs the instrument's positive control to run on the same platform;
+  without the control, the count is `NOT MEASURED`.
+- **Compare per-group check counts across platforms.** A group that quietly runs fewer checks on one platform
+  still exits 0. Print a `SUMMARY <group>: <checks> checks, <fails> FAIL` line per group, and tabulate macOS,
+  Windows and Linux side by side. Every difference must be a documented not-run item.
+
+**Inputs a clean runner does not have.**
+- Commit the approved runtime assets (models, images, camera presets) and check them against a manifest of
+  SHA-256 hashes at build time. Keep them out of any folder a frontend build copies recursively, or they ship
+  twice.
+- Mark hashed inputs `-text` or `binary` in `.gitattributes` ([Windows](#windows)). On Windows, a checked-out
+  `package-lock.json` hashed differently until it was marked.
+- Large fixtures that stay out of Git (golden renders): give the fixture-free test groups their own ctest label
+  (for example `portable`), run only that label in CI, and list the groups that did not run in the release report.
+
+**Keeping evidence.**
+- ctest rewrites `Testing/Temporary/LastTest.log` on every run. When a job runs ctest twice (a suite, then an
+  opt-in test), copy the log after the first run, or its output is lost.
+- **Windows writes CRLF.** Strip `\r` before matching lines read back from a file such as `CMakeCache.txt`
+  (`tr -d '\r' < CMakeCache.txt | grep …`). Python's text mode writes `\r\n` on Windows, which breaks
+  `shasum -c` on another system: write checksum files with `open(path, "w", newline="\n")`.
+- **Record the source commit, not the merge commit.** A `pull_request` run checks out a synthetic merge commit.
+  Record `github.event.pull_request.head.sha` as the source, next to `github.sha`.
+- **Read the compiler from CMake's own record.** `CMAKE_CXX_COMPILER_ID` and `CMAKE_CXX_COMPILER_VERSION` in
+  `build/CMakeFiles/<cmake-version>/CMakeCXXCompiler.cmake` work for MSVC, GCC and Clang alike.
+- Join lists of tests run or skipped with a separator that cannot occur in an item (`;`). Commas occur inside
+  parenthesised notes.
+
+**Check the artifact itself, with negative controls.** Assert the identity in the built bundle, not in the build
+options. A standard-library Python script runs unchanged on all three runners:
+- **Identity.**
+  - VST3: `Name`, `Version` and the `CID` values in `Contents/Resources/moduleinfo.json`, read by pattern
+    (the file has trailing commas).
+  - macOS: also `CFBundleIdentifier` and `CFBundleShortVersionString` in `Info.plist`.
+  - AU: also the type, subtype, manufacturer, name and packed version (`major<<16 | minor<<8 | patch`) in the
+    first `AudioComponents` entry.
+- **Architecture.**
+  - macOS: every required slice in `lipo -archs`.
+  - Windows: the PE machine field at `e_lfanew + 4` (`0x8664` for x64).
+  - Linux: the ELF class byte and `e_machine` at offset 18 (`0x3E` for x86_64).
+- **Embedded assets.** `juce_add_binary_data` stores the bytes verbatim. Find the first 4 KiB of each approved
+  asset in the binary, then compare the whole file at that offset. The same hashes on all three platforms prove
+  they ship the same assets.
+- **Required and forbidden strings.** The bridge's function names must be present. Debug-only environment
+  variables and test hooks must be absent.
+- **Negative controls.** Run the same script on builds that must fail (a development variant with another
+  identity, a debug build) and require the failure. A check that has never failed proves nothing.
+
+## GitHub Actions Behaviour
+
+From GitHub's documentation, read 2026-11-16; recheck before relying on it.
+
+- **Release workflows: `workflow_dispatch` only.** A dispatch trigger works only once the workflow file is on the
+  default branch. A release workflow added in a pull request cannot be dispatched until it is merged, so rehearse
+  its steps in the PR's own jobs or locally first.
+- **`paths` filters on `pull_request`** compare the pull request's whole diff with its base (a three-dot diff),
+  not the files of the latest push. Once any file in the PR matches, every push re-runs the workflow.
+- **`[skip ci]`** in a pushed commit's message creates no run. It therefore does not cancel runs already in
+  progress for the same concurrency group.
+- **Runner capacity.** A job that fails after waiting, with a message that it was "not acquired by Runner …
+  after multiple attempts", is a capacity failure (*tested*: seen on macOS runners). Re-run it with
+  `gh run rerun <run-id> --failed`; do not change the workflow.
+- **Stacked pull requests.** When PR B's base is PR A's branch, deleting A's branch after merging A retargets B
+  to A's base. If the repository does not delete merged branches automatically, delete A's branch after merging,
+  then check that B's base reads `main` before merging B. *Documented; not yet exercised in the case study.*
+
 ## Reproducing Linux Locally
 
 Docker reproduces the Linux job: run the job's `run:` steps in `ubuntu:22.04`, fetching JUCE at the CI pin and
@@ -205,7 +299,9 @@ Node from its tarball in place of the actions. arm64 containers run natively on 
 pluginval publishes Linux builds for x86_64 only. This reference's Windows path is native MSVC on Windows (JUCE
 dropped MinGW and does not support building Windows binaries from Linux); cross-compilation is not covered.
 Without a Windows machine, the Windows CI job is the first build. Docker Desktop shares only some host folders (not `/Applications`):
-fetch dependencies inside the container instead.
+fetch dependencies inside the container instead. Mount the repository read-only and `git clone --depth 1 file:///src`
+inside the container (with `--branch <branch>` for another branch), so the container's `npm ci` never touches the
+host's `node_modules` (*tested*).
 
 ## Common Mistakes
 
@@ -215,9 +311,16 @@ fetch dependencies inside the container instead.
 - Adding Windows or Linux only to the plugin target and forgetting test executables that compile the editor.
 - Validating a macOS AU in the build folder.
 - Copying plugins after build on Windows CI (needs admin) instead of passing `-D<copy option>=OFF`.
+- Linking a non-PIC static library into the Linux `.so`.
+- Counting a test that printed `NOT RUN` as a pass because ctest stayed green; require its `PASS` line.
+- Trusting a green test group whose check count dropped on one platform.
+- Losing the first ctest run's log to a second run in the same job.
+- Recording a pull request's merge commit as the source commit.
 
 ## Sources
 
+- GitHub Docs (read 2026-11-16): "Events that trigger workflows" (`workflow_dispatch`, `pull_request`, path
+  filters), "Skipping workflow runs", "Changing the base branch of a pull request", "Re-running workflows and jobs".
 - JUCE 9.0.3: `extras/Build/CMake/JUCEModuleSupport.cmake` (`_juce_get_platform_plugin_kinds`),
   `JUCEUtils.cmake` (copy folders, `pkgconfig_JUCE_BROWSER_LINUX_DEPS`, `NEEDS_WEBVIEW2`),
   `FindWebView2.cmake`, `docs/Linux Dependencies.md`, `BREAKING_CHANGES.md` (libxi-dev, Windows 10 1607),
