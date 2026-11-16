@@ -1,6 +1,6 @@
 # Guitar-gear materials for glTF and WebGL
 
-Use on the runtime derivative from [runtime export](../../guitar-gear-modeling/references/runtime-export.md). Keep accepted Blender materials in the master. glTF does not preserve arbitrary Blender procedural node networks or Blender-specific coordinate-driven shader logic; bake or translate the resulting appearance into supported glTF PBR inputs.
+Use on the runtime derivative from [runtime export](../../guitar-gear-modeling/references/runtime-export.md). Keep accepted Blender materials in the master. glTF does not preserve arbitrary Blender procedural node networks or Blender-specific coordinate-driven shader logic; bake or translate the resulting appearance into supported glTF PBR inputs. Worked evidence for wear, bakes, metals, LEDs and texture density is in [runtime wear, metals and LEDs](runtime-wear-metal-and-led.md).
 
 ## Translation and baking
 
@@ -22,11 +22,11 @@ Choose alpha mode by construction. Use opaque for continuous shells, `MASK`/alph
 |---|---|
 | Tolex/vinyl | Physically scaled normal and roughness grain; retain seams and cabinet silhouette in geometry. Check wrap direction and sparkle at grazing views. |
 | Grille cloth | Base color plus normal/roughness and alpha only if speaker visibility needs it. Preserve grille/baffle depth; avoid fiber geometry unless maximum zoom demonstrates the need. |
-| Nickel/chrome | Metallic PBR with useful environment reflections and restrained roughness variation. Black chrome often means a reflection-lighting problem, not missing white pigment. |
+| Nickel/chrome | Metallic PBR with useful environment reflections and restrained roughness variation. Black chrome often means a reflection-lighting problem, not missing white pigment ([plating](runtime-wear-metal-and-led.md#chrome-nickel-and-satin-plating)). |
 | Molded plastic | Dielectric response, subtle grain; avoid exporting unsupported subsurface effects as accidental translucency. |
 | Rubber | Rough dielectric with small normal detail and visible broad reflections, not featureless black. |
 | Speaker cones | Subtle roughness/fiber normal, preserve visible cone depth; do not brighten hidden speakers just to expose them through cloth. |
-| LED lenses | Keep an off-state lens/bezel and independently controlled emission. Use transmission only when supported and worth its cost; emission need not imply a dynamic light or bloom. |
+| LED lenses | Keep an off-state lens/bezel and independently controlled emission. Use transmission only when supported and worth its cost; emission need not imply a dynamic light or bloom ([LED lenses](runtime-wear-metal-and-led.md#led-lenses)). |
 | Panel graphics | Bake flush labels, tick marks, rules and flat logos into readable panel textures/masks. Keep raised/engraved geometry only for visible relief. |
 
 Clone materials for independently driven LEDs and per-plugin state before changing emission. Geometry/static textures can be shared within a viewer when ownership is explicit; changing one lamp must not illuminate every lamp or another plugin instance.

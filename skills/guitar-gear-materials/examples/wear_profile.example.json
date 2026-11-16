@@ -1,0 +1,76 @@
+{
+  "_doc": "Example GG_WEAR profile for scripts/wear_library.py. Object property gg_wear_<key> = levels[family][key][A|B|C] x the object's mult (mult_level overrides mult per level; chips and chipsize are never multiplied); 0 switches a term off. Each derivative <base>__<suffix> is a copy of the base material with only Base Color, Roughness, Metallic and Normal re-routed through the wear frame. Lengths in spec and lip_z / lip_r are object-local millimetres; mesh dimensions must be real (metres, object scale 1). The synthetic parts: a plated barrel (r 4.7 mm, 10 mm long, origin at its base), a moulded knob (r 9 mm, 16 mm tall, origin at its base) and a 60 x 112 x 29 mm painted box (origin at its centre).",
+  "level": "B",
+  "levels": {
+    "metal_plated": {
+      "scratch": [0.45, 0.58, 0.68],
+      "tarnish": [0.55, 0.68, 0.78],
+      "oxide": [0.45, 0.55, 0.65],
+      "edge": [0.55, 0.66, 0.75],
+      "lip": [0.75, 1.0, 1.15],
+      "lipwide": [0.0, 0.8, 1.0]
+    },
+    "plastic_knob": {
+      "edge": [0.5, 0.65, 0.75],
+      "polish": [0.35, 0.42, 0.5],
+      "contact": [0.0, 0.7, 0.9]
+    },
+    "powder_coat": {
+      "edge": [0.55, 0.62, 0.7],
+      "polish": [0.5, 0.5, 0.5],
+      "abrasion": [0.5, 0.5, 0.5],
+      "scuff": [0.55, 0.55, 0.55],
+      "jackrub": [0.5, 0.7, 0.85],
+      "lower": [0.0, 0.8, 1.2],
+      "sides": [0.0, 0.3, 0.55],
+      "strokes": [0.6, 0.85, 1.0],
+      "chips": [2, 4, 5],
+      "chipsize": [1.0, 1.0, 1.15]
+    }
+  },
+  "derivatives": {
+    "MAT_NICKEL_PLATED__WORN": {
+      "base": "MAT_NICKEL_PLATED",
+      "builder": "metal",
+      "spec": {
+        "label": "plated barrel: insertion lip, plug marks, tarnish",
+        "scratches": [{"length": 1.0, "feature": 0.15, "width": 0.03, "density": 0.35, "angle": 0, "spread": 80}],
+        "edge_r": 0.06, "crevice": 0.25, "speck": 0.10, "tarnish_size": 1.6,
+        "lip": true, "lip_wide": true, "lip_scratch": true
+      }
+    },
+    "MAT_KNOB_BLACK__WORN": {
+      "base": "MAT_KNOB_BLACK",
+      "builder": "plastic",
+      "spec": {"label": "moulded knob: grip polish, ridge contact", "grip_z": [8.0, 14.0], "edge_r": 0.2, "contact": true}
+    },
+    "MAT_POWDERCOAT__WORN": {
+      "base": "MAT_POWDERCOAT",
+      "builder": "paint",
+      "spec": {
+        "label": "powder coat: edges, rubs, abrasion, chips",
+        "half": [30.0, 56.0, 14.5],
+        "labels": [[-12.0, 8.0, 12.0, 14.0]],
+        "footswitch": [0.0, -30.0],
+        "jacks": [[10.0, 0.0]],
+        "lower": true, "sides": true,
+        "chips": [
+          [30.0, -56.0, -6.0, 0.25, "z"],
+          [-8.0, -56.0, -14.5, 0.2, "x"],
+          [-30.0, 40.0, 14.5, 0.15, "y"],
+          [30.0, 0.0, -14.5, 0.15, "y"],
+          [20.0, 56.0, -14.5, 0.12, "x"]
+        ],
+        "strokes": [
+          {"a": [30.0, 10.0, -12.0], "b": [30.0, 40.0, -12.5], "w": 0.3, "s": 0.7, "deep": 0.1, "gap": 3.5, "doc": "scrape along the right side near the bottom edge"},
+          {"a": [10.0, 56.0, -6.0], "b": [18.0, 56.0, 0.0], "w": 0.6, "s": 0.5, "kind": "rub", "doc": "rub on the rear face"}
+        ]
+      }
+    }
+  },
+  "objects": {
+    "Jack_Barrel": {"family": "metal_plated", "derivative": "MAT_NICKEL_PLATED__WORN", "mult": 1.0, "seed": 1.7, "lip_z": 10.0, "lip_r": 3.0},
+    "Knob": {"family": "plastic_knob", "derivative": "MAT_KNOB_BLACK__WORN", "mult": 1.0, "mult_level": [0.9, 1.0, 1.0], "seed": 4.2},
+    "Enclosure": {"family": "powder_coat", "derivative": "MAT_POWDERCOAT__WORN", "mult": 1.0, "seed": 9.5}
+  }
+}

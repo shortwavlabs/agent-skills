@@ -122,6 +122,7 @@ skills/juce-plugin/
     ├── ui-patterns.md          Editor patterns: layout, custom widgets, LookAndFeel, meters, FFT spectrum analyser
     ├── webview-ui.md           JUCE 9 WebView2, offline resources, relays, frontend integration
     ├── threejs-webview-ui.md   Interactive guitar-gear GLBs, physical controls, APVTS, idle rendering
+    ├── webview-gpu-memory-and-context-recovery.md  WebKit footprint measurement, releasing upload-only CPU copies, guarded-reload context recovery
     ├── audio-thread-safety.md  Real-time safety: processBlock rules, lock-free patterns, debugging
     ├── host-automation-and-editor-sync.md  Host automation on the audio thread, stock-attachment hazard, polled attachments, allocation gate
     ├── cmake-reference.md      Full CMake API: juce_add_plugin, SDK paths, CI/CD, platform specifics
@@ -170,10 +171,10 @@ Use these existing skills together for Blender-authored amps, pedals and rack ge
 
 | Skill | Responsibility | Runtime reference |
 |---|---|---|
-| [guitar-gear-modeling](skills/guitar-gear-modeling/SKILL.md) | Real dimensions, reusable construction; runtime collections, semantic nodes, pivots and hit proxies | [Runtime export](skills/guitar-gear-modeling/references/runtime-export.md) |
-| [guitar-gear-materials](skills/guitar-gear-materials/SKILL.md) | Material identity and graphics; glTF-safe PBR baking, cloth and texture budgets from texel versus screen density | [Runtime PBR](skills/guitar-gear-materials/references/runtime-pbr.md) |
-| [guitar-gear-qa](skills/guitar-gear-qa/SKILL.md) | Blender audits; GLB/WebGL parity, runtime metrics, host acceptance and accept/reject studies for performance candidates that can change the picture | [Runtime QA/report](skills/guitar-gear-qa/references/runtime-qa.md) |
-| [guitar-product-render](skills/guitar-product-render/SKILL.md) | Product photography; runtime camera presets, framing and lighting intent | [Runtime presentation](skills/guitar-product-render/references/runtime-presentation.md) |
+| [guitar-gear-modeling](skills/guitar-gear-modeling/SKILL.md) | Real dimensions, reusable construction; runtime collections, semantic nodes, pivots and hit proxies | [Runtime export](skills/guitar-gear-modeling/references/runtime-export.md), [reproducible derivatives and geometry fidelity](skills/guitar-gear-modeling/references/runtime-derivative-and-geometry-fidelity.md) |
+| [guitar-gear-materials](skills/guitar-gear-materials/SKILL.md) | Material identity and graphics; glTF-safe PBR baking, cloth and texture budgets from texel versus screen density | [Runtime PBR](skills/guitar-gear-materials/references/runtime-pbr.md), [wear, metals and LEDs](skills/guitar-gear-materials/references/runtime-wear-metal-and-led.md) |
+| [guitar-gear-qa](skills/guitar-gear-qa/SKILL.md) | Blender audits; GLB/WebGL parity, runtime metrics, host acceptance and accept/reject studies for performance candidates that can change the picture | [Runtime QA/report](skills/guitar-gear-qa/references/runtime-qa.md), [visual oracle](skills/guitar-gear-qa/references/visual-oracle.md) |
+| [guitar-product-render](skills/guitar-product-render/SKILL.md) | Product photography; runtime camera presets, framing and lighting intent | [Runtime presentation](skills/guitar-product-render/references/runtime-presentation.md), [lighting and probes](skills/guitar-product-render/references/runtime-lighting-and-probes.md) |
 | [juce-plugin](skills/juce-plugin/SKILL.md) | Three.js bindings, offline WebView2, APVTS/gestures, physical switch/jack semantics and instance performance | [Three.js/WebView UI](skills/juce-plugin/references/threejs-webview-ui.md) |
 
 **Triggers on:** exporting Blender guitar gear for an interactive plugin, semantic GLB controls, Three.js amp/pedal editors, runtime PBR/camera parity, JUCE WebView integration and validation.
@@ -186,6 +187,10 @@ Use these existing skills together for Blender-authored amps, pedals and rack ge
 - [Performance investigation](skills/juce-plugin/references/performance-investigation.md) attributes cost between DSP and editor before anything is optimized.
 - [WebView compatibility and packaging](skills/juce-plugin/references/webview-ui.md) covers version checks, offline resources, production CSP and resource-copy costs.
 - [Real-time-safe relay attachments](skills/juce-plugin/references/webview-ui.md#real-time-safe-relay-attachments) replace JUCE's web attachments in products (they post from the audio thread under host automation); the same reference covers the [macOS WKWebView teardown](skills/juce-plugin/references/webview-ui.md#wkwebview-teardown-on-macos-juce-903) and [windowed lifecycle testing](skills/juce-plugin/references/webview-ui.md#windowed-lifecycle-and-visible-window-testing).
+- Portable asset tools, which need nothing from the case-study projects:
+  - [`wear_library.py`](skills/guitar-gear-materials/scripts/wear_library.py), [`material_inspect.py`](skills/guitar-gear-materials/scripts/material_inspect.py) and [`pbr_bake.py`](skills/guitar-gear-materials/scripts/pbr_bake.py), run in Blender;
+  - [`normal_audit.py`](skills/guitar-gear-modeling/scripts/normal_audit.py), [`glb_validate.py`](skills/guitar-gear-modeling/scripts/glb_validate.py) and [`image_compare.py`](skills/guitar-gear-qa/scripts/image_compare.py), in standard-library Python.
+  - Each runs `--self-test`; the Blender tools also run `--blender-test`.
 - [Native gesture regression check](skills/juce-plugin/scripts/webview_gesture_check.cpp) covers normal completion, cancellation-equivalent completion, active teardown and idle teardown. Its guard is a JUCE 9.0.1-specific workaround; see [build instructions and scope](skills/juce-plugin/references/webview-ui.md#gesture-cleanup-on-editor-destruction) before adapting it to another version.
 
 Native gesture checks complement actual WebView keyboard, screen-reader and host testing; source verification alone is not a runtime test result.

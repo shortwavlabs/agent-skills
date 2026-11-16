@@ -1,0 +1,34 @@
+{
+  "maps": ["base_color", "orm", "normal"],
+  "samples": 16,
+  "seed": 12,
+  "margin_px": 8,
+  "ao_samples": 16,
+  "device": "GPU",
+  "threads": 1,
+  "color_mode": "RGBA",
+  "uv_layer": null,
+  "hide_during_ao": ["Studio_Floor"],
+  "repair_margin_overlap": true,
+  "families": {
+    "Enclosure": {
+      "objects": ["Enclosure_Shell", "Enclosure_BottomPlate"],
+      "sizes": {"base_color": [2048, 2048], "orm": [2048, 2048], "normal": [2048, 2048]},
+      "ao_distance_m": 0.004
+    },
+    "Knobs": {
+      "objects": ["Knob_Level", "Knob_Tone", "Knob_Drive"],
+      "sizes": {"base_color": [512, 1024], "orm": [1024, 2048], "normal": [1024, 2048]},
+      "ao_distance_m": 0.004,
+      "normal_from": {"Knob_Level": "Knob_Level_Detailed", "Knob_Tone": "Knob_Tone_Detailed", "Knob_Drive": "Knob_Drive_Detailed"},
+      "cage_extrusion_m": 0.00004,
+      "max_ray_distance_m": 0.0002,
+      "normal_from_samples": 128
+    },
+    "Hardware": {
+      "objects": ["Jack_Input", "Jack_Output", "Footswitch_Nut", "Footswitch_Washer"],
+      "sizes": {"base_color": [2048, 2048], "orm": [2048, 2048], "normal": [2048, 2048]},
+      "ao_distance_m": 0.002
+    }
+  }
+}

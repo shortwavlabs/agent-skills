@@ -4,7 +4,7 @@ Use for Blender assets destined for an interactive amp, pedal or rack editor. So
 
 ## Protect the source
 
-Inspect the accepted file, evaluated instances, dimensions, controls, materials and cameras first. Record its revision/hash. Save `gear_master.blend` → `gear_juce.blend` → `gear.glb`; never destructively optimize the master. Preserve its reusable components, cutters, production geometry, studio lights, QA cameras and material-development helpers. Scope repeatable export work to an explicit `EXPORT_JUCE` collection. Reopen the derivative and exported asset before delivery.
+Inspect the accepted file, evaluated instances, dimensions, controls, materials and cameras first. Record its revision/hash. Save `gear_master.blend` → `gear_juce.blend` → `gear.glb`; never destructively optimize the master. Preserve its reusable components, cutters, production geometry, studio lights, QA cameras and material-development helpers. Scope repeatable export work to an explicit `EXPORT_JUCE` collection. Reopen the derivative and exported asset before delivery. Hash checks, build manifests and repeat-build comparison are in [reproducible derivatives](runtime-derivative-and-geometry-fidelity.md#protect-the-master-build-a-derivative).
 
 Use the existing [Blender operations](blender-operations.md) procedure for nested instances and context-sensitive conversion. Source object counts are not evaluated assembly counts.
 
@@ -12,7 +12,7 @@ Use the existing [Blender operations](blender-operations.md) procedure for neste
 
 Before converting or joining evaluated objects, capture the effective material slots and any source-local coordinates that drive visible procedural variation. Evaluated mesh creation can preserve the shape while losing an object-linked material override; joining can also collapse `Generated`/`Object` coordinates into a different frame. Copy the evaluated slot assignments explicitly and, when the bake depends on per-part coordinates or deterministic object variation, preserve those values as named mesh attributes before consolidation. Compare a representative aged part before and after conversion rather than trusting matching material names.
 
-Protect silhouette-critical curved parts from automatic reduction. Speaker rims, cones, cable curves and rear hardware can distort under a decimation rule that is harmless on a flat shell. Reduce them only after a matched front/rear/grazing comparison shows the result is acceptable at maximum zoom.
+Protect silhouette-critical curved parts from automatic reduction. Speaker rims, cones, cable curves and rear hardware can distort under a decimation rule that is harmless on a flat shell. Reduce them only after a matched front/rear/grazing comparison shows the result is acceptable at maximum zoom. Glossy hardware is the same: a reduction within micrometres of the master can still interpolate wrong shading normals across faces ([geometry fidelity](runtime-derivative-and-geometry-fidelity.md#audit-shading-normals-not-only-positions)).
 
 ## Semantic hierarchy
 

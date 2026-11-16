@@ -182,6 +182,8 @@ A static editor with no intentionally continuous visual behaviour should approac
 
 The patterns have their owners: [webview-ui.md](webview-ui.md#streaming-visual-data) for telemetry, repaint and DOM cost; [threejs-webview-ui.md](threejs-webview-ui.md#rendering-threading-and-lifetime) for invalidation, shadow maps, redraw cadence, pixel ratio and draw calls. Anything that can change the picture is a candidate to accept or reject on matched evidence, not a default.
 
+Memory is measured as the summed physical footprint of the WebKit helpers, not RSS, which misses GPU-private memory; the method, the release of upload-only CPU copies and its consequence for context recovery are in [WebView GPU memory and context recovery](webview-gpu-memory-and-context-recovery.md).
+
 When a sibling product shares the architecture, measure it in the same host: it separates the architecture's baseline cost from a regression of this plugin.
 
 ## Multi-Instance Scaling

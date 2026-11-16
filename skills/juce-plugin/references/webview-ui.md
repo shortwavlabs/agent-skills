@@ -408,6 +408,7 @@ A short normal-cadence run (30 cycles) stays below the onset and proves nothing.
   - it moves the web view's lifetime from the editor to the processor, changing editor lifecycle ownership;
   - it may retain substantial helper memory while the editor is closed (a rendered editor measured ~600 MB with a heavy GLB);
   - it could introduce new host compatibility problems (reparenting across editor windows, hosts that destroy editors in unusual orders).
+- **Graphics-resource work is a separate matter.** Releasing decoded images after upload and WebGL context recovery ([WebView GPU memory and context recovery](webview-gpu-memory-and-context-recovery.md)) change neither this helper-process behaviour nor the teardown retention.
 - **Keep the confirmed teardown fix separate.** The JUCE 9.0.3 native-integration retention [above](#wkwebview-teardown-on-macos-juce-903) is small, in-process and fixed; removing the fix did not change this helper-process behaviour, and the fix does not address it.
 - Record the session state, so that a locked run's lifecycle numbers are not read as a plug-in defect.
 - Qualify reopening in a visible session, against a bare-WebView control under the same conditions.

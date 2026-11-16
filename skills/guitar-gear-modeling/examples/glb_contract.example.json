@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "description": "Product-neutral example for glb_validate.py: one knob, one two-state toggle, two input jacks sharing a choice parameter, and their hit proxies. Replace names, parameters and angles with the product's own, written by hand, never read back from the export.",
+  "asset": "gear.glb",
+  "root": "GEAR_ROOT",
+  "parameters": {
+    "gain": { "type": "continuous" },
+    "boost": { "type": "choice", "choices": ["Off", "On"] },
+    "inputMode": { "type": "choice", "choices": ["Regular", "High"] }
+  },
+  "extras_types": {
+    "knob": { "parameter_id": "string", "rotation_axis": ["X", "Y", "Z"], "rotation_sign": [-1, 1], "min_angle": "number", "max_angle": "number", "rest_angle": "number", "hit_target": "string" },
+    "toggle": { "parameter_id": "string", "rotation_axis": ["X", "Y", "Z"], "rotation_sign": [-1, 1], "state_count": "integer", "state_angles": "number[]", "state_labels": "string[]", "rest_angle": "number", "hit_target": "string" },
+    "input": { "parameter_id": "string", "choice_index": "integer", "hit_target": "string" },
+    "hit_target": { "control_node": "string" }
+  },
+  "nodes": [
+    { "name": "CTRL_GAIN", "parent": "GEAR_ROOT", "ui_type": "knob", "parameter_id": "gain", "rotation_axis": "Y", "rotation_sign": -1, "min_angle": -135, "max_angle": 135, "rest_angle": 0, "hit_target": "HIT_GAIN" },
+    { "name": "SWITCH_BOOST", "parent": "GEAR_ROOT", "ui_type": "toggle", "parameter_id": "boost", "rotation_axis": "Z", "rotation_sign": -1, "state_count": 2, "state_angles": [-16, 16], "state_labels": ["Off", "On"], "rest_angle": -16, "hit_target": "HIT_BOOST" },
+    { "name": "INPUT_REGULAR", "parent": "GEAR_ROOT", "ui_type": "input", "parameter_id": "inputMode", "choice_index": 0, "hit_target": "HIT_INPUT_REGULAR" },
+    { "name": "INPUT_HIGH", "parent": "GEAR_ROOT", "ui_type": "input", "parameter_id": "inputMode", "choice_index": 1, "hit_target": "HIT_INPUT_HIGH" }
+  ],
+  "hit_targets": [
+    { "name": "HIT_GAIN", "parent": "CTRL_GAIN", "ui_type": "hit_target", "control_node": "CTRL_GAIN" },
+    { "name": "HIT_BOOST", "parent": "SWITCH_BOOST", "ui_type": "hit_target", "control_node": "SWITCH_BOOST" },
+    { "name": "HIT_INPUT_REGULAR", "parent": "INPUT_REGULAR", "ui_type": "hit_target", "control_node": "INPUT_REGULAR" },
+    { "name": "HIT_INPUT_HIGH", "parent": "INPUT_HIGH", "ui_type": "hit_target", "control_node": "INPUT_HIGH" }
+  ],
+  "materials": { "required": ["HIT_INVISIBLE"], "forbidden": ["^Material(\\.\\d+)?$", "^Dots Stroke$"] },
+  "extensions": { "used": ["KHR_materials_emissive_strength", "KHR_materials_clearcoat", "KHR_texture_transform"], "required": [] },
+  "images": { "power_of_two": true, "mime_types": ["image/png", "image/jpeg"] },
+  "cameras": false,
+  "lights": false
+}

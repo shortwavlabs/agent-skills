@@ -11,7 +11,7 @@ Read [studio recipes](references/studio-recipes.md) for lighting patterns, fixed
 
 ## Runtime camera and lighting translation
 
-Use when deriving an interactive editor from an accepted Blender product scene. Read [runtime presentation](references/runtime-presentation.md) for evaluated camera presets, coordinate/FOV conversion, framing constraints, studio-reflection intent and Blender/WebGL parity. Keep accepted Blender cameras/lights intact and validate a separate runtime presentation.
+Use when deriving an interactive editor from an accepted Blender product scene. Read [runtime presentation](references/runtime-presentation.md) for evaluated camera presets, coordinate/FOV conversion, framing constraints, studio-reflection intent and Blender/WebGL parity. Read [runtime lighting and probes](references/runtime-lighting-and-probes.md) for HDRI and ground reflections, card radiance, spot falloff, reflection-probe placement and how to tell a lighting fault from a material fault (case study). Keep accepted Blender cameras/lights intact and validate a separate runtime presentation.
 
 ## Refinement decision rules
 
