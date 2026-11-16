@@ -301,8 +301,7 @@ All in one folder (for example `Source/licensing/`), one namespace:
 every change. Never store the license in plugin state: it would travel inside project files.
 
 **Specified** rules (the case study's second version implements 1-7 except `entitledUntil` and rule 2's checked
-stream write; its first compared
-nothing before writing or deleting):
+stream write; its first compared nothing before writing or deleting):
 
 1. **One lock for every change.** Each write, delete and pending-marker change happens inside one
    `juce::InterProcessLock` named for the product, held only for the file read-compare-write: never across a
