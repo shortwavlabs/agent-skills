@@ -80,7 +80,7 @@ A gate checks what it measures. Structural and positional gates cannot see shadi
 **Validated (Yellow Punch):** 1,657,368 → 240,074 triangles, mostly without collapsing anything visible:
 - the 1.26 M-triangle engraved cap was replaced by a flat cap carrying a normal map baked selected-to-active from the engraving (correlation 0.97 on groove walls);
 - faces that no camera can reach were deleted, and a dark interior liner was added so image-based light cannot tint the cavity;
-- the knob bodies were un-subdivided once: 384 → 192 radial segments, about 3 µm chord error;
+- the knob bodies were reduced with Un-Subdivide (`iterations` 2): 384 → 192 radial segments, about 3 µm chord error;
 - the visible hardware kept 153,888 triangles, unreduced.
 
 **Rejected (Prismatica B2):**
