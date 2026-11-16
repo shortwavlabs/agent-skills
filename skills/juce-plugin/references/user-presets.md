@@ -2,7 +2,7 @@
 
 Sounds the user names and saves as files, kept apart from the factory programs the host lists. The library must behave the same on macOS, Windows and Linux, survive damaged files and interrupted writes, never lose a preset to a mistaken click, and keep the audio thread untouched.
 
-**Evidence base.** One product (the Prismatica case study, JUCE 9.0.3). The library, processor and bridge tests (UP.01–UP.16 below) ran on macOS (arm64 and universal builds), Windows x64 and Linux x86_64 in GitHub Actions, and on Linux arm64 in Docker. The editor was accepted by its owner in Logic Pro on macOS. The editor's preset UI in WebView2 (Windows) and WebKitGTK (Linux) has not been checked in a real host. Each statement is marked as one of:
+**Evidence base.** One product (the Prismatica case study, JUCE 9.0.3). The library, processor and bridge tests (UP.01–UP.16 below) ran on macOS (arm64 and universal builds), Windows x64 and Linux x86_64 in GitHub Actions, and on Linux arm64 in Docker. The exception is UP.14's allocation count, which needs a macOS facility and is `NOT MEASURED` elsewhere. The editor was accepted overall by its owner in Logic Pro on macOS; item-level results were not recorded. The editor's preset UI in WebView2 (Windows) and WebKitGTK (Linux) has not been checked in a real host. Each statement is marked as one of:
 
 | Label | Meaning |
 |---|---|
@@ -80,7 +80,7 @@ One file per preset, with a product-specific extension. A small XML root records
 6. Every stored parameter that the layout has must be present.
 7. Skip parameters this build does not have, so files from a build with an optional feature still load.
 
-**Apply through the parameters.** For each stored parameter call `beginChangeGesture`, then `setValueNotifyingHost (convertTo0to1 (value))`, then `endChangeGesture`. Do this on the message thread. Do not use `apvts.replaceState`: it would also replace session parameters and non-parameter state.
+**Apply through the parameters.** For each stored parameter call `beginChangeGesture`, then `setValueNotifyingHost (convertTo0to1 (value))`, then `endChangeGesture`. Do this on the message thread. `apvts.replaceState` replaces the whole state, session parameters and non-parameter state included. It is simpler when a preset is meant to be the entire state, but not when a load must leave some of it alone. **Case-study choice.**
 
 ## Names
 
@@ -144,7 +144,7 @@ In the confirmation dialog, focus Cancel, so Return never deletes. Say where the
 
 ## Processor: selection and the modified mark
 
-Hosts call `setCurrentProgram` and `setStateInformation` on threads of their choosing. Keep the selection in atomics, and work out "modified" when asked, instead of tracking edits. **Tested** by UP.10, and by UP.14, which processes audio on one thread while another loads, saves and selects presets, and counts zero allocations on the audio thread.
+Hosts call `setCurrentProgram` and `setStateInformation` on threads of their choosing. Keep the selection in atomics, and work out "modified" when asked, instead of tracking edits. **Tested** by UP.10, and by UP.14, which processes audio on one thread while another loads, saves and selects presets. UP.14 counts zero allocations on the audio thread on macOS, where its allocation counter (a libmalloc hook) exists. On Windows and Linux it checks the other conditions and reports the count `NOT MEASURED`.
 
 - **State.**
   - the kind of selection, in an atomic: none, init, factory or user;
@@ -181,7 +181,7 @@ A preset picker built from a `<select>` gets the platform's native popup in WKWe
 
 **Evidence.**
 - **Tested** in the real WKWebView: in the case study's live check, every row has text and the row count stays constant when the mark appears.
-- The owner's Logic acceptance passed. Its checklist includes choosing from the open popup.
+- The owner's Logic acceptance passed overall. Its checklist includes choosing from the open popup, but item-level results were not recorded.
 - **Limitation:** choosing a row while the list changes was never reproduced in a controlled test, and the WebView2 and WebKitGTK popups were not examined. Check WebKit-specific UI in the real WebView or in WebKit's source, never only in the browser preview.
 
 ## Test seams and the test list
@@ -212,7 +212,7 @@ The case study's tests, as a starting list:
 | UP.11 | plug-in state format unchanged; a project restores exactly |
 | UP.12 | bridge: argument checks, results carry state, events only on change, none while idle |
 | UP.13 | the native function list |
-| UP.14 | audio thread during preset activity: no allocation, finite output |
+| UP.14 | audio thread during preset activity: finite output; no allocation (counted on macOS only) |
 | UP.15 | the product folder path, checked as a path only |
 | UP.16 | CI only: the real folder and Trash, round trip, case-insensitive duplicate refused |
 
@@ -231,7 +231,7 @@ The case study's tests, as a starting list:
 - [ ] A save interrupted after the temporary file was created leaves the previous file and lists nothing new, on Windows too.
 - [ ] Delete moves to the Trash, Recycle Bin or GIO Trash, and fails visibly when it cannot.
 - [ ] The factory program count and names are unchanged; old projects restore exactly.
-- [ ] No preset activity allocates on the audio thread.
+- [ ] No preset activity allocates on the audio thread, on every platform that has an allocation counter.
 - [ ] An idle editor sends no preset events.
 - [ ] In the real WebView, the picker's rows all have text and keep their positions when the modified mark changes.
 - [ ] Release binaries contain no debug folder override.

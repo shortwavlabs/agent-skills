@@ -253,6 +253,10 @@ whose suite started macOS-only and was ported to Windows and Linux CI.
   `build/CMakeFiles/<cmake-version>/CMakeCXXCompiler.cmake` work for MSVC, GCC and Clang alike.
 - Join lists of tests run or skipped with a separator that cannot occur in an item (`;`). Commas occur inside
   parenthesised notes.
+- **A scripted host run must prove that its actions happened.** In the case study, a two-second run ended
+  before the host's first program change (about 2.1 s in), so it exited cleanly without exercising program
+  changes. Assert in the log that each expected event occurred, and size the run from those events, not from a
+  guess.
 
 **Check the artifact itself, with negative controls.** Assert the identity in the built bundle, not in the build
 options. A standard-library Python script runs unchanged on all three runners:
@@ -320,8 +324,8 @@ host's `node_modules` (*tested*).
 
 ## Sources
 
-- GitHub Docs (read 2026-11-16): "Events that trigger workflows" (`workflow_dispatch`, `pull_request`, path
-  filters), "Skipping workflow runs", "Changing the base branch of a pull request", "Re-running workflows and jobs".
+- GitHub Docs (read 2026-11-16): the pages on workflow trigger events (`workflow_dispatch`, `pull_request` and
+  its path filters), skipping workflow runs, changing a pull request's base branch, and re-running jobs.
 - JUCE 9.0.3: `extras/Build/CMake/JUCEModuleSupport.cmake` (`_juce_get_platform_plugin_kinds`),
   `JUCEUtils.cmake` (copy folders, `pkgconfig_JUCE_BROWSER_LINUX_DEPS`, `NEEDS_WEBVIEW2`),
   `FindWebView2.cmake`, `docs/Linux Dependencies.md`, `BREAKING_CHANGES.md` (libxi-dev, Windows 10 1607),

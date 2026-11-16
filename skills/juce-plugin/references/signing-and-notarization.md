@@ -19,7 +19,7 @@ and action releases are vendor facts checked 2026-10: confirm them on the vendor
 - [Windows: GitHub Access Without A Password](#windows-github-access-without-a-password)
 - [Windows: Release Workflow](#windows-release-workflow)
 - [GitHub Secrets On A Free Plan](#github-secrets-on-a-free-plan)
-- [Second Product, Rehearsal And Install Checks](#second-product-rehearsal-and-install-checks) (implemented, not yet qualified)
+- [Second Product, Rehearsal And Install Checks](#second-product-rehearsal-and-install-checks) (implemented but not yet fully qualified)
 - [Linux](#linux)
 - [Common Mistakes](#common-mistakes)
 - [Sources](#sources)
@@ -36,7 +36,7 @@ and action releases are vendor facts checked 2026-10: confirm them on the vendor
 | Post-sign | `notarytool submit --wait`, `stapler staple` | Nothing to notarize; SmartScreen reputation builds from downloads |
 | Verify | `codesign --verify --strict`, `pkgutil --check-signature`, `stapler validate`, `spctl --assess --type install` | `Get-AuthenticodeSignature` status `Valid` with a timestamp certificate |
 | One identity for many products | Yes | Yes: one account and one profile sign every product; the signing quota is shared |
-| Setting up a second product | [Second product](#second-product-rehearsal-and-install-checks): implemented, not yet qualified | Same |
+| Setting up a second product | [Second product](#second-product-rehearsal-and-install-checks): implemented but not yet fully qualified | Same |
 
 ## macOS: Credentials
 
@@ -290,7 +290,7 @@ restrictions or protection rules (those need Pro, Team or Enterprise). Therefore
 
 ## Second Product, Rehearsal And Install Checks
 
-> **Status: implemented, not yet qualified (2026-11).** These procedures were written for a second product that
+> **Status: implemented but not yet fully qualified (2026-11).** These procedures were written for a second product that
 > reuses the first product's signing identities (the process above). No signed run has happened yet: the second
 > repository's secrets and federated credential were not configured, and its release workflows were not yet on
 > the default branch. Steps marked *rehearsed* ran without credentials. Everything else is unexecuted procedure,
