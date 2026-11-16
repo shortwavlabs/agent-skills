@@ -16,7 +16,7 @@ Read only the references needed for the task:
 
 ## Runtime glTF materials
 
-Use when exporting guitar gear to Three.js/WebGL. Read [runtime PBR](references/runtime-pbr.md) for procedural baking, supported material inputs, panel graphics, grille sampling, LED isolation and measured texture budgets. Read [runtime wear, metals and LEDs](references/runtime-wear-metal-and-led.md) for transferring `GG_WEAR_*` procedural wear, the bake settings two products used, spun and turned metal anisotropy, plated finishes, a transmissive LED lens and texture-density evidence (case studies). Preserve master shaders and judge the translated material at actual plugin resolution and intended maximum zoom.
+Use when exporting guitar gear to Three.js/WebGL. Read [runtime PBR](references/runtime-pbr.md) for procedural baking, supported material inputs, panel graphics, grille sampling, LED isolation and measured texture budgets. Read [runtime wear, metals and LEDs](references/runtime-wear-metal-and-led.md) for transferring `GG_WEAR_*` procedural wear, the bake settings two products used, spun and turned metal anisotropy, plated finishes, a transmissive LED lens and texture-density evidence (case studies). Bundled Blender tools: [`wear_library.py`](scripts/wear_library.py) (procedural wear groups, builders and profiles), [`material_inspect.py`](scripts/material_inspect.py) (read-only material and wear report) and [`pbr_bake.py`](scripts/pbr_bake.py) (PBR and ORM bakes with provenance); usage and limits are in that reference. Preserve master shaders and judge the translated material at actual plugin resolution and intended maximum zoom.
 
 ## Refinement decision rules
 

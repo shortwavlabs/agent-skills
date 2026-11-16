@@ -7,7 +7,13 @@ The process lesson from Prismatica's runtime editor:
 
 This reference owns that process and the comparison rules. [Runtime QA](runtime-qa.md) owns the asset, host and candidate checks it relies on.
 
-**Evidence.** Prismatica `docs/ui/ui-b3o-visual-oracle.md`, `ui-b3o-experiment-ledger.md`, `ui-b3-refinement-1-final-report.md` and `ui-b2-production-asset-final-report.md`. The thresholds and counts are **case-study values**.
+**Bundled tool.** [`scripts/image_compare.py`](../scripts/image_compare.py): standard-library PNG comparison.
+- Class A (identical) or class B, with configurable thresholds (defaults are the case study's), an optional background mask (`--mask-colour`) and named regions of interest (`--roi`).
+- It writes difference images ×8 and 1:1 crop sheets.
+- It compares a pair or two directories.
+- It matched the case study's own comparison tool on 55 real view pairs, with `--mask-colour #45484a`.
+
+**Evidence (historical; not needed to use the tool).** Prismatica `docs/ui/ui-b3o-visual-oracle.md`, `ui-b3o-experiment-ledger.md`, `ui-b3-refinement-1-final-report.md` and `ui-b2-production-asset-final-report.md`. The thresholds and counts are **case-study values**.
 
 ## Contents
 

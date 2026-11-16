@@ -2,7 +2,21 @@
 
 What two pedal projects established about carrying procedural wear, plated and machined metal, and LED lenses from Blender into a three.js editor. It extends [runtime PBR](runtime-pbr.md), which owns the general translation rules, colour spaces and texture budgets.
 
-**Evidence.**
+## Bundled tools
+
+These run on any Blender project. They need nothing from the case-study workspaces. Tested with Blender 5.2.1 LTS. Each runs a plain-Python `--self-test` (CI) and a Blender `--blender-test` on synthetic scenes (local; CI has no Blender).
+
+| Tool | Use |
+|---|---|
+| [`scripts/wear_library.py`](../scripts/wear_library.py) | the `GG_WEAR_*` node groups and `metal_wear` / `plastic_wear` / `paint_wear` builders, ported node for node from the case study's wear library; JSON wear profiles ([example](../examples/wear_profile.example.json)). `blender --background in.blend --python wear_library.py -- apply --profile p.json [--save out.blend]` |
+| [`scripts/material_inspect.py`](../scripts/material_inspect.py) | read-only JSON report: materials, Principled inputs linked or default, `GG_WEAR_*` groups used, per-object `gg_*` properties and slot links, image colour spaces, missing external images |
+| [`scripts/pbr_bake.py`](../scripts/pbr_bake.py) | base colour, ORM (R AO, G roughness, B metallic) and tangent normal bakes per family, with a UV report, source hashing and a cache key in `bake_provenance.json` ([example config](../examples/bake_config.example.json)). `blender --background in.blend --python pbr_bake.py -- --config bake.json --out dir` |
+
+Two departures from the case-study procedure are deliberate:
+- **Margin repair pass.** `pbr_bake.py` adds a second, margin-0 pass for families of several objects (`repair_margin_overlap`, on by default). Blender bakes object by object, and a later object's margin overwrites an earlier object's edge texels; that was reproduced with a 2-texel island gap.
+- **RGBA output.** It writes RGBA PNGs by default; `"color_mode": "RGB"` reproduces the case studies' files.
+
+**Evidence (historical; not needed to use the tools).** The file names below identify the case-study sources the tools were ported from.
 - **Yellow Punch** (its Blender `wear_lib.py`, runtime `build_runtime.py` and runtime report).
 - **Prismatica:**
   - Blender stages B2 and B3 (`Blender/prismatica/b2|b3/build_runtime.py`, `bake_materials.py`, `wear_master.json`);
@@ -53,7 +67,7 @@ Every number below is a **case-study value**: derive your own from the master. L
 - **Toggle levers** (Prismatica B3, F4). `metal_wear` on the toggle's own plated material, amounts per part, feature sizes scaled to the toggle assembly, a distinct seed per part.
 
 **Transferring wear to another product (Validated, Prismatica B3):**
-- **Check what the master already contains.** Prismatica's master already used Yellow Punch's `GG_WEAR_*` groups on the footswitch, LED bezel, knobs, pot hardware and jacks. B3 read them out (`tools/inspect_wear.py` → `wear_master.json`: per object, its `gg_wear_*` properties, materials and link type) and baked them.
+- **Check what the master already contains.** Prismatica's master already used Yellow Punch's `GG_WEAR_*` groups on the footswitch, LED bezel, knobs, pot hardware and jacks. B3 read them out (per object: its `gg_wear_*` properties, materials and link type; `material_inspect.py` does this) and baked them.
 - **Separate missing wear from hidden wear.** The owner's "missing wear" was the runtime lighting hiding it (a probe bug, a dim scrim, panel reflections in the knobs; see [runtime lighting](../../guitar-product-render/references/runtime-lighting-and-probes.md)), not missing data. Check that before adding wear.
 - **Transfer the technique, not the numbers.** Apply the groups to the target part's own material with amounts and feature sizes fitted to that part. Never copy another product's baked texture or its whole material.
 

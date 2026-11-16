@@ -187,6 +187,10 @@ Use these existing skills together for Blender-authored amps, pedals and rack ge
 - [Performance investigation](skills/juce-plugin/references/performance-investigation.md) attributes cost between DSP and editor before anything is optimized.
 - [WebView compatibility and packaging](skills/juce-plugin/references/webview-ui.md) covers version checks, offline resources, production CSP and resource-copy costs.
 - [Real-time-safe relay attachments](skills/juce-plugin/references/webview-ui.md#real-time-safe-relay-attachments) replace JUCE's web attachments in products (they post from the audio thread under host automation); the same reference covers the [macOS WKWebView teardown](skills/juce-plugin/references/webview-ui.md#wkwebview-teardown-on-macos-juce-903) and [windowed lifecycle testing](skills/juce-plugin/references/webview-ui.md#windowed-lifecycle-and-visible-window-testing).
+- Portable asset tools, which need nothing from the case-study projects:
+  - [`wear_library.py`](skills/guitar-gear-materials/scripts/wear_library.py), [`material_inspect.py`](skills/guitar-gear-materials/scripts/material_inspect.py) and [`pbr_bake.py`](skills/guitar-gear-materials/scripts/pbr_bake.py), run in Blender;
+  - [`normal_audit.py`](skills/guitar-gear-modeling/scripts/normal_audit.py), [`glb_validate.py`](skills/guitar-gear-modeling/scripts/glb_validate.py) and [`image_compare.py`](skills/guitar-gear-qa/scripts/image_compare.py), in standard-library Python.
+  - Each runs `--self-test`; the Blender tools also run `--blender-test`.
 - [Native gesture regression check](skills/juce-plugin/scripts/webview_gesture_check.cpp) covers normal completion, cancellation-equivalent completion, active teardown and idle teardown. Its guard is a JUCE 9.0.1-specific workaround; see [build instructions and scope](skills/juce-plugin/references/webview-ui.md#gesture-cleanup-on-editor-destruction) before adapting it to another version.
 
 Native gesture checks complement actual WebView keyboard, screen-reader and host testing; source verification alone is not a runtime test result.

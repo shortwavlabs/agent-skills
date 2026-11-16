@@ -2,7 +2,7 @@
 
 How to measure what a WebGL editor really costs in WebKit, how to release CPU copies of data the GPU already holds, and how to keep the editor recoverable after a WebGL context loss once those copies are gone. Use it after [rendering and lifetime](threejs-webview-ui.md#rendering-threading-and-lifetime) are in place and a memory problem has been measured, not before.
 
-**Evidence base.** One product (the Prismatica case study: a three.js 0.185.1 pedal editor in a JUCE 9 WKWebView; implementation in its `plugin/web/src/scene.ts` and `main.ts`, evidence in its `docs/ui/ui-b3o-*` and `ui-b3or1-*` reports), macOS 26 on Apple silicon, one machine, debug and release VST3/AU builds. Context losses were forced with `WEBGL_lose_context`. WebView2 and WebKitGTK were not measured. Each statement below is marked as one of:
+**Evidence base.** One product (the Prismatica case study: a three.js 0.185.1 pedal editor in a JUCE 9 WKWebView; historical sources: its `plugin/web/src/scene.ts` and `main.ts`, and its `docs/ui/ui-b3o-*` and `ui-b3or1-*` reports. The snippets below are self-contained and need none of them), macOS 26 on Apple silicon, one machine, debug and release VST3/AU builds. Context losses were forced with `WEBGL_lose_context`. WebView2 and WebKitGTK were not measured. Each statement below is marked as one of:
 
 | Label | Meaning |
 |---|---|

@@ -2,7 +2,21 @@
 
 How to build a runtime GLB as a reproducible derivative of a protected Blender master, and why reducing visible geometry is the riskiest optimization in the pipeline. Extends [runtime export](runtime-export.md); materials belong to [runtime PBR](../../guitar-gear-materials/references/runtime-pbr.md) and acceptance to the [visual oracle](../../guitar-gear-qa/references/visual-oracle.md).
 
-**Evidence.** Two products, each a labelled case study, not a template:
+## Bundled tools
+
+Standard-library Python: no Blender, no numpy, nothing from the case-study workspaces. Each runs a `--self-test`.
+
+| Tool | Use |
+|---|---|
+| [`scripts/normal_audit.py`](../scripts/normal_audit.py) | candidate GLB against reference GLB. Reports positional, corner, **in-face** and flat-face normal deviation, plus the normal with the tangent-space normal map applied. Points are split into flat and curved bins; degenerate triangles and unreachable points are reported separately; thresholds give an exit code. `--make-fixtures DIR` writes the synthetic fillet demonstration: a candidate with 0 positional and 0 corner error that still fails in-face. About 3–5 s for 100k triangles; 18 s for a 249k-against-598k pair (Apple M5 Max). |
+| [`scripts/glb_validate.py`](../scripts/glb_validate.py) | a GLB checked against a hand-written JSON contract ([example](../examples/glb_contract.example.json)): semantic nodes and parents, extras, hit proxies, unique names, no `.001` suffixes, one root, finite transforms, materials, extension allow-list, images, cameras and lights. `--compare other.glb` hashes every buffer view and JSON section to check a repeat build. |
+
+**Limitations:**
+- "Unreachable" means no reference surface within the search radius, not "no camera sees it". The case study's audit also excluded faces no camera can see, so its in-face share was lower (5.4 % against 6.1 % on the same knob).
+- Draco, meshopt and quantized meshes are rejected.
+- JPEG or KTX2 normal maps, and `KHR_texture_transform`, are listed as skipped.
+
+**Evidence (historical; not needed to use the tools).** Two products, each a labelled case study, not a template:
 - **Yellow Punch:** an overdrive pedal, its runtime build script and report.
 - **Prismatica:** a chorus pedal, its builds B2 and B3 in `Blender/prismatica/b2|b3/` and its reports in `docs/ui/ui-b2-*` and `ui-b3-*`.
 
@@ -101,7 +115,7 @@ A gate checks what it measures. Structural and positional gates cannot see shadi
 
 **Why positions are not enough.** Collapse-based decimation minimises positional error and is blind to normals. A collapse can leave a large triangle running from a fillet's end across a flat wall. The renderer then interpolates the fillet's tilt across the wall, so a highlight bends or darkens where the surface is in fact flat. Glossy and metal surfaces show it at once.
 
-**The Prismatica audit** (`audit_normals.py`, Validated):
+**The Prismatica audit** (Validated; ported as `normal_audit.py`, which reproduces its normal-map-applied figures on the same knob: 0.83 % against 0.80 % over 5°, the same p99 and maximum):
 - **Read the GLB the way a renderer does.** For each exported triangle, sample 7 points: the 3 corners, plus the centroid and the 3 edge midpoints for the **in-face** measure.
 - **Compare with the master's interpolated normal at the nearest point.** Try every master triangle within 20 µm and keep the best match.
 - **Measure again with the normal map applied** (`n = T·x + B·y + N·z`, read bilinearly). That is the normal that actually shades.

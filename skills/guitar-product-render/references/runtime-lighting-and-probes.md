@@ -2,7 +2,7 @@
 
 What a Blender-to-three.js lighting translation got wrong, how it was diagnosed and what fixed it. It extends [runtime presentation](runtime-presentation.md), which owns camera presets and the general rule to translate studio intent.
 
-**Evidence.**
+**Evidence (historical case studies; the method needs none of these files).**
 - **Yellow Punch:** an overdrive pedal; its editor's `web/src/scene.ts` (three.js 0.185.1).
 - **Prismatica:** a chorus pedal; its `plugin/web/src/scene.ts` and reports `docs/ui/ui-b3-visual-recovery-plan.md` and `ui-b3-refinement-1-final-report.md`.
   - B2 was rejected by the owner.
