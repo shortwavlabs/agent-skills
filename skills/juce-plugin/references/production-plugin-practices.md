@@ -11,6 +11,7 @@
 - Tests and measurement targets
 - Oversampled circuit-model plugins
 - Host validation and release gates
+- Third-party notices and the framework licence
 
 ## When To Use This Reference
 
@@ -68,6 +69,8 @@ Useful patterns:
 - Separate non-parameter state in the APVTS ValueTree: selected file paths, display names, status strings, preset metadata, and version markers.
 - Persist loaded model, package, preset, IR, or sample paths in `getStateInformation()`.
 - On restore, load missing files safely and report visible warnings instead of failing the processor.
+
+User preset libraries (named files the user saves, renames and deletes, kept apart from the host's program list) are in [user-presets.md](user-presets.md): storage per platform, atomic writes, validation before applying, the Trash, the modified mark and their tests.
 
 Do not do message-thread work from parameter callbacks. If parameter changes need preset-dirty tracking or UI notification, set an atomic flag in the listener and publish from a `juce::Timer` or message-thread path. This includes the editor: JUCE's stock attachments post from the audio thread under host automation ([host-automation-and-editor-sync.md](host-automation-and-editor-sync.md)).
 
@@ -146,6 +149,8 @@ Processor tests:
 - State save/restore preserves paths and parameters.
 - Missing files fail safely.
 - Latency updates when delayed stages are enabled or replaced.
+- A user preset library: names, atomic writes, damaged files, the Trash, the audio thread
+  ([test list](user-presets.md#test-seams-and-the-test-list)).
 - Block-size invariance and other exact-equality checks run on every shipped CPU and compiler: on x86, JUCE's
   Intel-only snap-to-zero makes `juce::dsp` filter and oversampler output depend on block size
   ([platform-builds.md](platform-builds.md#floating-point-results-differ-between-cpus)).
@@ -200,8 +205,57 @@ DAW smoke should include:
 
 For signed distribution, add platform signing, notarization, installer validation, clean-machine install, strict plugin validation, and checksums: [signing-and-notarization.md](signing-and-notarization.md). Windows and Linux builds and their validation (pluginval under Xvfb on Linux) are in [platform-builds.md](platform-builds.md).
 
+## Third-Party Notices And The Framework Licence
+
+Ship a notices file in every package and inside each bundle (`Contents/Resources`), and derive its contents from
+the build, not from a sibling product's file.
+
+- **JUCE modules.** List the modules the plug-in target actually compiled: each module is one
+  `include_juce_<module>` translation unit among the target's object files. A copied list can name modules the
+  product does not link (*tested*: a second product's copied list named `juce_dsp`, which it did not link).
+- **Code those modules compile in.** In the case study (JUCE 9.0.3; `juce_audio_utils` and `juce_gui_extra`
+  with their dependencies), the compiled modules brought in:
+  - zlib, HarfBuzz and SheenBidi;
+  - LunaSVG and PlutoVG;
+  - libpng, the IJG JPEG library and libwebp;
+  - FLAC, libogg, libvorbis, Opus, opusfile and libopusenc.
+
+  Each has its own notice to reproduce. Re-derive the list from the module sources of the JUCE version you ship.
+- **Format SDKs.** List them per format and platform: the VST3 SDK, the PreSonus plug-in extensions, the
+  AudioUnitSDK (macOS AU only), and the WebView2 SDK loader (Windows only).
+- **The page bundle.** List every npm package the bundler included (the JUCE WebView library, three.js, …),
+  taken from the lockfile's production dependencies or the bundler's metafile.
+- **Media.** Fonts (for example SIL OFL) and images such as HDRIs or textures. Record the author, source and
+  licence even where none is required (CC0).
+- **Not shipped.** Say which system components are loaded from the user's machine and not distributed:
+  WebKit, WebKitGTK, the WebView2 Runtime, GTK.
+
+**State the framework licence you actually hold.** JUCE is dual-licensed: AGPLv3, or the JUCE End User Licence
+Agreement. Under the JUCE 9 EULA (read 2026-11-16 at <https://juce.com/legal/juce-9-licence/>; recheck it, terms
+and prices change):
+
+| Licence type | Eligibility (revenue or funding, previous 12 months) |
+|---|---|
+| Starter | free; up to US$20,000 |
+| Indie | paid; up to US$300,000 |
+| Pro | paid; no limit |
+| Educational | free; educational use, as the EULA defines it |
+
+- **What counts.** For an individual: all revenue or funding from their use of JUCE, including donations,
+  sponsorship and advertising. For a company: all revenue of the company and its affiliates, from all sources.
+- **Above the limit,** move to a higher type, or stop developing and distributing. Sales of the plug-in count,
+  so check eligibility before paid releases.
+- **No mixing.** Starter, Indie and Pro may not be used at the same time, nor products combined across types.
+  Every developer working on JUCE-dependent code needs a licence seat.
+- **Keep JUCE's notices.** §2.9 forbids removing or altering JUCE's copyright and proprietary notices. Keep
+  JUCE's copyright line, its dual-licence statement and its warranty disclaimer. The JUCE 9 EULA has no
+  splash-screen or attribution requirement.
+- **Never write that a paid licence was bought unless it was.** Do not copy another product's licence wording
+  without checking it, and never ship an unresolved `TODO` about the licence.
+
 ## Sources
 
 - JUCE `AudioProcessor` reference (https://docs.juce.com/master/classAudioProcessor.html): `setLatencySamples()`, `getBypassParameter()`, `processBlockBypassed()`, `updateHostDisplay()`.
 - JUCE `dsp::Oversampling` reference (https://docs.juce.com/master/classdsp_1_1Oversampling.html).
+- JUCE 9 End User Licence Agreement (https://juce.com/legal/juce-9-licence/), read 2026-11-16.
 - Wrapper behaviour (when latency is queried, how host bypass is delivered) differs between JUCE versions and plugin formats; check the pinned JUCE version's wrapper sources and test in the target hosts.

@@ -106,7 +106,7 @@ skills/vcv-rack-plugin/
 
 Build JUCE audio plugins (VST3, AU, AAX, LV2, Standalone) in C++ with CMake. Covers the full development workflow from project scaffolding to multi-format builds — AudioProcessor lifecycle, parameter management with APVTS, DSP module chains, custom editor GUIs, WebView UIs with web technologies (React, Vue, Svelte, Three.js) and semantic GLB controls, state serialization, real-time audio safety, and cross-platform CI/CD.
 
-**Triggers on:** JUCE, audio plugins, VST plugins, AU plugins, audio effects, synthesizers, MIDI processors, AudioProcessor, AudioProcessorEditor, Projucer, `juce_add_plugin`, PluginProcessor.cpp, PluginEditor.cpp, porting to Windows/Linux, code signing, notarization, plugin release packaging, Gumroad license keys, plugin activation, demo mode.
+**Triggers on:** JUCE, audio plugins, VST plugins, AU plugins, audio effects, synthesizers, MIDI processors, AudioProcessor, AudioProcessorEditor, Projucer, `juce_add_plugin`, PluginProcessor.cpp, PluginEditor.cpp, porting to Windows/Linux, code signing, notarization, plugin release packaging, user preset libraries, Gumroad license keys, plugin activation, demo mode.
 
 #### Structure
 
@@ -126,10 +126,11 @@ skills/juce-plugin/
     ├── audio-thread-safety.md  Real-time safety: processBlock rules, lock-free patterns, debugging
     ├── host-automation-and-editor-sync.md  Host automation on the audio thread, stock-attachment hazard, polled attachments, allocation gate
     ├── cmake-reference.md      Full CMake API: juce_add_plugin, SDK paths, CI/CD, platform specifics
-    ├── production-plugin-practices.md  Product plugin practices: validation, assets, state restore
+    ├── production-plugin-practices.md  Product plugin practices: validation, assets, state restore, notices, JUCE licence type
+    ├── user-presets.md         User preset files: per-platform folders, safe writes, validation, Trash, modified mark, WebKit select, tests
     ├── performance-investigation.md    CPU attribution, headless vs live callback, matrix, tooling, equivalence classes, gates, report
-    ├── platform-builds.md      macOS vs Windows vs Linux: MSVC fixes, WebView2/WebKitGTK, glibc baseline, headless tests, x86 float differences, CI jobs
-    ├── signing-and-notarization.md  macOS Developer ID, notarized .pkg, Windows Artifact Signing via GitHub OIDC
+    ├── platform-builds.md      macOS vs Windows vs Linux: MSVC fixes, WebView2/WebKitGTK, glibc baseline, headless tests, x86 float differences, CI jobs and evidence
+    ├── signing-and-notarization.md  macOS Developer ID, notarized .pkg, Windows Artifact Signing via GitHub OIDC, second-product reuse and install checks
     └── gumroad-licensing.md    Gumroad license keys: entitlement table, activation accounting, license-file protocol, shutdown, demo mode, WebView activation
 ```
 
@@ -144,14 +145,15 @@ skills/juce-plugin/
 | **WebView UIs (JUCE 9)** | Pinned compatibility guidance, WebView2, offline resources/CSP, relay lifetime, tested gesture cleanup, explicit dev mode |
 | **Interactive 3D gear** | Blender → GLB → Three.js → WebView; physical controls, APVTS authority, accessibility, state-space checks, render-on-demand |
 | **State serialization** | XML state save/load, non-parameter state via ValueTree children |
+| **User presets** | A preset library on disk shared by every instance: per-platform folders, versioned files validated before applying, names valid on every system and compared case-insensitively, safe writes, the Trash, the modified mark across host threads, the WebKit `<select>` hazard, a test list |
 | **Audio thread safety** | No-allocation rules, lock-free patterns, denormal prevention, debugging; host automation reaching listeners on the audio thread, the stock-attachment message-queue hazard (editor open), polled editor attachments, the allocation gate with AU automation delivered from the audio callback |
 | **Synths** | Synthesiser/SynthesiserVoice/SynthesiserSound framework, polyphonic MIDI, gain ramping |
 | **AudioProcessorGraph** | Processor chaining, graph nodes, dynamic rebuild, node bypass |
 | **Build system** | CMake: juce_add_plugin, SDK paths, binary data, cross-platform, GitHub Actions CI/CD |
 | **Plugin formats** | VST3, AU, AUv3, AAX, LV2, Standalone — format-specific categories and properties |
-| **Production practices** | Separate plugin/test/measurement builds, asset/model loading, state restore, oversampled circuit-model plugins (rate policy, integer latency, bypass parameter, model revision), host validation, release gates |
-| **Platform builds** | What changes on Windows and Linux: per-platform formats and bundle layouts, MSVC portability fixes, WebView2 and WebKitGTK runtime behaviour, glibc baseline containers, headless editor tests, Intel-only snap-to-zero and other cross-CPU float differences, CI jobs |
-| **Signing and notarization** | macOS Developer ID signing, notarized and stapled `.pkg` with installer choices and Dark Mode branding; Windows Microsoft Artifact Signing with GitHub OIDC (identity validation, certificate profile, federated credential, verification); secrets on the GitHub Free plan |
+| **Production practices** | Separate plugin/test/measurement builds, asset/model loading, state restore, oversampled circuit-model plugins (rate policy, integer latency, bypass parameter, model revision), host validation, release gates, third-party notices and the JUCE licence type |
+| **Platform builds** | What changes on Windows and Linux: per-platform formats and bundle layouts, MSVC portability fixes, WebView2 and WebKitGTK runtime behaviour, glibc baseline containers, headless editor tests, Intel-only snap-to-zero and other cross-CPU float differences, CI jobs, CI evidence and artifact identity checks, GitHub Actions behaviour |
+| **Signing and notarization** | macOS Developer ID signing, notarized and stapled `.pkg` with installer choices and Dark Mode branding; Windows Microsoft Artifact Signing with GitHub OIDC (identity validation, certificate profile, federated credential, verification); secrets on the GitHub Free plan; a second product on the same identities, rehearsal without credentials and install checks (implemented but not yet fully qualified) |
 | **Licensing (Gumroad)** | Selling with per-sale license keys: product set-up with the Gumroad MCP server, an entitlement decision table (refunds, chargebacks, memberships, imported customers), activation accounting with a non-incrementing preflight, a revision-checked license file shared across host processes, cancellation and shutdown without force-killing threads, HTTPS on all platforms (lazy libcurl on Linux), realtime demo dropouts, the WebView activation dialog, a test matrix and support procedures |
 | **Performance investigation** | Where a plugin's CPU goes and how to prove a fix: attribution before optimization, headless versus live-callback measurement, equivalence classes, performance gates, and a report that keeps rejected candidates |
 

@@ -266,6 +266,23 @@ C++ listens through `withEventListener('uiReady', callback)`; JS emits through `
 
 Keep one slider state per control, subscribe in an effect, apply its current value after subscribing and remove listener IDs in cleanup. Pointerdown captures and begins one gesture; input/move only updates. One idempotent handler ends on pointerup/cancel/lost capture/blur/unmount. Keyboard edits need correctly bracketed gestures too. Do not begin/end on every `onChange` while also beginning on mouse/pointerdown: that nests automation gestures. This lifecycle also applies to plain DOM controls.
 
+## Native form controls in macOS WebKit
+
+A `<select>` opens the platform's native popup in WKWebView. It does not open a DOM list, and it behaves unlike
+Chromium in ways a browser preview cannot show. The following comes from WebKit's source (`main`, read 2026-11-16),
+not from a reproduced failure:
+
+- **The open popup is a snapshot.** Options changed while it is open are not shown.
+- **A choice is applied by row position against the current options.** Inserting or removing an option before
+  the chosen row while the popup is open (a "(modified)" mark added because automation moved a knob) makes the
+  click select a neighbour. Appending after the last option shifts nothing.
+- **`hidden` and `display: none` options are listed** as rows. Chromium hides them.
+
+Keep option positions fixed while the control has focus, and defer rebuilds to `blur`. Show changing status in a
+first option that is never hidden. Check the picker in the real WebView, or in WebKit's source, never only in the
+preview. The source references, mitigations and preset-picker tests are in
+[user-presets.md](user-presets.md#a-native-select-in-macos-webkit).
+
 ## Local resources and development mode
 
 Build the frontend before BinaryData generation. Declare HTML/JS/CSS/GLB/camera outputs and source dependencies in CMake so edits rebuild the package. Use `juce_add_binary_data` and link its target into the plugin. Large GLBs are binary resources, never Base64 inside JS. Fixed filenames or a generated manifest keep provider routes aligned with bundled output.
@@ -361,6 +378,7 @@ An in-process editor test creates no window, so it cannot see window, compositor
   - With the display asleep **and** the screen locked, WKWebView treated the page as hidden: `document.hidden` was true, `requestAnimationFrame` stopped and no frame was presented. Every hidden run in testing had both conditions; display sleep alone and lock alone were not isolated.
   - Such runs still qualify audio-thread allocation, because the audio path does not depend on visibility. They do **not** qualify rendering, input or presentation.
   - A window covered by another window, or moved off screen, was **not** reported hidden in testing. Only the combined display-asleep-and-locked state was.
+  - So also record the host window's own visibility from outside the page, for example whether `NSWindow.occlusionState` includes `NSWindowOcclusionStateVisible`. In testing, an unlocked session twice produced live-host rows whose window was not visible, presumably because another window or Space covered it. The cause was not isolated, and `document.hidden` would not have caught it. Discard such rows and rerun with the window uncovered.
 - **Presentation.** Neither a frame callback nor a GPU fence proves that pixels were displayed: in WKWebView a fence placed after the first render signalled at the next frame boundary, and `gl.finish()` did not time GPU work. Bound the first visible frame from outside the page instead:
   - capture the plug-in window repeatedly from launch (`screencapture -l <window id>`, unlocked session);
   - find the first capture showing the content;
