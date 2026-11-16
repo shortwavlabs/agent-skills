@@ -32,7 +32,7 @@ Test the actual clean embedded build, not only the dev server. After a known vis
 
 ## Performance candidates that can change appearance
 
-Lower pixel ratio, smaller shadow maps, smaller textures, a lower redraw rate and merged meshes are hypotheses. Each one must show **both** a measured benefit and no unacceptable visual loss; a downgrade that merely sounds cheaper is not shipped. Run the study in the real system WebView with the production asset.
+Judge candidates against a frozen, owner-approved [visual oracle](visual-oracle.md) with a declared comparison class. Lower pixel ratio, smaller shadow maps, smaller textures, a lower redraw rate and merged meshes are hypotheses. Each one must show **both** a measured benefit and no unacceptable visual loss; a downgrade that merely sounds cheaper is not shipped. Run the study in the real system WebView with the production asset.
 
 1. Measure the candidate's benefit in the unit it claims, on the target hardware: frame time with the GPU forced to finish, draw calls and triangles per frame, decoded texture memory, load time, or CPU by process. Record which resource it actually saves.
 2. Capture matched snapshots of the current build and the candidate with the same camera, size, lighting and state:

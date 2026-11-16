@@ -202,7 +202,7 @@ Keep these apart in reports and fixes:
 
 ## Rejected approaches and attribution lessons
 
-Recorded so the next agent does not repeat them without new evidence. Each was judged against byte-identical (class A) or thresholded (class B) WKWebView views ([performance candidates](../../guitar-gear-qa/references/runtime-qa.md#performance-candidates-that-can-change-appearance)).
+Recorded so the next agent does not repeat them without new evidence. Each was judged against byte-identical (class A) or thresholded (class B) WKWebView views ([comparison classes](../../guitar-gear-qa/references/visual-oracle.md#comparison-classes), [performance candidates](../../guitar-gear-qa/references/runtime-qa.md#performance-candidates-that-can-change-appearance)).
 
 | Candidate | Outcome | Lesson |
 |---|---|---|
@@ -212,7 +212,7 @@ Recorded so the next agent does not repeat them without new evidence. Each was j
 | No shadow map for a 0.06-intensity fill light | **Rejected:** contact shadows around raised details at the closest zoom (4 views) | A weak light can still own the contact shadows |
 | Half-resolution transmission target for the LED glass | **Rejected:** LED lens and nearby views (27 views) | — |
 | Build the studio environment once instead of twice; ask for host values during the GLB load | **Rejected:** no measured gain (the first frame was not earlier) | Measure before keeping even an obviously redundant step's removal |
-| Geometry reduction (an earlier asset) | **Rejected** after it passed position audits within 11 µm | Edge collapse minimises positional error and ignores shading normals: interpolated fillet tilt across large triangles left a dark band on knob skirts and fine lines on knob flutes at the closest zoom. Audit normals at points **inside** faces, not only at corners, and reduce per part family; a global triangle target can damage exactly the glossy parts that matter |
+| Geometry reduction (an earlier asset) | **Rejected** after it passed position audits within 11 µm | Edge collapse minimises positional error and ignores shading normals: interpolated fillet tilt across large triangles left a dark band on knob skirts and fine lines on knob flutes at the closest zoom. Audit normals at points **inside** faces, not only at corners, and reduce per part family; a global triangle target can damage exactly the glossy parts that matter ([geometry fidelity](../../guitar-gear-modeling/references/runtime-derivative-and-geometry-fidelity.md)) |
 | The ~200 ms "first orbit stall" | a **harness artefact** | It was the first animation frame after ~90 synchronous `gl.finish()` measurement frames. A user's first orbit measured 18–22 ms. Synchronous GPU waits distort the frames that follow them |
 | LED glass (`KHR_materials_transmission`) | **unresolved trade-off** | It costs about 77 MB and a second opaque pass (draw calls 80 → 40 without it), but cheaper techniques visibly changed the approved look. An owner decision, not an optimization |
 | GPU-compressed textures (KTX2 with raw ASTC) | **not built** (architectural; owner decision) | Estimated about −180 MB per editor; needs an encoder, a loader, a larger asset and a backend check |

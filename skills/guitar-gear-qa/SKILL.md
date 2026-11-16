@@ -13,7 +13,7 @@ Read [the QA checklist](references/qa-checklist.md) for the inspection matrix, m
 
 For interactive plugin assets, read [runtime QA](references/runtime-qa.md) for semantic hierarchy/pivot checks, browser visual parity, a reusable metrics report, host automation/state restore and instance-ladder profiling. Run standalone WebGL acceptance before JUCE integration and repeat on each target WebView backend. The static Blender audit is insufficient for these claims.
 
-During a performance pass, every change that can alter the picture (pixel ratio, shadow-map size, texture resolution, redraw rate, merged geometry) is a candidate, not a default. Judge it with the [performance candidate procedure](references/runtime-qa.md#performance-candidates-that-can-change-appearance): a measured benefit, matched views at every critical size tier, and a recorded ACCEPT or REJECT with the reason.
+During a performance pass, every change that can alter the picture (pixel ratio, shadow-map size, texture resolution, redraw rate, merged geometry) is a candidate, not a default. Judge it with the [performance candidate procedure](references/runtime-qa.md#performance-candidates-that-can-change-appearance): a measured benefit, matched views at every critical size tier, and a recorded ACCEPT or REJECT with the reason. Establish and freeze the approved appearance before any optimization: [visual-first acceptance and the visual oracle](references/visual-oracle.md) covers the phases, what to freeze, and byte-identical versus thresholded comparison classes.
 
 ## Refinement decision rules
 

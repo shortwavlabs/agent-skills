@@ -11,7 +11,7 @@ Read [construction standards](references/construction-standards.md) for referenc
 
 ## Runtime GLB export
 
-Use for an interactive guitar-gear plugin asset. Preserve the accepted master and build a separate runtime derivative. Read [runtime export](references/runtime-export.md) for export collections, semantic nodes, rest pivots, extras, hit proxies and static consolidation. Source-level separate-part rules above remain appropriate for the master; runtime joining is scoped to the derivative.
+Use for an interactive guitar-gear plugin asset. Preserve the accepted master and build a separate runtime derivative. Read [runtime export](references/runtime-export.md) for export collections, semantic nodes, rest pivots, extras, hit proxies and static consolidation. Read [reproducible derivatives and geometry fidelity](references/runtime-derivative-and-geometry-fidelity.md) before building a repeatable derivative or reducing any visible geometry: master hashing, repeat-build comparison, and why a position-accurate decimation can still break shading normals (case study). Source-level separate-part rules above remain appropriate for the master; runtime joining is scoped to the derivative.
 
 ## Refinement decision rules
 
