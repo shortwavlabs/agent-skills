@@ -35,6 +35,7 @@ Every number below is a **case-study value**: derive your own from the master. L
   | `GG_WEAR_ConvexEdge` | edge wear from a Bevel-node normal dotted with the true normal, × local AO | Radius, Low, High |
   | `GG_WEAR_EnclosureChips`, `…Strokes` | deterministic paint chips, rubs and scratches from data lists, some cut to the substrate | per-feature data |
 
+- **Base finishes are not in the wear layer.** Powder-coat orange peel, machining rings and the radial tangent for spun metal live in each product's base material graphs, which the wear layer leaves untouched. Yellow Punch's earlier builds show orange-peel noise and a radial tangent, but whether those exact values survive in its final build was not verified. No anodized finish was found in either product.
 - **One builder per material family:** `metal_wear` (scratches, polish, dull, tarnish, oxide, edge, lip wear), `plastic_wear`, `insert_wear`, `paint_wear`, `bottom_wear`, `rubber_wear`, `dc_wear`.
   - Metal bump distance is about 4 µm; paint bump is 40 µm ("about the coating thickness").
 - **Per-part amounts:**

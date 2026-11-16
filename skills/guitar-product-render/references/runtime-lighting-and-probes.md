@@ -9,7 +9,7 @@ What a Blender-to-three.js lighting translation got wrong, how it was diagnosed 
   - B3 checkpoint 1 was **not approved**.
   - B3 refinement 1 was accepted as a whole: asset, lighting, probes and renderer settings.
 
-Every value below is a **case-study value**, fitted to one master on one machine. Labels used: **Validated**, **Case-study value**, **Rejected**, **Limitation**.
+Every value below is a **case-study value**, fitted to one master on one machine. Labels used: **Validated**, **Case-study value**, **Rejected**, **Not approved** (B3 checkpoint 1), **Limitation**.
 
 ## Contents
 
@@ -42,7 +42,7 @@ Diagnosed in B3 by A/B experiments, scored as mean absolute error (MAE) against 
 | Cause | Effect | Evidence |
 |---|---|---|
 | The environment was a uniform grey room plus cards; the master lights reflections with an HDRI (`studio_small_09`, strength 0.4) over a grey ground | mirrors reflect flat grey, so toggles, footswitch wall and bezel read as grey paint | adding the HDRI and ground |
-| Card radiance converted as W/(4π·A) | reflected studio lights too weak | W/(π·A), 4× brighter, matched (footswitch luminance 63 against the master's 64) |
+| Card radiance converted as W/(4π·A) | reflected studio lights too weak | W/(π·A), 4× brighter, scored best (footswitch luminance 63 against the master's 64). The code records it as an empirical fit, not a derivation of Cycles' radiance |
 | The overhead scrim at Yellow Punch's 1.0; the master's light gives 0.38 | overhead glare; with unconverted anisotropy, a hard star | scrim and anisotropy experiments |
 | The key light added again as a directional light | key counted twice | MAE fell as the directional key was lowered; it is 0 in the accepted rig |
 | Directional key: no falloff | the master's panel is about 30 % brighter at the front left than at the top; the runtime was flat | spot key with decay 2 |
@@ -62,11 +62,11 @@ The accepted configuration (Validated as a whole; every value is a case-study va
   - PMREM near plane 0.5 mm. An earlier run's near plane clipped the ground and was discarded.
 
 **Cards**
-- Converted as W/(π·A) from the master's lights: key 3.6, fill 2.2, rear 8.8.
-- Scrim **0.6**. Checkpoint 1 used the master's 0.38 (part of the unapproved checkpoint); 1.0 made the knob tops glare.
+- Fill 2.2 and rear 8.8, as W/(π·A) of the master's lights. The key card keeps a quarter of its 14.3 (3.6); the key's direct light comes from the spot below.
+- Scrim **0.6**. Checkpoint 1 used the rule's 0.38 (Not approved), which hid the metals' wear; 1.0 made the knob tops glare.
 
 **Key light**
-- A `SpotLight` at the key softbox's position: cone 60°, penumbra 0.6, **decay 2**, intensity 0.3.
+- A `SpotLight` at the key softbox's position: `angle` π/3 (three.js's half-angle), penumbra 0.6, **decay 2**, intensity 0.3.
 - 2048² shadow map.
 - Narrowing its shadow camera (focus 0.41) hardened the shadows and worsened every score: rejected.
 

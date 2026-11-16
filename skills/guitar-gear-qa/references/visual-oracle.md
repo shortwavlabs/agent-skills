@@ -31,7 +31,7 @@ This reference owns that process and the comparison rules. [Runtime QA](runtime-
 **Case study.** Accepted B3 cost more than rejected B2:
 - 597,676 against 249,168 triangles;
 - about 232 against 102 MiB of decoded textures;
-- 1,048–1,161 against 572–587 MB of WebKit helper memory per editor.
+- 1,048–1,161 against 572–587 MB of WebKit helper RSS per editor (the measure used before B3-O; its physical footprint was later measured at about 1.32–1.33 GB).
 
 B3-O then removed about 294 MB per editor (−22 %) with **all 45 oracle views byte-identical**. Fidelity first gave the optimization a fixed target; B2's gates had protected numbers that were not the product.
 
