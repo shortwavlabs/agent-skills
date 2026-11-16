@@ -273,8 +273,9 @@ Chromium in ways a browser preview cannot show. The following comes from WebKit'
 not from a reproduced failure:
 
 - **The open popup is a snapshot.** Options changed while it is open are not shown.
-- **A choice is applied by row position against the current options.** Inserting or removing an option while the
-  popup is open (a "(modified)" mark added because automation moved a knob) makes the click select a neighbour.
+- **A choice is applied by row position against the current options.** Inserting or removing an option before
+  the chosen row while the popup is open (a "(modified)" mark added because automation moved a knob) makes the
+  click select a neighbour. Appending after the last option shifts nothing.
 - **`hidden` and `display: none` options are listed** as rows. Chromium hides them.
 
 Keep option positions fixed while the control has focus, and defer rebuilds to `blur`. Show changing status in a

@@ -141,7 +141,8 @@ endif()
 **Static libraries inside the plug-in.** A project static library (a DSP core shared by the plug-in and its
 tests) linked into the Linux `.so` must be position-independent. Without it, the link fails with
 `relocation R_X86_64_PC32 against symbol … can not be used when making a shared object; recompile with -fPIC`
-(*tested*). macOS and Windows do not need this.
+(*tested*). macOS and Windows do not need this. Set it on the library target, or set
+`CMAKE_POSITION_INDEPENDENT_CODE ON` before creating the targets to apply it to all of them.
 
 ```cmake
 if(UNIX AND NOT APPLE)

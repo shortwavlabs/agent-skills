@@ -36,6 +36,7 @@ and action releases are vendor facts checked 2026-10: confirm them on the vendor
 | Post-sign | `notarytool submit --wait`, `stapler staple` | Nothing to notarize; SmartScreen reputation builds from downloads |
 | Verify | `codesign --verify --strict`, `pkgutil --check-signature`, `stapler validate`, `spctl --assess --type install` | `Get-AuthenticodeSignature` status `Valid` with a timestamp certificate |
 | One identity for many products | Yes | Yes: one account and one profile sign every product; the signing quota is shared |
+| Setting up a second product | [Second product](#second-product-rehearsal-and-install-checks): implemented, not yet qualified | Same |
 
 ## macOS: Credentials
 
@@ -376,8 +377,9 @@ check_p12() {
 7. Run pluginval on the installed copy.
 
 **Installing on a developer's own Mac.** A `.pkg` installs into `/Library/Audio/Plug-Ins`. If a development
-copy of the same plug-in sits in `~/Library/Audio/Plug-Ins`, macOS has two components with the same type,
-subtype and manufacturer, and nothing defines which one a host loads. Before installing:
+copy of the same plug-in sits in `~/Library/Audio/Plug-Ins` (a local build with copy-after-build on), macOS has
+two components with the same type, subtype and manufacturer, and nothing defines which one a host loads. This
+applies to every release package of that plug-in, not only the first. Before installing:
 1. Move the user-folder copies to a backup folder.
 2. Write the rollback down:
    - remove the system copies;
@@ -385,7 +387,9 @@ subtype and manufacturer, and nothing defines which one a host loads. Before ins
    - move the backups back;
    - run `killall -9 AudioComponentRegistrar`.
 
-User data, such as presets in Application Support, is untouched by either step.
+User data, such as presets in Application Support, is untouched by either step. On Windows, likewise keep one
+copy: a VST3 left in both `C:\Program Files\Common Files\VST3` and the per-user folder gives the host two
+plug-ins with the same class IDs.
 
 **People's acceptance checklist.** Automation does not cover:
 - Gatekeeper and the installer's dialogs, with branding in Light and Dark Mode;
