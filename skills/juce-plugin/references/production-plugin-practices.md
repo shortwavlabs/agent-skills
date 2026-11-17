@@ -69,6 +69,7 @@ Useful patterns:
 - Separate non-parameter state in the APVTS ValueTree: selected file paths, display names, status strings, preset metadata, and version markers.
 - Persist loaded model, package, preset, IR, or sample paths in `getStateInformation()`.
 - On restore, load missing files safely and report visible warnings instead of failing the processor.
+- Number text in XML state follows the host's C++ locale in JUCE 9.0.3: a host with a decimal-comma global locale writes `0,83`, which `String::getDoubleValue` (and so an APVTS restore) reads as 0. Parse such text yourself if you read it ([user presets](user-presets.md#number-text-follows-the-hosts-c-locale)).
 
 User preset libraries (named files the user saves, renames and deletes, kept apart from the host's program list) are in [user-presets.md](user-presets.md): storage per platform, atomic writes, validation before applying, the Trash, the modified mark and their tests.
 

@@ -300,21 +300,23 @@ All in one folder (for example `Source/licensing/`), one namespace:
 `deviceId`, `lastChecked` (UTC ms), optional `entitledUntil`, and `revision`, a fresh random id written with
 every change. Never store the license in plugin state: it would travel inside project files.
 
-**Specified** rules (the case study's second version implements 1-7 except `entitledUntil` and rule 2's checked
-stream write; its first compared nothing before writing or deleting):
+**Specified** rules (the case study's current version implements 1-7 except `entitledUntil`; its first compared
+nothing before writing or deleting, its second did not yet check writes):
 
 1. **One lock for every change.** Each write, delete and pending-marker change happens inside one
    `juce::InterProcessLock` named for the product, held only for the file read-compare-write: never across a
    network call, never on the audio thread.
-2. **Atomic replacement.** Write a `TemporaryFile` through a `FileOutputStream`, check `openedOk()`, the write
-   and `getStatus()` after `flush()`, then call `overwriteTargetFileWithTemporary()`. That call uses `replaceFileIn`,
-   which is `rename()` on POSIX and `ReplaceFile` on Windows in JUCE 9.0.3. Do not rely on `File::replaceWithText`:
-   it ignores the result of writing the temporary file. A temporary file that cannot be created, or a replacement
-   that fails (the failed-write test below fails at the replacement), returns `false`; but a short write after a
-   successful open (a full disk) returns `true` and installs the truncated file
-   ([code](user-presets.md#writing-a-file-safely)). Replacement prevents torn reads; it does not
-   prevent lost updates or stale deletes, which is what rules 3-5 are for. `File::moveFileTo` deletes the target
-   first.
+2. **Atomic replacement, only after a complete write.** Write a temporary file next to the target through a
+   `FileOutputStream`; check `openedOk()`, the write and `getStatus()` after `flush()`, **and then the file's size
+   on disk against the bytes intended**: in JUCE 9.0.3 a short write (a full disk accepting part of the buffer) leaves
+   every stream check reporting success (source-derived; reproduced on macOS and Linux with `RLIMIT_FSIZE`). Then replace the target with one `rename()` (POSIX) or `MoveFileExW`
+   (Windows), not `overwriteTargetFileWithTemporary()`, whose Linux fallback deletes the target when `rename()`
+   fails ([code and sources](user-presets.md#writing-a-file-safely)). Do not rely on `File::replaceWithText`: a
+   short write makes it return `true` and install the truncated file (**tested**, case study, `RLIMIT_FSIZE` on macOS
+   and Linux). Give the caller the new `revision` only after the write committed: a revision kept in memory that is
+   not on disk makes the next result look stale, so a later revocation would be discarded. Replacement prevents torn
+   reads; it does not prevent lost updates or stale deletes, which is what rules 3-5 are for. `File::moveFileTo`
+   deletes the target first.
 3. **Every job carries the identity it checked.** A re-check snapshots `(key, revision)` when it starts.
 4. **Apply a result only if that identity is still on disk.** Under the lock, re-read the file. Same key and
    revision: apply (refresh `lastChecked` with a new revision, or delete on a revocation). Anything else (another
@@ -506,12 +508,20 @@ instances on one folder for cross-process cases; a blocking fake makes interleav
   removes the marker without counting.
 - X entered again after Y: as in the stale case, but the customer enters X again instead of a background resolve.
   The explicit request wins: X is installed, still without an incrementing call.
-- Failed license write: make `license.json` unwritable while markers stay writable, with a **non-empty** directory
-  in its place, and assert the set-up. An empty one doesn't work on Linux: when `rename()` fails, JUCE 9.0.3 falls
-  back to deleting the target, which removes an empty directory, and the write succeeds (macOS refuses to copy over
-  it, so the test passes there). The activation licenses the session with the warning and keeps the marker;
-  remove the obstacle, advance past the claim's age limit, and a fresh manager installs the license without
-  counting.
+- Failed license write: make `license.json` unwritable while markers stay writable, with a directory in its place,
+  and assert the set-up. With `overwriteTargetFileWithTemporary` an **empty** directory doesn't work on Linux: when
+  `rename()` fails, JUCE 9.0.3 falls back to deleting the target, which removes an empty directory, and the write
+  succeeds (macOS refuses to copy over it, so the test passes there). With the single rename of rule 2 an empty
+  directory stays and the write fails on every platform, which makes a good check of rule 2 itself. The activation
+  licenses the session with the warning and keeps the marker; remove the obstacle, advance past the claim's age
+  limit, and a fresh manager installs the license without counting.
+- Failed and short writes of each file (`license.json`, a marker, `installed.json`): inject a failure at each step
+  (temporary file not created, half the bytes written, flush, rename) and, on POSIX, a real short write with
+  `RLIMIT_FSIZE` lowered below the file's size. The previous file stays byte-identical; a claim whose marker isn't
+  saved reports it (the degraded path); `installed.json` or `license.json` failing keeps the marker, and the next
+  session installs without counting; after a failed re-check save, the next re-check saves and a revocation still
+  applies. *Case study: these ran on macOS, Linux and Windows CI; Windows has no `RLIMIT_FSIZE`, so its short write
+  is simulated.*
 - Degraded path: make the marker folder unwritable (a file in its place). One incrementing call, no marker; a
   license for another key written during the call stays and is adopted; replacing a key held at the claim works.
 - Refusal keeps a license: an incrementing call refused (over the allowance) while `license.json` holds a license
