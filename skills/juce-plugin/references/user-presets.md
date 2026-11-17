@@ -2,7 +2,7 @@
 
 Sounds the user names and saves as files, kept apart from the factory programs the host lists. The library must behave the same on macOS, Windows and Linux, survive damaged files and interrupted writes, never lose a preset to a mistaken click, and keep the audio thread untouched.
 
-**Evidence base.** One product (the Prismatica case study, JUCE 9.0.3). The library, processor and bridge tests (UP.01–UP.16 below) ran on macOS (arm64 and universal builds), Windows x64 and Linux x86_64 in GitHub Actions, and on Linux arm64 in Docker. The exception is UP.14's allocation count, which needs a macOS facility and is `NOT MEASURED` elsewhere. The editor was accepted overall by its owner in Logic Pro on macOS; item-level results were not recorded. The editor's preset UI in WebView2 (Windows) and WebKitGTK (Linux) has not been checked in a real host. Each statement is marked as one of:
+**Evidence base.** One product (the Prismatica case study, JUCE 9.0.3). The library, processor and bridge tests (UP.01–UP.16 below) ran on macOS (arm64 and universal builds), Windows x64 and Linux x86_64 in GitHub Actions, and on Linux arm64 in Docker. The exception is UP.14's allocation count, which needs a macOS facility and is `NOT MEASURED` elsewhere. The editor was accepted overall by its owner in Logic Pro on macOS; item-level results were not recorded. The editor's preset UI in WebView2 (Windows) and WebKitGTK (Linux) has not been checked in a real host. The file-safety statements below (writing, renaming, deleting, number text) also draw on a second JUCE 9.0.3 product, a pedal plugin with the same kind of library; its tests ran on macOS arm64 (locally and in GitHub Actions), Windows x64 and Linux x86_64 in GitHub Actions, and each statement it supports says "pedal plugin". Each statement is marked as one of:
 
 | Label | Meaning |
 |---|---|
@@ -75,12 +75,20 @@ One file per preset, with a product-specific extension. A small XML root records
 1. Cap the file size (64 KiB in the case study) before reading it.
 2. Check the root tag. The format version must be an integer. A newer version gets its own message ("saved by a newer version of …"), not "damaged".
 3. Each known ID may appear at most once. Ignore unknown IDs: a session parameter found in a file is never applied.
-4. Each value must be a plain decimal number. `juce::String::getDoubleValue` reads `"abc"` as 0, so match the text first.
+4. Each value must be a plain decimal number. `juce::String::getDoubleValue` reads `"abc"` as 0, so match the text first. Accept a decimal comma as well as a point, and read it as the decimal separator ([number text](#number-text-follows-the-hosts-c-locale)).
 5. Each value must be finite and within the range, with a small tolerance. Choice and switch parameters must be whole steps.
 6. Every stored parameter that the layout has must be present.
 7. Skip parameters this build does not have, so files from a build with an optional feature still load.
 
 **Apply through the parameters.** For each stored parameter call `beginChangeGesture`, then `setValueNotifyingHost (convertTo0to1 (value))`, then `endChangeGesture`. Do this on the message thread. `apvts.replaceState` replaces the whole state, session parameters and non-parameter state included. It is simpler when a preset is meant to be the entire state, but not when a load must leave some of it alone. **Case-study choice.**
+
+### Number text follows the host's C++ locale
+
+JUCE 9.0.3 formats a `double` (`String (double)`, a `var` holding a double, and therefore every `ValueTree` property written as XML) through a `std::ostream`. It imbues the classic locale on the stream buffer, but the stream that formats the number takes the process's global C++ locale (`text/juce_String.cpp`, `StackArrayStream`). **Source-derived**, and reproduced with JUCE 9.0.3 on macOS: after `std::locale::global (std::locale ("de_DE.UTF-8"))`, `String (0.83)` is `"0,83"` and a preset holds `value="0,8299999833106995"`.
+
+- A host that sets a decimal-comma global locale therefore writes presets, and plug-in state, with decimal commas. `getDoubleValue` stops at the comma: `"0,83"` reads as 0 and `"1,0e-7"` as 1. An APVTS state restored through `ValueTree::fromXml` reads them the same way.
+- A preset loader should accept one decimal comma in place of the point and parse the value that was saved. **Tested** (pedal plugin): every decimal-point fixture converted to commas loads bit-identically to the original; a preset saved by JUCE under a comma locale holds commas and loads its saved values (macOS and Windows; **not run** on Linux, whose CI container had no comma locale).
+- The writer is not fixed by this. Files saved in such a host keep their commas, and an older plug-in version that reads with `getDoubleValue` misreads them. **Limitation:** no host known to set a comma locale was identified; the pedal plugin left its writer and state format unchanged.
 
 ## Names
 
@@ -101,24 +109,38 @@ The name is the file name, so validate it exactly as given and never trim silent
 
 - It writes a `TemporaryFile` with `appendText` and ignores that call's result, then returns `overwriteTargetFileWithTemporary()`.
 - If the temporary file cannot be opened, nothing exists to move, so it returns `false` and the target is untouched.
-- If the file opens but the write is short (a full disk or a quota), it still returns `true` and replaces the target with the truncated file.
+- If the file opens but the write is short (a full disk or a quota), it still returns `true` and replaces the target with the truncated file. **Tested** (pedal plugin, macOS and Linux): with `RLIMIT_FSIZE` lowered to 64 bytes, `replaceWithText` of 200 bytes returned `true` and left 64 bytes.
 
-Write through a stream and check it before replacing the target:
+**Checking the stream is not enough either** (JUCE 9.0.3, **source-derived**). `FileOutputStream::write` only copies a small payload into its buffer and returns `true`. `flush()` discards `flushBuffer()`'s result. `writeInternal` sets the stream's status only when `::write` (POSIX) or `WriteFile` (Windows) fails outright, not when it writes fewer bytes than asked, which a full disk or quota can do. A short write therefore leaves `openedOk()`, the write's result and `getStatus()` all reporting success (reproduced on macOS and Linux with `RLIMIT_FSIZE`, below; the Windows path is read in source only). After closing the stream, compare the size of the file on disk with the number of bytes intended.
+
+**Replace the target with one rename, not `overwriteTargetFileWithTemporary`** (JUCE 9.0.3, **source-derived**). That call uses `File::replaceFileIn` → `moveInternal`. On POSIX, when `rename()` fails, `moveInternal` falls back to `copyInternal`; on Linux (`native/juce_CommonFile_linux.cpp`) that deletes the target and then copies, and deletes the target again if the copy fails, so a failed replacement can lose both versions. (macOS's `copyInternal` refuses an existing destination.) On Windows it is `ReplaceFile` without a backup name, which Microsoft documents can fail with `ERROR_UNABLE_TO_MOVE_REPLACEMENT` after the replaced file no longer exists.
 
 ```cpp
-juce::TemporaryFile temp (target, juce::TemporaryFile::useHiddenFile);
-bool written = false;
+// The bytes File::replaceWithText writes (UTF-8, no BOM, CRLF), so existing files keep their exact format.
+juce::MemoryOutputStream bytes;
+bytes.writeText (text, false, false, "\r\n");
+
+// Next to the target (same volume); ".tmp" keeps a leftover out of every "*.<ext>" listing.
+const auto temp = target.getParentDirectory().getNonexistentChildFile (
+    "." + target.getFileName() + "." + juce::String::toHexString (juce::Random::getSystemRandom().nextInt()), ".tmp", false);
+const juce::TemporaryFile cleanup (target, temp);   // deletes the temporary file on every return below
 {
-    juce::FileOutputStream out (temp.getFile());
-    written = out.openedOk() && out.writeText (text, false, false, "\n");
-    out.flush();
-    written = written && out.getStatus().wasOk();
-}   // close the stream before renaming
-if (! written || ! temp.overwriteTargetFileWithTemporary())
-    return failure ("could not be saved");
+    juce::FileOutputStream out (temp);
+    if (! out.openedOk() || ! out.write (bytes.getData(), bytes.getDataSize()))
+        return false;
+    out.flush();                                     // fsync (POSIX) or FlushFileBuffers (Windows)
+    if (out.getStatus().failed())
+        return false;
+}                                                    // closed before the rename
+if (temp.getSize() != (juce::int64) bytes.getDataSize())
+    return false;                                    // a short write: the target is untouched
+// One rename that replaces the target or leaves it as it was:
+// POSIX std::rename (from, to); Windows MoveFileExW (from, to, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH).
+// Retry it a few times on Windows (JUCE tries five times, 100 ms apart): a scanner or indexer can hold the target.
+return renameOver (temp, target);
 ```
 
-`overwriteTargetFileWithTemporary` renames the temporary file over the target: `rename()` on POSIX, `ReplaceFile` on Windows. It tries five times, 100 ms apart, and if every attempt fails, `TemporaryFile`'s destructor deletes the temporary file. **Source-derived.** **Limitation:** the case study never forced a failed or short write in a test. Its tests cover saving, overwriting and refusing (UP.02, UP.03). Add a test that makes the write fail, for example with a read-only folder or a folder standing where the file should be, and checks that the previous file is unchanged.
+**Tested** (pedal plugin, macOS, Linux and Windows): each step made to fail through an injected fault (temporary file not created, half the bytes written, flush failure, rename failure) for an overwrite and a new file; the previous file stays byte-identical and no temporary file remains. A real short write runs with `RLIMIT_FSIZE` lowered (macOS and Linux; ignore `SIGXFSZ` and print nothing while the limit is low, since stdout may be a file). An empty folder standing where the file should be survives the failed write on all three platforms (JUCE's Linux fallback would delete it). **Limitation:** Windows has no `RLIMIT_FSIZE`, so its short write is simulated only, and a real full disk (`ENOSPC`) was not reproduced anywhere. The Prismatica case study (UP.02, UP.03) covers saving, overwriting and refusing, not failed writes.
 
 ## Listing, renaming and deleting
 
@@ -130,15 +152,35 @@ Re-list the folder:
 - when the window or the picker gains focus, to catch changes made by other processes;
 - when a process-wide revision counter changes, which any instance bumps after it changes the folder.
 
-**Renaming.** Use `File::moveFileTo`. In JUCE 9.0.3, `NAMES_ARE_CASE_SENSITIVE` is defined only on Linux and BSD. Elsewhere `moveFileTo` skips deleting the target when the two paths differ only in case, so a case-only rename happens in place. Do not hand-roll a rename as "delete the target, then move": on a case-insensitive file system, the target of a case-only rename is the source file itself. Refuse a rename onto another existing preset, compared case-insensitively. **Tested** by UP.04 on all three platforms.
+**Renaming.** Do not use `File::moveFileTo`, and do not hand-roll "delete the target, then move". In JUCE 9.0.3 `moveFileTo` deletes an existing destination before moving, unless the two paths compare equal, and it compares path **strings**: ignoring case on macOS and Windows, exactly on Linux and BSD (`NAMES_ARE_CASE_SENSITIVE`). **Source-derived.** Where the file system matches names more loosely than that comparison, the "destination" is the source itself and the rename deletes the preset:
 
-**Deleting.** Move the file to the Trash, and report a failure. Never fall back silently to a permanent delete. **Source-derived;** **tested** by UP.16 on all three platforms. `File::moveToTrash` in JUCE 9.0.3:
+- macOS: APFS ignores Unicode normalisation, while JUCE lists names precomposed. A new name typed or pasted with a decomposed accent (`e` + U+0300) is a different string but the same file. **Tested** (pedal plugin): the rename deleted the preset before the fix below.
+- Linux on a case-insensitive volume (ext4 casefold, CIFS, vfat): `"foo"` → `"Foo"` is the same file, but JUCE compares exactly. **Source-derived;** not reproduced.
+
+Instead:
+- Refuse a rename onto another listed preset whose name matches ignoring case, compared by full path so the source never counts as "another".
+- Refuse when anything exists at the destination that is not the source itself (compare `File::getFileIdentifier`).
+- Then rename once, without deleting anything: `std::rename` on POSIX, `MoveFileW` on Windows (it refuses an existing destination other than the source itself).
+
+**Tested** (pedal plugin, all three platforms, with the single rename): a case-only rename happens in place, and a rename to the other accent encoding in capitals keeps the preset and its contents. Prismatica's UP.04 passed with `moveFileTo`, on ordinary volumes only; it does not show `moveFileTo` is safe where names match loosely.
+
+The same loose matching affects **Save As**: a new preset must not be written over a file that already exists at its path even when no listed name matches. Refuse it. **Tested** (pedal plugin, macOS: before the fix, Save As of the decomposed spelling silently replaced the existing preset).
+
+**Deleting.** Move the file to the Trash, and report a failure. Never fall back silently to a permanent delete. **Source-derived;** **tested** by UP.16 on all three platforms (each runner had a Trash or Recycle Bin). `File::moveToTrash` in JUCE 9.0.3:
 
 | Platform | Mechanism |
 |---|---|
-| macOS | `NSFileManager trashItemAtURL` (Finder Trash) |
-| Windows | `SHFileOperation` with `FOF_ALLOWUNDO` (Recycle Bin) |
-| Linux | GIO's `g_file_trash`, through `dlopen` of `libgio`. Returns `false` when GIO is missing, so the delete must fail visibly |
+| macOS | `NSFileManager trashItemAtURL` (Finder Trash); fails when the item can't be trashed |
+| Windows | `SHFileOperation` with `FOF_ALLOWUNDO \| FOF_NOCONFIRMATION \| FOF_SILENT \| FOF_NOERRORUI`: the Recycle Bin **when possible**, otherwise a permanent delete that still returns success (below) |
+| Linux | GIO's `g_file_trash`, through `dlopen` of `libgio`. Returns `false` when GIO is missing or the item can't be trashed, so the delete must fail visibly |
+
+**Windows: `moveToTrash` is not always recoverable.** `FOF_ALLOWUNDO` recycles only if possible. Where an item can't be recycled (a drive without a Recycle Bin, a network path, the bin turned off by the user or by policy), the shell deletes it permanently and the call still succeeds; the file is gone, so a "gone means recycled" check passes. `FOF_WANTNUKEWARNING` only shows a confirmation first, and `IFileOperation` with `FOFX_RECYCLEONDELETE` makes the same decision. From Microsoft's documentation of the flags (not JUCE source); JUCE's own call is characterised by the test below. To recycle **or fail**:
+
+- Use `IFileOperation` (`FOF_ALLOWUNDO | FOFX_RECYCLEONDELETE | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI`) with an `IFileOperationProgressSink`.
+- In `PreDeleteItem`, return an error unless `dwFlags` contains `TSF_DELETE_RECYCLE_IF_POSSIBLE`. An error cancels that delete and the rest of the operation (**documented** by Microsoft). That the flag is absent exactly when the item would be removed permanently is a forum-sourced claim; the test below is what verifies it.
+- Count success only when `PostDeleteItem` receives a non-null `psiNewlyCreated`, the item now in the Recycle Bin (**documented**: null means it was deleted outright), and the file is gone from its folder.
+
+**Tested** (pedal plugin, Windows x64 in GitHub Actions): with the documented policy "Do not move deleted files to the Recycle Bin" (`HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer`, `NoRecycleFiles` = 1) set on the disposable runner, deleting a file and a preset fails and both stay unchanged, with no dialog; JUCE's `File::moveToTrash` on the same runner returned `true` and the file was gone, deleted permanently. With the bin available, the same code moves presets to the Recycle Bin (UP.16-style real-folder test). Run such a test only on a disposable machine, require its `PASS` line, and give the step a timeout in case a shell dialog appears. The same refusal held for the file reached through a network path (`\\localhost\C$\…`), in the same run with the policy set. **Limitation:** a drive without a Recycle Bin, and a network path without the policy, were not exercised separately; only Windows Server 2025 (the `windows-2025` runner) was tested.
 
 In the confirmation dialog, focus Cancel, so Return never deletes. Say where the file goes ("It will be moved to the Trash"). Give the library a constructor flag that deletes permanently, for tests only, so test runs do not fill the Trash.
 
@@ -229,7 +271,11 @@ The case study's tests, as a starting list:
 - [ ] A load changes no session parameter. A damaged file changes nothing.
 - [ ] Saving "Lush" over "lush" asks before overwriting, on Linux too.
 - [ ] A save interrupted after the temporary file was created leaves the previous file and lists nothing new, on Windows too.
-- [ ] Delete moves to the Trash, Recycle Bin or GIO Trash, and fails visibly when it cannot.
+- [ ] Delete moves to the Trash, Recycle Bin or GIO Trash, and fails visibly when it cannot. On Windows with the Recycle Bin turned off, the file is still there afterwards.
+- [ ] A short write (half the bytes, and a real one under `RLIMIT_FSIZE` where the OS has it) leaves the previous file byte-identical; success means the bytes on disk were counted.
+- [ ] A failed replacement never deletes the previous file (no `overwriteTargetFileWithTemporary`, no `moveFileTo`).
+- [ ] A rename or Save As to another spelling of an existing name (case, accent encoding) never deletes or replaces that preset.
+- [ ] A preset with decimal commas loads the values it was saved with.
 - [ ] The factory program count and names are unchanged; old projects restore exactly.
 - [ ] No preset activity allocates on the audio thread, on every platform that has an allocation counter.
 - [ ] An idle editor sends no preset events.
@@ -239,12 +285,17 @@ The case study's tests, as a starting list:
 ## Sources
 
 - JUCE 9.0.3 `juce_core`:
-  - `files/juce_File.cpp` (`replaceWithText`, `moveFileTo`, `NAMES_ARE_CASE_SENSITIVE`);
-  - `files/juce_TemporaryFile.cpp`;
+  - `files/juce_File.cpp` (`replaceWithText`, `replaceFileIn`, `moveFileTo`, `NAMES_ARE_CASE_SENSITIVE`);
+  - `files/juce_TemporaryFile.cpp`, `files/juce_FileOutputStream.cpp` (`write`, `flush`, `flushBuffer`);
+  - `native/juce_SharedCode_posix.h` (`writeInternal`, `moveInternal`), `native/juce_CommonFile_linux.cpp` (`copyInternal`);
+  - `text/juce_String.cpp` (`StackArrayStream`, number formatting);
   - `native/juce_Files_mac.mm`, `juce_Files_windows.cpp`, `juce_Files_linux.cpp` (`userApplicationDataDirectory`, `moveToTrash`, `isHidden`).
 - WebKit `main` (read 2026-11-16):
   - `Source/WebKit/WebProcess/WebCoreSupport/WebPopupMenu.cpp`;
   - `Source/WebKit/UIProcess/mac/WebPopupMenuProxyMac.mm`;
   - `Source/WebCore/html/HTMLSelectElement.cpp`.
 - Microsoft, "Naming Files, Paths, and Namespaces": reserved device names, trailing dots and spaces.
+- Microsoft: `ReplaceFile` (`ERROR_UNABLE_TO_MOVE_REPLACEMENT`), `SHFILEOPSTRUCT` (`FOF_ALLOWUNDO`, `FOF_WANTNUKEWARNING`), `IFileOperation::SetOperationFlags` (`FOFX_RECYCLEONDELETE`), `IFileOperationProgressSink::PreDeleteItem` and `PostDeleteItem`; the "Do not move deleted files to the Recycle Bin" policy (`NoRecycleFiles`).
+- CodeGuru forum, "How to tell if a file or a folder could be placed into the Recycle Bin?": the `TSF_DELETE_RECYCLE_IF_POSSIBLE` reading, verified by the Windows test above.
+- Second case study: a pedal plugin's checked write, rename, Windows delete and preset loader, and their tests (not public). The snippets above are self-contained.
 - Case study: the Prismatica repository's `plugin/Source/UserPresets.{h,cpp}`, its processor and web editor, `plugin/web/src/presets.ts` and `plugin/tests/ProcessorTests.cpp`. The snippets above are self-contained.
