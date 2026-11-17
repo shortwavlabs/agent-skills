@@ -5,7 +5,7 @@
 - When to use this reference
 - Build structure
 - Processor structure
-- Parameters and state
+- Parameters and state (state saved in a decimal-comma host)
 - Asset and model loading
 - Realtime callback rules
 - Tests and measurement targets
@@ -69,7 +69,47 @@ Useful patterns:
 - Separate non-parameter state in the APVTS ValueTree: selected file paths, display names, status strings, preset metadata, and version markers.
 - Persist loaded model, package, preset, IR, or sample paths in `getStateInformation()`.
 - On restore, load missing files safely and report visible warnings instead of failing the processor.
-- Number text in XML state follows the host's C++ locale in JUCE 9.0.3: a host with a decimal-comma global locale writes `0,83`, which `String::getDoubleValue` (and so an APVTS restore) reads as 0. Parse such text yourself if you read it ([user presets](user-presets.md#number-text-follows-the-hosts-c-locale)).
+- Number text in XML state follows the host's C++ locale in JUCE 9.0.3, so a restore can misread a project saved in a decimal-comma host ([below](#state-saved-in-a-decimal-comma-host)).
+
+### State saved in a decimal-comma host
+
+**Why it happens.** JUCE 9.0.3 writes each number in an XML state through `serialiseDouble`, and so do `var::toString` and `XmlElement::setAttribute (double)`. That function uses a `std::ostream` which takes the process's global C++ locale; only its buffer is classic ([number text](user-presets.md#number-text-follows-the-hosts-c-locale)).
+- A host that sets a decimal-comma global locale therefore saves values such as `"0,6600000262260437"`, `"1,0"`, `"0,"` for zero, and `"9,999999974752427e-7"`.
+- **Source-derived** (`text/juce_String.cpp`), and **tested** in the Prismatica case study: states written under `de_DE.UTF-8` on macOS, Linux and Windows hold exactly these forms.
+
+**Find where the text is first read as a number before fixing anything.**
+- **Unpacking keeps the text.** `AudioProcessor::getXmlFromBinary` and `ValueTree::fromXml` keep each attribute as the original string: `NamedValueSet::setFromXmlAttributes` stores `var (String)`, decoding only `base64:` names. **Source-derived;** consistent with the case study, whose reader received the comma text intact.
+- **The first conversion truncates.** It is `String::getDoubleValue` (`CharacterFunctions::readDoubleValue`, which accepts only a point), and it stops at the comma: `"0,66"` reads as 0, `"-3,25"` as −3, and `"9,99…e-7"` as 9. In the case study this call was in its own reader, which rebuilds the tree before `replaceState`. Under `de_DE.UTF-8`, 7 of its 12 parameters restored with other values. **Tested** on all three platforms.
+- **The common pattern has no such call to fix.** With `apvts.replaceState (ValueTree::fromXml (*xml))`, `AudioProcessorValueTreeState::setNewState` hands the property `var` to the parameter as a `float`, and a string `var` converts through the same `getDoubleValue` inside JUCE (`juce_AudioProcessorValueTreeState.cpp`, `juce_Variant.cpp`). **Source-derived, not tested.** Changing a `getDoubleValue` call elsewhere does not reach this path. Convert each value's text in the tree yourself before `replaceState`, or rebuild the tree with numbers as the case study does.
+
+**The reader-only fix.** **Tested** (case study). Make it at that conversion:
+- **Accept a number.** A trimmed, length-capped value with one optional sign, digits with one decimal point **or** one decimal comma, and an optional exponent: `[-+]?(\d+([.,]\d*)?|[.,]\d+)([eE][-+]?\d+)?`. Replace the comma with a point, then call the same `getDoubleValue` as before, so a decimal-point value reads exactly as it always did.
+- **Anything else is no value.** That covers words, mixed or repeated separators (`0,2.5`, `1.234,5`), NaN and Inf. The parameter takes the default it would take if missing, and the rest of the state restores. Before the fix, the case study read such text by its prefix (`"0.5abc"` as 0.5).
+- **Keep the existing range clamping and step snapping** after the conversion.
+- **Leave the writer alone:** no new field, format or migration.
+
+**Limitations.**
+- A build without the fix still misreads a comma state, and states saved in such a host keep their commas. A classic-locale writer would be a separate decision, because it changes those bytes.
+- Grouped numbers are refused, which is safe only while no parameter can reach 1000.
+- `setStateInformation`'s thread is the host's choice. The fix adds parsing to a path that already parses XML and allocates.
+- No real host known to set a comma locale was identified, so no host session was run. Only `de_DE.UTF-8` was exercised.
+
+**Regression checklist:**
+- [ ] Every parameter restores from a state the plug-in itself wrote under a real decimal-comma locale (`std::locale::global` in the test, restored afterwards). The values must equal those restored from the same session's decimal-point state, and the saved values for named cases: zero, scientific notation, negatives, range ends, fractions, switches and choices.
+- [ ] That check prints NOT RUN without a comma locale, so CI requires its PASS line on each platform. A Linux container needs `locales` and `locale-gen de_DE.UTF-8`.
+- [ ] Committed comma states with decimal-point twins, which run without any locale.
+- [ ] Decimal-point states, including fixtures from earlier releases, restore bit-identically to a copy of the previous reader kept in the test.
+- [ ] Malformed text and mixed separators leave the parameter at its default. Comma values out of range are still clamped, and values between steps snapped.
+- [ ] The state writer is unchanged.
+
+*Case study:*
+- Prismatica PR #9, stacked on its preset reliability PR #8; open, not merged at the time of writing.
+- The fix is in `7d22b53`, in `plugin/Source/StateSerialization.cpp`'s `state::read`. The tests (ST.01–ST.06) are in `plugin/tests/ProcessorTests.cpp`.
+- Code and CI at `1add365`, GitHub Actions run 44005725936, where the comma-locale checks ran under `de_DE.UTF-8` on:
+  - macOS arm64;
+  - Linux x86_64 (Ubuntu 22.04 container);
+  - Windows x64 (Windows Server 2025).
+- Report: `docs/reliability/state-decimal-comma-reader.md`.
 
 User preset libraries (named files the user saves, renames and deletes, kept apart from the host's program list) are in [user-presets.md](user-presets.md): storage per platform, atomic writes, validation before applying, the Trash, the modified mark and their tests.
 
@@ -259,4 +299,8 @@ and prices change):
 - JUCE `AudioProcessor` reference (https://docs.juce.com/master/classAudioProcessor.html): `setLatencySamples()`, `getBypassParameter()`, `processBlockBypassed()`, `updateHostDisplay()`.
 - JUCE `dsp::Oversampling` reference (https://docs.juce.com/master/classdsp_1_1Oversampling.html).
 - JUCE 9 End User Licence Agreement (https://juce.com/legal/juce-9-licence/), read 2026-11-16.
+- JUCE 9.0.3 `juce_core` and `juce_audio_processors` sources:
+  - `text/juce_String.cpp` (`serialiseDouble`) and `text/juce_CharacterFunctions.h` (`readDoubleValue`);
+  - `containers/juce_NamedValueSet.cpp` (`setFromXmlAttributes`) and `containers/juce_Variant.cpp` (string to double);
+  - `utilities/juce_AudioProcessorValueTreeState.cpp` (`setNewState`).
 - Wrapper behaviour (when latency is queried, how host bypass is delivered) differs between JUCE versions and plugin formats; check the pinned JUCE version's wrapper sources and test in the target hosts.
