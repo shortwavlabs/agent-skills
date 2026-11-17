@@ -5,10 +5,10 @@
 - When to use this reference
 - Build structure
 - Processor structure
-- Parameters and state (state saved in a decimal-comma host)
+- Parameters and state (state saved in a decimal-comma host, factory preset qualification)
 - Asset and model loading
 - Realtime callback rules
-- Tests and measurement targets
+- Tests and measurement targets (filesystem side effects of tests and validators)
 - Oversampled circuit-model plugins
 - Host validation and release gates
 - Third-party notices and the framework licence
@@ -80,7 +80,24 @@ Useful patterns:
 **Find where the text is first read as a number before fixing anything.**
 - **Unpacking keeps the text.** `AudioProcessor::getXmlFromBinary` and `ValueTree::fromXml` keep each attribute as the original string: `NamedValueSet::setFromXmlAttributes` stores `var (String)`, decoding only `base64:` names. **Source-derived;** consistent with the case study, whose reader received the comma text intact.
 - **The first conversion truncates.** It is `String::getDoubleValue` (`CharacterFunctions::readDoubleValue`, which accepts only a point), and it stops at the comma: `"0,66"` reads as 0, `"-3,25"` as −3, and `"9,99…e-7"` as 9. In the case study this call was in its own reader, which rebuilds the tree before `replaceState`. Under `de_DE.UTF-8`, 7 of its 12 parameters restored with other values. **Tested** on all three platforms.
-- **The common pattern has no such call to fix.** With `apvts.replaceState (ValueTree::fromXml (*xml))`, `AudioProcessorValueTreeState::setNewState` hands the property `var` to the parameter as a `float`, and a string `var` converts through the same `getDoubleValue` inside JUCE (`juce_AudioProcessorValueTreeState.cpp`, `juce_Variant.cpp`). **Source-derived, not tested.** Changing a `getDoubleValue` call elsewhere does not reach this path. Convert each value's text in the tree yourself before `replaceState`, or rebuild the tree with numbers as the case study does.
+- **The common pattern has no such call to fix.** With `apvts.replaceState (ValueTree::fromXml (*xml))`, `AudioProcessorValueTreeState::setNewState` hands the property `var` to the parameter as a `float`, and a string `var` converts through the same `getDoubleValue` inside JUCE (`juce_AudioProcessorValueTreeState.cpp`, `juce_Variant.cpp`). **Source-derived**, and **tested** in a second case study, Vintage Combo, below. Changing a `getDoubleValue` call elsewhere does not reach this path. Convert each value's text in the tree yourself before `replaceState`, or rebuild the tree with numbers as the first case study does.
+
+**The direct `replaceState` path, with migrations.** **Tested** (Vintage Combo, JUCE 9.0.3, macOS arm64). Its reader runs schema migrations on the tree, then calls `apvts.replaceState`:
+- a state from before schema 4 gets Reverb 0;
+- one from before schema 5 gets the Cabinet off;
+- a missing power parameter is added, on.
+
+What was found and done:
+- **Reproduced first.** The plug-in's own `getStateInformation` under `de_DE.UTF-8` wrote `"6,369999885559082"`, and a restore read 6.37 as 6.0; trims and the other knobs truncated the same way.
+- **The fix.** After the unchanged migrations and before `replaceState`, every parameter value in the tree is read with the number pattern above and stored back as a `double`. Text that is not a finite number restores that parameter's default.
+- **Evidence:**
+  - a comma state restores exactly;
+  - the same state relabelled schema 3 and 4 still gets its migrations, with exact comma values;
+  - `nan`, `inf`, `abc`, an empty value and `1e999` restore the default, with no NaN anywhere;
+  - a decimal-point state restores bit for bit and writes the same bytes again;
+  - the writer's bytes match the earlier build's for the same sound.
+- A text-equal comparison of `getStateInformation` against the previous commit backs the writer claim.
+- Like the first case study, the writer is left alone, so a build without the fix still misreads comma states.
 
 **The reader-only fix.** **Tested** (case study). Make it at that conversion:
 - **Accept a number.** A trimmed, length-capped value with one optional sign, digits with one decimal point **or** one decimal comma, and an optional exponent: `[-+]?(\d+([.,]\d*)?|[.,]\d+)([eE][-+]?\d+)?`. Replace the comma with a point, then call the same `getDoubleValue` as before, so a decimal-point value reads exactly as it always did.
@@ -110,6 +127,33 @@ Useful patterns:
   - Linux x86_64 (Ubuntu 22.04 container);
   - Windows x64 (Windows Server 2025).
 - Report: `docs/reliability/state-decimal-comma-reader.md`.
+
+*Second case study:*
+- Vintage Combo, `shortwavlabs/vintage-combo`, branch `feature/greenfield-dsp`.
+- Reproduction: `docs/reliability/evidence/baseline-bdd6824.json`, section F.
+- Fix: `restoreState` in `Source/PluginProcessor.cpp`, commit `9861bab`.
+- Tests: group E of `Tests/PresetReliability.cpp`, with committed baseline state blobs, decimal point and decimal comma, in `Tests/fixtures/state`.
+- macOS arm64 only.
+- Report: `docs/reliability/cross-product-reliability-audit.md`.
+
+### Factory preset qualification
+
+A factory preset made only of legal parameter values can still drive the engine somewhere it fails. Validating the values is not enough.
+
+1. **Validate every value.** Each one is in range, snapped to a legal step and whole for switches and choices. Pin the table in a test, so a change to a value or the order changes the test.
+2. **Render representative audio for every preset.** Use stimuli like the real input, at a hot but realistic level. For a guitar amplifier that means band-limited plucks rather than a naive sawtooth, whose instant steps a real pickup never produces.
+3. **Check every render.** The output must be finite and not silent, with no engine fault, recovery or fail-closed state.
+4. **Separate preset faults from engine limits.** Render the defaults or Init with the same stimuli. A fault that also appears there belongs to the engine, not the preset.
+5. **Keep the approved DSP.** Choose another value; do not change the engine to suit a preset. Prove the sound is unchanged with the existing golden renders, through the built plug-in.
+6. **Approval needs an audition.** Until the owner has listened, label the bank provisional.
+
+**Tested** (Vintage Combo, group F5 of `Tests/PresetReliability.cpp`, commit `9861bab`).
+- The first draft of one clean preset tripped the engine's fail-closed path on band-limited plucks peaking at −12 dBFS.
+- A sweep traced the trip to one switch combined with high settings of two other controls. The final value avoids that region, and the engine was not changed.
+- The seven presets and Init render with no fault from band-limited plucks peaking at −6 dBFS.
+- A naive sawtooth trips the defaults too: that is an engine limit, which the presets do not cause and which this work did not fix.
+- **Owner accepted:** the owner reported after `f5cb173` that they had auditioned and approved all seven factory sounds. No Vintage Combo commit records that yet: the cited reports, at `f5cb173`, still call the bank provisional.
+- The thresholds found belong to that engine. Find your own engine's limits by measurement.
 
 User preset libraries (named files the user saves, renames and deletes, kept apart from the host's program list) are in [user-presets.md](user-presets.md): storage per platform, atomic writes, validation before applying, the Trash, the modified mark and their tests.
 
@@ -208,6 +252,35 @@ Measurement target:
 
 A headless target measures work; a live audio-device callback measures deadline behaviour and editor cost. For a CPU investigation or a performance pass, follow [performance-investigation.md](performance-investigation.md).
 
+### Filesystem side effects of tests and validators
+
+Isolating the feature under test does not isolate the plug-in. Before running tests, pluginval, auval or a host harness on a developer's machine, list every path the plug-in, its editor and its standalone can write or create.
+
+| What | Example |
+|---|---|
+| user data | the preset folder, the Trash it deletes into |
+| diagnostics | fault or crash logs, telemetry, written on a timer or on a state change |
+| configuration | the standalone's settings file, audio device state, research or feature flag files |
+| licensing | license files, activation markers, an install record |
+| caches and temporary files | temporary files beside a target, extracted assets, WebView caches |
+
+Then decide, for each path, how the tests avoid it:
+- a test seam, for example a folder parameter or an injected Trash call;
+- a scratch location;
+- or an accepted, recorded side effect.
+
+A validator such as pluginval runs the real plug-in, so test seams in the test target do not apply to it.
+
+To prove the isolation on macOS, run the suite inside a `sandbox-exec` profile. The profile allows everything but denies `file-write*` on the user paths that must stay untouched; any write there then fails the test instead of passing unseen.
+- Run a negative control on a scratch path first, to show that the profile denies writes on that macOS version.
+- **Limitation (Vintage Combo):** an AU registered in-process could not be instantiated inside such a profile, so its in-process AU checks ran outside it.
+
+Two traps on macOS:
+- **`HOME` does not redirect JUCE's user folders.** JUCE resolves `userHomeDirectory` with `NSHomeDirectory()`, which ignores `$HOME` for an unsandboxed process. Redirecting `HOME` therefore does not isolate a test that uses `userApplicationDataDirectory`. **Source-derived** (`native/juce_Files_mac.mm`), and confirmed by a scratch probe during the Vintage Combo work. That probe is not committed: `NSHomeDirectory()` returned the real home with `HOME` set elsewhere.
+- **A validator writes through the plug-in's own diagnostics.** Vintage Combo's preset tests and its pluginval runs denied writes to the preset folder and the Trash. Yet its two pluginval runs on the VST3 made the plug-in append 15 and 13 rows to the user's real `fault-log.jsonl`. Its editor, once its page loads, also lists the real preset folder, read only; that read was not observed.
+  - **Tested** (Vintage Combo, `docs/reliability/cross-product-reliability-audit.md`).
+  - That diagnostic log is **not** isolated in Vintage Combo; the side effect is only recorded.
+
 ## Oversampled Circuit-Model Plugins
 
 JUCE-specific practices for plugins whose DSP runs an oversampled circuit model (the modelling method itself is in the `circuit-to-dsp` skill):
@@ -227,6 +300,13 @@ Before wider testing:
 - Configure and build Release plugin artifacts.
 - Run the audio-thread allocation gate under host automation with the editor **open and closed**, AU automation delivered from the audio callback ([host-automation-and-editor-sync.md](host-automation-and-editor-sync.md#regression-tests)).
 - For a release that adds parameters: compare the hosted AU parameter list with the previous release's, and restore a previous release's state ([parameter-management.md](parameter-management.md#au-parameter-order-and-version-hints)).
+- For a release that adds or changes factory programs, check:
+  - the program list;
+  - the hosted VST3 parameter surface, which gains a Program parameter;
+  - a project saved after a factory program and an edit, which must restore the edit;
+  - the qualification renders above.
+  - See [factory programs and host restore](parameter-management.md#factory-programs-and-host-restore).
+- List the files the tests and validators will write, and isolate them ([filesystem side effects](#filesystem-side-effects-of-tests-and-validators)).
 - Build and run Release tests.
 - Run the measurement harness.
 - Validate AU with `auval` on macOS.
@@ -240,6 +320,7 @@ DAW smoke should include:
 - Automation write/read.
 - Host bypass and plugin bypass.
 - Session save, close, reopen, and playback.
+- A factory program from the host's own preset menu, then an edit, save and reopen: the edit remains. Note the host's preset display with the editor open and closed.
 - Missing asset path restore.
 - Sample-rate changes.
 - Multiple instances of the heaviest expected preset, with the editor closed and with one editor open.
@@ -304,3 +385,8 @@ and prices change):
   - `containers/juce_NamedValueSet.cpp` (`setFromXmlAttributes`) and `containers/juce_Variant.cpp` (string to double);
   - `utilities/juce_AudioProcessorValueTreeState.cpp` (`setNewState`).
 - Wrapper behaviour (when latency is queried, how host bypass is delivered) differs between JUCE versions and plugin formats; check the pinned JUCE version's wrapper sources and test in the target hosts.
+- Vintage Combo (`shortwavlabs/vintage-combo`, branch `feature/greenfield-dsp`), the second case study for state in a decimal-comma host, factory preset qualification and test side effects:
+  - `docs/reliability/cross-product-reliability-audit.md`;
+  - `docs/presets/factory-user-preset-architecture.md`;
+  - `Tests/PresetReliability.cpp`;
+  - commits `bdd6824` to `f5cb173`.

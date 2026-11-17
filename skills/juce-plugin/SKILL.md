@@ -327,7 +327,7 @@ For interactive Blender-authored amps, pedals or rack gear, read [Three.js/WebVi
 Read these as needed based on what you're implementing:
 
 - **`references/plugin-lifecycle.md`** — Complete AudioProcessor contract: all overrides, bus configurations, double precision, Synthesiser framework for synths
-- **`references/parameter-management.md`** — APVTS patterns: parameter layout, attachments, raw pointers, non-parameter state, parameter groups, AU parameter order and version hints (keeping Logic automation across releases)
+- **`references/parameter-management.md`** — APVTS patterns: parameter layout, attachments, raw pointers, non-parameter state, parameter groups, AU parameter order and version hints (keeping Logic automation across releases), factory programs and host restore (stable program numbers, a `getCurrentProgram` derived from the values, the VST3 Program parameter, restore tests)
 - **`references/dsp-patterns.md`** — DSP cookbook: ProcessorChain, filters, oscillators, waveshapers, convolution reverb, delay lines, wavetable synthesis, LFO at control rate, two-level chain architecture, per-sample vs block processing
 - **`references/ui-patterns.md`** — Editor patterns: component layout, custom widgets, LookAndFeel, meters, FFT spectrum analyser, responsive resize, binary data for assets
 - **`references/webview-ui.md`** — JUCE 9 WebBrowserComponent, WebView2, local resources, native functions, parameter bindings, frontend frameworks, explicit development mode, and streaming visual data (meter and repaint cost, idle acceptance)
@@ -366,7 +366,7 @@ Split into bands using `juce::dsp::LinkwitzRileyFilter<>` crossover filters, pro
 
 ### Custom Preset System
 
-Keep factory presets as the host's program list (embedded or compiled in). For user presets saved as files, read [user presets](references/user-presets.md). It covers storage per platform, atomic writes, validating a file before applying it, case-insensitive names, the Trash, the selection and modified mark across threads, the editor bridge, a WebKit `<select>` hazard, and tests. `apvts.replaceState()` replaces the whole state, session parameters and non-parameter state included: it suits a preset that is the entire state. When a preset must leave some of it alone, set the preset's parameters with gestures instead.
+Keep factory presets as the host's program list (embedded or compiled in); keep program numbers stable and `getCurrentProgram` truthful after a restore ([factory programs and host restore](references/parameter-management.md#factory-programs-and-host-restore)). Qualify each factory preset by rendering it, not only by its values ([factory preset qualification](references/production-plugin-practices.md#factory-preset-qualification)). For user presets saved as files, read [user presets](references/user-presets.md). It covers storage per platform, atomic writes, validating a file before applying it, case-insensitive names, the Trash, the selection and modified mark across threads, the editor bridge, a WebKit `<select>` hazard, and tests. `apvts.replaceState()` replaces the whole state, session parameters and non-parameter state included: it suits a preset that is the entire state. When a preset must leave some of it alone, set the preset's parameters with gestures instead.
 
 ## Tips
 
