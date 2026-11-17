@@ -2,7 +2,7 @@
 
 Sounds the user names and saves as files, kept apart from the factory programs the host lists. The library must behave the same on macOS, Windows and Linux, survive damaged files and interrupted writes, never lose a preset to a mistaken click, and keep the audio thread untouched.
 
-**Evidence base.** One product (the Prismatica case study, JUCE 9.0.3). The library, processor and bridge tests (UP.01–UP.16 below) ran on macOS (arm64 and universal builds), Windows x64 and Linux x86_64 in GitHub Actions, and on Linux arm64 in Docker. The exception is UP.14's allocation count, which needs a macOS facility and is `NOT MEASURED` elsewhere. The editor was accepted overall by its owner in Logic Pro on macOS; item-level results were not recorded. The editor's preset UI in WebView2 (Windows) and WebKitGTK (Linux) has not been checked in a real host. The file-safety statements below (writing, renaming, deleting, number text) also draw on a second JUCE 9.0.3 product, a pedal plugin with the same kind of library; its tests ran on macOS arm64 (locally and in GitHub Actions), Windows x64 and Linux x86_64 in GitHub Actions, and each statement it supports says "pedal plugin". Each statement is marked as one of:
+**Evidence base.** One product (the Prismatica case study, JUCE 9.0.3). The library, processor and bridge tests (UP.01–UP.16 below) ran on macOS (arm64 and universal builds), Windows x64 and Linux x86_64 in GitHub Actions, and on Linux arm64 in Docker. The exception is UP.14's allocation count, which needs a macOS facility and is `NOT MEASURED` elsewhere. The editor was accepted overall by its owner in Logic Pro on macOS; item-level results were not recorded. The editor's preset UI in WebView2 (Windows) and WebKitGTK (Linux) has not been checked in a real host. The file-safety statements below (writing, renaming, deleting, number text) also draw on a second JUCE 9.0.3 product, a pedal plugin with the same kind of library; its tests ran on macOS arm64 (locally and in GitHub Actions), Windows x64 and Linux x86_64 in GitHub Actions, and each statement it supports says "pedal plugin". A third product, Vintage Combo, hardened a preset format that had already shipped and added a factory bank. Its tests ran on macOS arm64 only, because its engine builds nowhere else; each statement it supports says "Vintage Combo". Each statement is marked as one of:
 
 | Label | Meaning |
 |---|---|
@@ -29,7 +29,14 @@ Sounds the user names and saves as files, kept apart from the factory programs t
 ## Decide what a preset is
 
 - **Sound parameters only.** Store what makes the sound and its level. Leave out session parameters: input calibration for the user's interface, output routing or monitoring, bypass, and the editor size. A load never changes them. **Case-study choice;** tested by UP.02.
-- **Factory programs stay the host's program list.** `getNumPrograms`, the program names and what each program sets do not change when user presets exist. Hosts store a program by its index, so adding user presets to the list would make saved projects point at other programs. **Case-study choice;** tested by UP.09.
+- **Factory programs stay the host's program list.** `getNumPrograms`, the program names and what each program sets do not change when user presets exist. Hosts store a program by its index, so adding user presets to the list would make saved projects point at other programs. **Case-study choice;** tested by UP.09. Program numbering, a truthful `getCurrentProgram`, the VST3 Program parameter and the restore tests are in [factory programs and host restore](parameter-management.md#factory-programs-and-host-restore).
+- **Each kind of preset can set a different set of parameters.**
+  - Vintage Combo's factory presets set the 16 tone parameters only.
+  - Its Init and user presets also set the input jack and both trims.
+  - None of them sets the amplifier's power switch, which is session state, like the editor size.
+  - Define the set once, in one table, and make the modified mark compare only what the selected kind sets. **Case-study choice;** tested (Vintage Combo, groups F and G).
+- **Init is separate from the factory bank.** It resets to the defaults. It is its own entry in the picker, not a factory program, and its name is reserved. **Case-study choice** in Prismatica and Vintage Combo.
+- **The plug-in owns every preset fact:** the factory table, the folder, which preset the parameters came from and whether they changed. The page renders what it is told and holds no preset values. A browser-preview mock may stand in outside the plug-in, but it is never consulted inside it. **Case-study choice** in Prismatica and Vintage Combo.
 - **The selection is session state.** Which preset is selected is not saved in the plug-in state, so the state format stays unchanged and a restored project shows no preset. Storing the name in projects is a product decision; if you do, add a format version first. **Case-study choice;** tested by UP.11.
 - **Presets are shared files, not instance state.** Another instance, or the same host after a restart, lists and loads them. **Tested** by UP.08.
 
@@ -82,6 +89,21 @@ One file per preset, with a product-specific extension. A small XML root records
 
 **Apply through the parameters.** For each stored parameter call `beginChangeGesture`, then `setValueNotifyingHost (convertTo0to1 (value))`, then `endChangeGesture`. Do this on the message thread. `apvts.replaceState` replaces the whole state, session parameters and non-parameter state included. It is simpler when a preset is meant to be the entire state, but not when a load must leave some of it alone. **Case-study choice.**
 
+### Hardening a format that has already shipped
+
+When users already have files, compatibility comes first. Vintage Combo's presets were the whole APVTS state tree with CRLF line endings, loaded with `apvts.replaceState`. That was hardened without changing the format.
+
+- **Reproduce before fixing.** Build the unchanged code with only a test-only folder override added. Run each failure case in a scratch folder, and record what the old code did.
+  - Vintage Combo's baseline applied damaged files:
+    - a DTD entity was expanded;
+    - an out-of-range value was clamped;
+    - a file with one parameter reset the parameters it lacked;
+    - `value="nan"` made a parameter NaN, because JUCE's number reader accepts `nan`; the engine reads that parameter at the next block.
+  - **Tested** (Vintage Combo, its baseline record).
+- **Freeze the old bytes first.** Write fixtures with the old build's own save code, before changing anything. The new writer must then reproduce them byte for byte for the same sound. A classic-locale number writer reproduces JUCE's text under the default locale. **Tested** (Vintage Combo: the same sound saves the old file's bytes, CRLF included).
+- **Migrate per file.** An old file needs the same migrations the project-state reader applies to a state of the same schema, for example a feature's default added in a later schema. Apply them after validation, then ignore unknown and retired IDs and properties. **Tested** (Vintage Combo: schema 3, schema 4 and unversioned files derived from the baseline fixture load with their migrations).
+- **Store more than you apply.** A file that held session parameters can keep holding them, so older builds still read it as before. The new loader applies only the preset parameters. Loading an old preset then no longer changes those session parameters, which is a behaviour change the owner must accept. **Case-study choice.**
+
 ### Number text follows the host's C++ locale
 
 JUCE 9.0.3 formats a `double` (`String (double)`, a `var` holding a double, and therefore every `ValueTree` property written as XML) through a `std::ostream`. It imbues the classic locale on the stream buffer, but the stream that formats the number takes the process's global C++ locale (`text/juce_String.cpp`, `StackArrayStream`). **Source-derived**, and reproduced with JUCE 9.0.3 on macOS: after `std::locale::global (std::locale ("de_DE.UTF-8"))`, `String (0.83)` is `"0,83"` and a preset holds `value="0,8299999833106995"`.
@@ -102,6 +124,15 @@ The name is the file name, so validate it exactly as given and never trim silent
 - not the name of a built-in entry such as "Init".
 
 **Names are case-insensitive on every platform.** macOS and Windows file systems normally are; Linux ext4 is not. Compare names case-insensitively everywhere, so "Lush" and "lush" are the same preset on all three systems. A preset keeps the case it was first saved with, and an overwrite keeps the stored name. **Tested** by UP.03 and UP.16; on Linux's case-sensitive file system, UP.16 checks that a duplicate differing only in case is refused.
+
+**New rules apply to new names only.** Stricter rules added to a library that has shipped must not lose existing files.
+- A listing that filters by the name rules, as UP.07's does, hides every file an earlier build allowed and the new rules refuse. A load or a rename that checks the name first can no longer reach it.
+- Instead, keep only the listing's exclusions that protect the library:
+  - hidden files and any name starting with a dot, which covers a temporary file an interrupted save left behind, on Windows too;
+  - the built-in names such as "Init".
+- List every other file with the extension. Accept any listed name for load, overwrite, rename-from and delete. Check the rules only for a new name: Save As of a name not listed, and the target of a rename.
+- **Tested** (Vintage Combo): `CON`, `aux.1` and `Ends with dot.`, which its earlier `createLegalFileName` check allowed, stay listed, loadable, overwritable, renamable to a valid name and deletable.
+- **Limitation:** an earlier preset whose name starts with a dot is a hidden file, so it is no longer listed; the file is not touched.
 
 ## Writing a file safely
 
@@ -144,7 +175,7 @@ return renameOver (temp, target);
 
 ## Listing, renaming and deleting
 
-**Listing.** List `*.<ext>` with `File::findFiles | File::ignoreHiddenFiles`, then drop every name that fails the name rules. Sort the result naturally and case-insensitively. **Tested** by UP.07.
+**Listing.** List `*.<ext>` with `File::findFiles | File::ignoreHiddenFiles`, then drop every name that fails the name rules. Sort the result naturally and case-insensitively. **Tested** by UP.07. A library whose rules became stricter after release drops only leading-dot and built-in names instead ([new rules apply to new names only](#names)).
 
 The name check matters on Windows. `useHiddenFile` only prefixes the temporary file's name with a dot and sets no attribute. Windows decides "hidden" by the `FILE_ATTRIBUTE_HIDDEN` attribute alone, so `ignoreHiddenFiles` keeps a temporary file left by an interrupted save, and only the name check removes it. **Source-derived** (JUCE 9.0.3 `File::isHidden`).
 
@@ -229,6 +260,8 @@ A preset picker built from a `<select>` gets the platform's native popup in WKWe
 ## Test seams and the test list
 
 - **Construct the library with a folder and a Trash flag.** Every test uses a scratch folder with permanent deletion. **Case-study choice.**
+- **Or inject the Trash call.** Vintage Combo defines a test-only hook in its test target. The hook replaces the platform Trash call with a move into a scratch folder. Tests then run the product's delete path, including a refused Trash, which must leave the file in place. **Tested** (Vintage Combo, group B). **Limitation:** with the hook in place the real Trash call is never exercised. Vintage Combo's own Trash, and its host workflows, were not reported checked by the owner, so for that product they are not established.
+- **Isolating the preset folder is not isolating the test.** Vintage Combo's preset tests used scratch folders, yet its pluginval runs on the VST3 made the plug-in append rows to the user's real diagnostic log. List every file the plug-in can write before running tests or validators ([filesystem side effects](production-plugin-practices.md#filesystem-side-effects-of-tests-and-validators)).
 - **Debug-only folder override.** For a page harness, an environment variable such as `<PRODUCT>_PRESET_DIRECTORY` can redirect the library, but only in debug builds. Check that release binaries do not contain it: `strings <binary> | grep -c <PRODUCT>_PRESET_DIRECTORY` must print 0.
 - **The real folder and Trash, in CI only.** One test uses the product's own folder and the system Trash. It runs only when an opt-in variable is set, on a disposable CI home. It refuses a folder that already holds presets, reports `NOT RUN` otherwise, and deletes what it made whatever happens. The CI step must require its `PASS` line, so that a skipped run cannot count as a pass.
 
@@ -281,6 +314,7 @@ The case study's tests, as a starting list:
 - [ ] An idle editor sends no preset events.
 - [ ] In the real WebView, the picker's rows all have text and keep their positions when the modified mark changes.
 - [ ] Release binaries contain no debug folder override.
+- [ ] Hardening a shipped format: fixtures written by the old build load with their migrations, the same sound saves the old bytes, and files whose names the new rules refuse stay usable.
 
 ## Sources
 
@@ -299,3 +333,8 @@ The case study's tests, as a starting list:
 - CodeGuru forum, "How to tell if a file or a folder could be placed into the Recycle Bin?": the `TSF_DELETE_RECYCLE_IF_POSSIBLE` reading, verified by the Windows test above.
 - Second case study: a pedal plugin's checked write, rename, Windows delete and preset loader, and their tests (not public). The snippets above are self-contained.
 - Case study: the Prismatica repository's `plugin/Source/UserPresets.{h,cpp}`, its processor and web editor, `plugin/web/src/presets.ts` and `plugin/tests/ProcessorTests.cpp`. The snippets above are self-contained.
+- Third case study: Vintage Combo, `shortwavlabs/vintage-combo`, branch `feature/greenfield-dsp`.
+  - Code: `Source/presets/{SafeFile,UserPresets,FactoryPresets}.h`, and the processor, editor and `web/src/presets.ts` at `9861bab` and `d5b41c1`.
+  - Tests: `Tests/PresetReliability.cpp`, 626 checks in groups A to H.
+  - Baseline reproduction: `tools/reliability/baseline` and its record `docs/reliability/evidence/baseline-bdd6824.json`, at `fc0732b`.
+  - Reports: `docs/reliability/cross-product-reliability-audit.md` and `docs/presets/factory-user-preset-architecture.md`.

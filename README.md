@@ -117,7 +117,7 @@ skills/juce-plugin/
 │   └── webview_gesture_check.cpp  JUCE 9.0.1 gesture teardown regression check
 └── references/
     ├── plugin-lifecycle.md     AudioProcessor contract: overrides, bus configs, Synthesiser framework
-    ├── parameter-management.md APVTS patterns: parameter layout, attachments, state, groups, AU parameter order and version hints
+    ├── parameter-management.md APVTS patterns: parameter layout, attachments, state, groups, AU parameter order and version hints, factory programs
     ├── dsp-patterns.md         DSP cookbook: ProcessorChain, filters, oscillators, wavetable synthesis, delay, distortion
     ├── ui-patterns.md          Editor patterns: layout, custom widgets, LookAndFeel, meters, FFT spectrum analyser
     ├── webview-ui.md           JUCE 9 WebView2, offline resources, relays, frontend integration
@@ -139,7 +139,7 @@ skills/juce-plugin/
 | Area | Details |
 |------|---------|
 | **Plugin development** | AudioProcessor/AudioProcessorEditor pattern, processBlock(), CMake project setup |
-| **Parameter management** | APVTS: ParameterLayout, SliderAttachment, raw pointers, ParameterReferences struct; AU parameter-list order, version hints and the regression check that keeps Logic automation across releases |
+| **Parameter management** | APVTS: ParameterLayout, SliderAttachment, raw pointers, ParameterReferences struct; AU parameter-list order, version hints and the regression check that keeps Logic automation across releases; factory programs that survive project restore (stable numbers, a derived `getCurrentProgram`, the VST3 Program parameter) |
 | **DSP module** | ProcessorChain, IIR/FIR/SVF filters, Oscillator, WaveShaper, Convolution, DelayLine, LadderFilter, wavetable synthesis, LFO at control rate, two-level chain architecture |
 | **Editor/GUI** | Component layout (FlexBox, Grid), custom widgets, LookAndFeel, meters, FFT spectrum analyser, binary data |
 | **WebView UIs (JUCE 9)** | Pinned compatibility guidance, WebView2, offline resources/CSP, relay lifetime, tested gesture cleanup, explicit dev mode |

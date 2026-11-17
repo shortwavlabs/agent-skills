@@ -198,6 +198,70 @@ std::stable_sort (v.begin(), v.end(), [] (auto& a, auto& b) { return a.hint < b.
 
 VST3 does not use the version hint: its parameter IDs are the hashed string IDs and its order is the declaration order. AUv3 has no equivalent mechanism; JUCE advises not adding or removing parameters there if Logic and GarageBand must keep automation.
 
+## Factory Programs and Host Restore
+
+Factory presets embedded in the plug-in are normally exposed through JUCE's program API: `getNumPrograms`, `getProgramName`, `setCurrentProgram` and `getCurrentProgram`. Hosts store and replay program **numbers**, so the program list behaves like the parameter list: once shipped, its order is part of every saved project. User presets on disk stay out of it ([user-presets.md](user-presets.md#decide-what-a-preset-is)).
+
+**How the JUCE 9.0.3 wrappers use the API.**
+
+| Wrapper | Behaviour | Evidence |
+|---|---|---|
+| AU | A host setting `kAudioUnitProperty_PresentPreset` to a number of 0 or more calls `NewFactoryPresetSet`, which calls `setCurrentProgram`. Restoring a project through `kAudioUnitProperty_ClassInfo` sets the present preset to −1 with the saved name, then calls `setStateInformation`; no program is applied | **Source-derived** (`juce_audio_plugin_client_AU_1.mm`, `AUBase.cpp`); **tested** in-process on the built AU (case study below) |
+| AU | The factory preset list (`kAudioUnitProperty_FactoryPresets`) is built from `getProgramName`, in program order | **Tested** (case study) |
+| VST3 | With `getNumPrograms() > 1`, the wrapper appends a host-visible, automatable "Program" parameter after every other parameter, Bypass included | **Source-derived** (`juce_audio_plugin_client_VST3.cpp`, `ProgramChangeParameter`); **tested**: the parameter surface grew from 21 to 22, the existing 21 unchanged in order and defaults |
+| VST3 | `setComponentState` writes `getCurrentProgram()` into that parameter after every component state. The parameter's `setNormalized` calls `setCurrentProgram` only when its value differs from `getCurrentProgram()` | **Source-derived** |
+
+**Keep `getCurrentProgram` truthful.** A plug-in that stores "the last program selected" reports it even after the user edits the sound. A host that saves that number and replays it after restoring a project would then put the factory values back over the saved ones. Derive the number from the parameters instead:
+- program k while every parameter the factory preset sets holds k's values, within a normalised tolerance;
+- otherwise a neutral program that changes nothing, such as 0.
+
+An edited project then reports the neutral program, and an unedited one reports a program that only sets the values it already has. **Tested** (case study).
+
+**The residual risk.** The plug-in cannot tell a replayed program number from a deliberate choice. Suppose a host stored a non-zero number while the values matched, and the values were edited later without the host being told; replaying that stale number after a restore still applies the program. Notifying the host on every change of the derived number (below) narrows this; it does not close it. The restore test below saves the derived number, so it cannot show this case.
+
+Tradeoffs:
+- A project that happens to sound exactly like a factory preset reports it.
+- The factory values must differ from each other; test that.
+- The neutral entry appears in the host's preset list.
+
+**Program 0 can keep an older build's meaning.** A plug-in that shipped with one placeholder program, whose `setCurrentProgram` did nothing, can keep index 0 as a do-nothing entry and put factory preset i at i + 1. A host that selects program 0, by itself or from an old project, still changes nothing.
+- Never reorder or remove a program after release; append new ones.
+- Refuse invalid numbers without touching a parameter.
+- Ignore `changeProgramName`, so a host cannot rename a factory program.
+- **Case-study choice.**
+
+**What a program sets is a product decision.** A factory program can set only the tone parameters and leave power, input calibration, input routing and trims as the user set them, so it cannot change their gain staging. Init and user presets may cover more. Decide it per parameter, write it down, and make the modified mark compare only what each kind sets ([user-presets.md](user-presets.md#processor-selection-and-the-modified-mark)).
+
+**Host notification.**
+- After the editor applies a factory program, call `updateHostDisplay (ChangeDetails().withProgramChanged (true))`, so the host's preset display follows.
+- When a host selects a program itself, it already knows; do not notify it back.
+- A notification sent from the editor's timer runs only while the editor is open. A host can therefore show a different program for the same values, depending on whether the editor was open when they changed.
+- On AU, JUCE's notification sets the present preset to `getCurrentProgram()`. That can replace the name the host restored with the neutral program's name or a factory name.
+- **Source-derived;** what Logic shows in these cases was not observed.
+
+**Tests.** Keep the wrapper evidence apart from host behaviour.
+
+| Level | What to check |
+|---|---|
+| processor | count, names and order, pinned in the test; invalid numbers and the neutral program change nothing; each program sets exactly its values with balanced gestures and leaves the rest; the factory values are distinct |
+| processor, restore | select factory program k, edit a parameter it sets, save the state and `getCurrentProgram()`, restore into a fresh instance, then call `setCurrentProgram` with the saved number (an AU host replaying `PresentPreset`) and with `getCurrentProgram()` (VST3's `setComponentState`). Every restored value must remain. Repeat without the edit: the program is reported and changes nothing |
+| AU, in process | load the built AU with `dlopen`, register it for the process under a spare subtype with `AudioComponentRegister`, and read `kAudioUnitProperty_FactoryPresets`. Set `PresentPreset` to each number and read the parameters back. Save ClassInfo after a program and an edit, restore it into a fresh instance: the edit remains and the present preset reads −1 |
+| VST3, parameter surface | list the hosted parameters of the previous release and of the candidate, through a headless host; record the added Program parameter |
+| validators | `auval` and pluginval exercise the programs; pluginval reports "Current program is -1" as a warning for an AU with no present preset, which is expected by design |
+| real hosts | **not covered** by the levels above: a host that stores a program number separately and replays it, and what each host's preset display shows with the editor open and closed |
+
+The state format does not change: projects store parameter values, not a program number, and old states restore with their existing migrations.
+
+**Case study:** Vintage Combo (JUCE 9.0.3, macOS arm64, `shortwavlabs/vintage-combo` branch `feature/greenfield-dsp`).
+- **Tested:**
+  - the processor checks in `Tests/PresetReliability.cpp`, groups E8 and F, commit `9861bab`;
+  - the in-process AU check `tools/reliability/au_programs.cpp`: 31 of 31, `docs/reliability/evidence/au-programs.json`;
+  - the parameter surface, `docs/reliability/evidence/parameter-surface.json`;
+  - pluginval at strictness 10 on the VST3.
+- **Validated after installation** (`f5cb173`): `auval`, `auval -strict` and pluginval at strictness 10 on the installed AU.
+- **Not established:** the host display behaviour above, and whether any real host replays a stored program number after a restore.
+- Design and rationale: `docs/presets/factory-user-preset-architecture.md`, "Host programs".
+
 ## Non-Parameter State
 
 For UI state (editor size, tab index) or non-automatable data:
