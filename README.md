@@ -489,3 +489,30 @@ skills/faust-dsp/
 - [Faust GitHub](https://github.com/grame-cncm/faust) — compiler source, examples, architecture files
 - [Faust Examples](https://faustdoc.grame.fr/examples/) — categorized examples (ambisonics, reverb, physical modeling, etc.)
 - [Faust Wiki](https://github.com/grame-cncm/faust/wiki) — tutorials, platform-specific guides, workshops
+
+### workspace-housekeeping
+
+Keep a workspace of many plug-in and research projects recoverable and lean. The skill covers preservation before
+reclamation:
+- private, remotely verified git-bundle backups of unpublished work;
+- whole-bundle preservation of audition and cited binaries with SHA-256 provenance;
+- committed source for qualification runs, and frozen evidence changed only by versioned amendment;
+- APFS-aware recoverable-space accounting;
+- owner-approved deletion manifests, revalidated against the filesystem before execution.
+
+Project-specific retention rules always take precedence.
+
+**Triggers on:** cleaning up checkouts, worktrees, build directories, caches or research output; backing up work in
+progress; preserving audition builds; citing a binary or research result; reporting disk usage.
+
+#### Structure
+
+```
+skills/workspace-housekeeping/
+├── SKILL.md                    Principles, workflow and pitfalls
+├── agents/openai.yaml
+└── references/
+    ├── policy.md               The full workspace policy (revision 2)
+    └── procedures.md           WIP snapshots, bundle backups and remote verification, whole-bundle digests,
+                                archive verification, APFS clones, pre-deletion revalidation
+```
