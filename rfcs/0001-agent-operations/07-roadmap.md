@@ -1,6 +1,6 @@
 # 7. Implementation roadmap
 
-Part of [RFC 0001: Operational Skills](README.md). Status: **structure approved** (owner decision D13, revision 2).
+Part of [RFC 0001: Operational Skills](README.md). Status: **approved** (owner decision D13; revision 3).
 
 Phase 1 is four reviewable PRs on stacked branches, each based on its predecessor. Implementation PRs stay in draft
 until the owner reviews them, and a phase starts only after the previous one has been reviewed. Small, coherent and
@@ -19,6 +19,7 @@ trustworthy beats numerous.
 
 - Revision 1: the seven design documents.
 - Revision 2: owner decisions D1–D13 recorded, architectural corrections, reconciliation with PR #18.
+- Revision 3: final review; D14 (host-recorded approvals), authorization statuses, trust-boundary refinements.
 - Checks: the repository validator, plus the validator's link, anchor and path-leak logic run over `rfcs/`, and a
   scan for private names.
 - Exit: final owner review of revision 2.
@@ -27,10 +28,10 @@ trustworthy beats numerous.
 
 | PR | Content | Base |
 |---|---|---|
-| **1a** | **Shared foundation only:** the canonical operational core; deterministic synchronization of generated copies with drift detection (read-only check by default, explicit write mode); validator support for `rfcs/`; record and scenario format definitions for the Phase 1 formats; example records and synthetic fixtures; validator checks for record structure; prevention of new cross-skill relative links; deterministic self-tests, including regression tests for malformed records, drifted copies, incompatible versions and invalid authorization references. Standard library only. No skill directories, no paid evaluations | RFC branch |
+| **1a** | **Shared foundation only:** the canonical operational core; deterministic synchronization of generated copies with drift detection (read-only check by default, explicit write mode); validator support for `rfcs/`; record and scenario format definitions for the Phase 1 formats; example records and synthetic fixtures; validator checks for record structure; prevention of new cross-skill relative links; deterministic self-tests, including regression tests for malformed records, drifted copies, incompatible versions and invalid authorization references; the authorization status vocabulary, with runtime fixtures that define, without performing, the checks of 1c. Standard library only. No skill directories, no paid evaluations | RFC branch |
 | 1b | `development-coordination`: the [coordination protocol](05-artifact-conventions.md#claims-and-the-coordination-protocol), the activity check through a generated copy of `path_in_use.py`, the worktree decision procedure, safe interruption, scenarios. Settles process start time, Windows, network filesystems and the several-machines convention | 1a |
-| 1c | `agent-handoff`: the record, the resume procedure, authorization-reference verification, refreshing before compaction, `handoff_check.py`, scenarios. Settles where owner identities are declared | 1b |
-| 1d | `instruction-governance`: canonical policy, adapters per agent, the trust boundary, the precedence rule, the trigger table, the policy audit tool (read-only by default, proposed diff, revision and digest checks, explicit approval, unrelated text preserved, no partial writes), opt-in enforcement adapters documented but never installed by an agent | 1a |
+| 1c | `agent-handoff`: the record, the resume procedure, runtime authorization-reference verification (including host-recorded approval evidence, D14, against the 1a fixtures), refreshing before compaction, `handoff_check.py`, scenarios. Until 1d declares owner identities in the canonical policy, runtime verification reports unknown (ask once) | 1b |
+| 1d | `instruction-governance`: canonical policy (including the owner identities and trusted repositories it declares), adapters per agent, the trust boundary, the precedence rule, the trigger table, the policy audit tool (read-only by default, proposed diff, revision and digest checks, explicit approval, unrelated text preserved, no partial writes), opt-in enforcement adapters documented but never installed by an agent | 1a |
 
 **Phase 1 exit:**
 - Tier 0 and Tier 1 pass.

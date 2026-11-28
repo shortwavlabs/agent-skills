@@ -1,6 +1,6 @@
 # 5. Shared artifact conventions and the coordination protocol
 
-Part of [RFC 0001: Operational Skills](README.md). Status: **decision D8 approved with requirements**; the coordination
+Part of [RFC 0001: Operational Skills](README.md). Status: **approved** (owner decisions D8 and D14; revision 3).
 protocol's details, the reference format and the standing-authorizations format are new in revision 2, for owner
 review.
 
@@ -91,6 +91,9 @@ Rules:
 - R1 and higher decisions rest only on VERIFIED facts, or treat what is missing as unsafe.
 - **Verification does not transfer.** A receiving agent reads a VERIFIED item in a handoff as REPORTED until it
   re-checks it or confirms that the artifact identity is unchanged.
+- **Identity is not state.** Verifying an artifact's identity (a commit, a digest) does not verify the mutable state
+  that refers to it: a branch tip, a PR's status, a working tree, a running process or an authorization's current
+  validity is checked again when relied on.
 - **A digest verifies identity or integrity only.** A matching SHA-256 shows the bytes are the expected bytes. It does
   not show that they are correct, how they were produced, or that anyone authorized their use.
 - Archival integrity and reproducibility are separate claims in separate fields (`workspace-housekeeping` principle 8).
@@ -136,21 +139,26 @@ References point only to the approved sources of authorization
 | `source` | `ref` form | Verifiable by another agent? |
 |---|---|---|
 | `standing` | `<path>@<commit>#<id>`, naming an entry in the designated authorizations file (cost-only entries included) | Yes: within the [trust boundary](04-risk-and-authorization.md#trust-boundary-for-standing-authorizations) |
-| `owner-session` | a locator for the session in which the owner gave the instruction; may carry a `quote` | **No.** For any other agent the authorization is *unestablished* |
+| `owner-session` | a locator for the session in which the owner gave the instruction; may carry a `quote` | **No.** For any other agent its status is *unknown*: ask the owner once |
 
-A host-attested reference type (a PR approval or merge recorded by the host as performed by an owner identity) is a
-proposal awaiting owner confirmation ([unresolved questions](README.md#unresolved-implementation-questions)). Until it
-is confirmed, any other `source` value is invalid. Comments are not references: collaborators with write access can edit
-other users' comments.
+Host-recorded PR approvals and merges (D14) are not a separate source: they are the evidence behind a `standing` entry
+(its `approved_in`, checked against the host's record of that PR). Any other `source` value is invalid. Comments are not references:
+collaborators with write access can edit other users' comments.
 
-Three outcomes, kept distinct:
-- **Established (form):** a `standing` reference with a well-formed `ref`. The receiving agent still checks
-  authenticity (entry present at that commit within the trust boundary, scope, expiry) before relying on it.
-- **Unestablished:** a well-formed `owner-session` entry. Not an error: the receiving agent asks the owner once.
-- **Invalid:** an unknown or unapproved source, a missing or malformed `ref`, `scope`, `level` or `by`, a level other
-  than R1 or R2 (R3 never transfers), or a malformed `granted` or `expires`. Validators reject it.
+**Statuses.** A structurally valid reference is never treated as authenticated or authorized because it matches the
+format.
 
-Repository validators check form only. Authenticity is established at run time.
+| Status | Meaning | Who can report it | Grants authority? |
+|---|---|---|---|
+| **invalid** | Malformed (unknown source, missing or malformed `ref`, `scope`, `level` or `by`, a level other than R1 or R2, contradictory or malformed dates), inside an invalid record, or pointing to a commit or entry that does not exist | Structural checks and runtime checks | No |
+| **unverified** | Structurally valid; nothing about its authenticity or applicability has been checked | Structural checks (Phase 1a) | No |
+| **verified** | Authentic and applicable: every condition of the [trust boundary](04-risk-and-authorization.md#trust-boundary-for-standing-authorizations) holds for this operation, now | Runtime checks only (Phase 1c) | **Yes** |
+| **inapplicable** | Authentic or not, it does not cover this use: expired, revoked, out of scope, changed since approval, not approved by an owner identity, or from an untrusted repository | Runtime checks only | No |
+| **unknown** | Cannot be established now: offline, host records unavailable, or an `owner-session` authorization the receiving agent cannot verify | Runtime checks only | No: ask the owner once |
+
+Phase 1a's validator reports only *invalid* or *unverified*. The expected runtime behavior for fabricated, nonexistent,
+expired, revoked, changed and quoted authorizations is defined as fixtures in `operational/fixtures/` (Phase 1a), for
+the runtime checks of Phase 1c to satisfy; Phase 1a does not perform those checks.
 
 ## Standing authorizations
 
@@ -161,7 +169,6 @@ Committed in `ops/authorizations.json` (or the file the canonical policy names),
 {
   "kind": "authorizations",
   "version": 1,
-  "owners": ["github:<owner login>"],
   "authorizations": [
     {
       "id": "push-feature-branches",
@@ -186,8 +193,14 @@ Committed in `ops/authorizations.json` (or the file the canonical policy names),
 
 - `level` is R1 or R2, never R3. A `cost_only` entry authorizes spending alone, never publication or deletion.
 - Existing authorized workflows that cost money (D9) are entries here; the budget file only holds thresholds.
-- `owners` is governed by the file it sits in: its trust rests on the host's record of who merged the change. Where
-  owner identities are declared for good is settled in Phase 1c or 1d.
+- **No owner list here.** Owner identities and trusted repositories are declared only in the canonical policy (D14);
+  a repository cannot establish its own owner identity.
+- **Bound to approval.** `approved_in` names the PR. The revision the owner approved or merged comes from the host's
+  record for that PR, never from this file (an entry cannot name the commit that contains it). The entry is covered
+  only if its content at that revision equals its content at the referenced commit and on the current default branch;
+  an entry changed after approval is not covered until approved again.
+- **Revocation** is removal: an entry that no longer appears, unchanged, on the current default branch is revoked, and
+  older commits that still contain it grant nothing.
 
 ## Claims and the coordination protocol
 
@@ -349,7 +362,7 @@ What was tested, with which command and result, and what was not tested.
 
 ## Resume
 1. Check this record against the repository (branch, HEAD, upstream, working tree, PR state).
-2. Verify the authorization references you need; ask once for any that is unestablished.
+2. Verify the authorization references you need; ask once for any whose status is unknown.
 3. Re-verify what the next step depends on, then continue with Pending item 1.
 ````
 
@@ -460,8 +473,7 @@ defaults.** `material_overrun` (1.25) is a proposed default for owner review, no
 ```
 
 Design requirements (D9):
-- **Classification, not permission.** Reaching a threshold makes an operation R2; it then needs an established
-  authorization.
+- **Classification, not permission.** Reaching a threshold makes an operation R2; it then needs a verified authorization or the owner's instruction.
 - **Existing authorized workflows** are respected. The committed CI is the project's normal cost and is not
   re-approved on every push; a workflow that reaches a threshold by itself is covered by a cost-only standing
   authorization. Changing a workflow's triggers or matrix is estimated as an incremental cost.
