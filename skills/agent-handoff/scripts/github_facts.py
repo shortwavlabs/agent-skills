@@ -95,7 +95,7 @@ def same(a, b) -> bool:
 
 def approvals(api, slug: str, number: str) -> tuple[list[dict], str | None]:
     """(every host-recorded approval candidate on the PR: its merge and each reviewer's latest decisive review,
-    the PR's base commit)."""
+    the PR's base branch name)."""
     pr = api(f"repos/{slug}/pulls/{number}")
     out = []
     if pr.get("merged") and pr.get("merged_by") and pr.get("merge_commit_sha"):
@@ -117,7 +117,30 @@ def approvals(api, slug: str, number: str) -> tuple[list[dict], str | None]:
         basis = last if last["state"] != "CHANGES_REQUESTED" else approved[-1]
         out.append({"kind": "approval", "by": f"github:{login}", "revision": basis.get("commit_id"),
                     "at": basis.get("submitted_at"), "state": state})
-    return out, (pr.get("base") or {}).get("sha")
+    return out, (pr.get("base") or {}).get("ref")
+
+
+def introduced(api, slug: str, path: str, entry_id: str, candidate: dict, at_revision, base_ref: str | None):
+    """True when the approved PR itself introduced or changed the entry. The point of comparison is what the PR's own
+    changes sit on: for a merge, the merge commit's first parent (the base branch just before the merge); for a review,
+    the merge base of the reviewed commit and the base branch. The PR's recorded base commit is not used: it can
+    predate an entry pushed to the base branch later, which an unrelated merge would then appear to approve."""
+    if candidate["revision"] is None or at_revision is None:
+        return None if candidate["revision"] is None else False
+    if candidate["kind"] == "merge":
+        parents = api(f"repos/{slug}/commits/{candidate['revision']}").get("parents") or []
+        if not parents:
+            return None
+        before = parents[0]["sha"]
+    else:
+        if not base_ref:
+            return None
+        base = api(f"repos/{slug}/compare/{urllib.parse.quote(base_ref)}...{candidate['revision']}")
+        before = (base.get("merge_base_commit") or {}).get("sha")
+        if not before:
+            return None
+    previous = entry_at(api, slug, path, before, entry_id)
+    return previous is None or not same(previous, at_revision)
 
 
 def reinstated(api, slug: str, branch: str, path: str, entry_id: str, since: str | None):
@@ -155,15 +178,12 @@ def gather(reference: dict, root: Path, owners=(), api=gh_api, remote: str = "or
         m = PR_URL.match(str(entry.get("approved_in", "")))
         if not m:
             return facts
-        candidates, base = approvals(api, f"{m.group(1)}/{m.group(2)}", m.group(3))
-        at_base = entry_at(api, slug, path, base, entry_id) if base else None
+        candidates, base_ref = approvals(api, f"{m.group(1)}/{m.group(2)}", m.group(3))
         for c in candidates:
             at_revision = entry_at(api, slug, path, c["revision"], entry_id) if c["revision"] else None
             c["entry_at_approved_revision"] = None if at_revision is None and c["revision"] is None else \
                 ("identical" if at_revision is not None and same(at_revision, entry) else "changed")
-            # The approval binds the entry only if this PR introduced or changed it (not an unrelated PR merged later).
-            c["introduced_entry"] = None if base is None or c["revision"] is None else \
-                (at_revision is not None and (at_base is None or not same(at_base, at_revision)))
+            c["introduced_entry"] = introduced(api, slug, path, entry_id, c, at_revision, base_ref)
         owned = [c for c in candidates if c["by"] in owners]
         usable = [c for c in owned if c["state"] == "active" and c["entry_at_approved_revision"] == "identical"]
         chosen = (usable or owned or candidates or [{"kind": "none", "by": None, "state": "active",
@@ -204,6 +224,8 @@ class FakeGitHub:
         self.files: dict[str, dict] = {}              # revision -> authorizations document (or None)
         self.branch_history: list[str] = []           # commits touching the file on the default branch, newest first
         self.pr = {"merged": False}
+        self.parents: dict[str, str] = {}             # commit -> first parent
+        self.merge_base: str | None = None            # the compare endpoint's merge base
         self.reviews: list[dict] = []
         self.down = False
         self.calls: list[str] = []
@@ -220,7 +242,10 @@ class FakeGitHub:
         if parsed.path.startswith(base + "/commits/"):
             if parts[-1] not in self.files:
                 raise NotFound(path)
-            return {"sha": parts[-1]}
+            parent = self.parents.get(parts[-1])
+            return {"sha": parts[-1], "parents": [{"sha": parent}] if parent else []}
+        if parsed.path.startswith(base + "/compare/"):
+            return {"merge_base_commit": {"sha": self.merge_base}} if self.merge_base else {}
         if parsed.path.startswith(base + "/contents/"):
             ref = query["ref"][0]
             doc = self.files.get(self.branch_history[0] if ref == self.default and self.branch_history else ref)
@@ -278,8 +303,11 @@ def self_test() -> list[str]:
                      "merged_at": "2026-11-27T18:00:00Z"}
             for k, v in kw.items():
                 setattr(gh, k, v)
-            gh.pr.setdefault("base", {"sha": base_commit})
+            gh.pr.setdefault("base", {"ref": "main", "sha": base_commit})
             gh.files.setdefault(base_commit, doc())
+            gh.parents.setdefault(merge_commit, base_commit)
+            if gh.merge_base is None:
+                gh.merge_base = base_commit
             return gh
 
         def outcome(gh, action="push-branch") -> tuple[str, str]:
@@ -324,6 +352,15 @@ def self_test() -> list[str]:
             ("owner merged a PR that never touched the entry",
              host(files={ref_commit: doc(entry), merge_commit: doc(entry), head: doc(entry), base_commit: doc(entry)}),
              "inapplicable"),
+            ("entry pushed to main after the PR was opened, then the owner merged the unrelated PR",
+             host(files={ref_commit: doc(entry), merge_commit: doc(entry), head: doc(entry), base_commit: doc(),
+                         "9" * 40: doc(entry)}, parents={merge_commit: "9" * 40}), "inapplicable"),
+            ("owner's review of a PR whose merge base already had the entry",
+             host(pr={"merged": False, "base": {"ref": "main"}}, merge_base="9" * 40,
+                  files={ref_commit: doc(entry), review_commit: doc(entry), head: doc(entry), "9" * 40: doc(entry)},
+                  reviews=[{"user": {"login": "example-owner"}, "state": "APPROVED", "commit_id": review_commit,
+                            "submitted_at": "2026-11-27T17:00:00Z"}]), "inapplicable"),
+            ("merge commit without parents recorded", host(parents={merge_commit: ""}), "unknown"),
             ("the PR changed the entry the owner merged",
              host(files={ref_commit: doc(entry), merge_commit: doc(entry), head: doc(entry),
                          base_commit: doc({**entry, "expires": "2026-12-31T00:00:00Z"})}), "verified"),

@@ -60,6 +60,7 @@ Every record carries `kind` and `version` (JSON) or a `Version:` header line (Ma
   claims/<id>.json  live claims
   claims/stale/     claims archived after expiry with a dead holder, kept until reviewed
   handoffs/<branch>.md
+  handoffs/history/ superseded handoff records, kept until reviewed
 ```
 
 - **Sandbox-compatible exclusion.** The agent creates `.agent-state/.gitignore` containing `*` before writing anything
@@ -197,8 +198,10 @@ Committed in `ops/authorizations.json` (or the file the canonical policy names),
 - `actions` (Phase 1c) lists the operations the entry covers as exact slugs; runtime verification matches the
   operation's action against it, because whether a sentence covers an operation is not decided mechanically. An entry
   without `actions` verifies as unknown.
-- **Bound to its PR.** The `approved_in` PR must have introduced or changed the entry: an owner merging an unrelated
-  PR approves nothing already on the branch. Standing references must name the designated file.
+- **Bound to its PR.** The `approved_in` PR must have introduced or changed the entry, compared with the merge
+  commit's first parent (a merge) or with the merge base of the reviewed commit (a review), never with the PR's
+  recorded base, which can predate an entry pushed to the branch later: an owner merging an unrelated PR approves
+  nothing already on the branch. Standing references must name the designated file.
 - Existing authorized workflows that cost money (D9) are entries here; the budget file only holds thresholds.
 - **No owner list here.** Owner identities and trusted repositories are declared only in the canonical policy (D14);
   a repository cannot establish its own owner identity.

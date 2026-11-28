@@ -42,8 +42,10 @@ The first condition that fails decides.
 9. The entry is well formed, matches the reference (who granted it, its level), was granted by an owner identity, and
    names an `approved_in` PR in the same repository.
 10. The host records an approval or merge of that PR by an owner identity, still active (not dismissed, not superseded
-    by a later change request). **That PR introduced or changed the entry** (its content at the PR's base is absent or
-    different): merging an unrelated PR approves nothing already on the branch. The entry's content at the approved
+    by a later change request). **That PR introduced or changed the entry**: its content just before the PR's own
+    changes (the merge commit's first parent, or the reviewed commit's merge base with the base branch) is absent or
+    different. Merging an unrelated PR approves nothing already on the branch, even an entry pushed after the PR was
+    opened. The entry's content at the approved
     revision equals the referenced content. Git author fields never count.
 11. The entry is unchanged on the current default branch (absent: revoked; changed: not covered), and was not removed
     and reintroduced after the approval (a reinstatement needs fresh approval).
@@ -77,8 +79,9 @@ it: an entry for `merge-pr` does not cover `delete-files`.
 
 `github_facts.gather()` reads, through `gh api` and nothing else: the repository and its default branch; the
 referenced commit (GitHub answers a missing one with HTTP 422, read as "does not exist"); the authorizations file at
-the referenced commit, at the PR's base, at each approved revision and on the default branch; the PR named in
-`approved_in` (its merge, merged-by and base) and its reviews; and the commits that touched the file
+the referenced commit, at each approved revision, at the commit just before the PR's changes (the merge commit's
+first parent, or the compare API's merge base for a review) and on the default branch; the PR named in `approved_in`
+(its merge, merged-by and base branch) and its reviews; and the commits that touched the file
 on the default branch since the approval (up to 100; more is unknown). It writes nothing. Each reviewer's latest
 decisive review counts: an approval later dismissed is `dismissed`, one followed by a change request is
 `superseded`. Any failure to reach or parse the host gives `host_reachable: false`, hence unknown.
