@@ -1,6 +1,6 @@
 # 5. Shared artifact conventions and the coordination protocol
 
-Part of [RFC 0001: Operational Skills](README.md). Status: **approved** (owner decisions D8 and D14; revision 3).
+Part of [RFC 0001: Operational Skills](README.md). Status: **approved** (owner decisions D8 and D14; revision 3, amended in revision 5 after the Phase 1b review).
 protocol's details, the reference format and the standing-authorizations format are new in revision 2, for owner
 review.
 
@@ -313,8 +313,8 @@ is reported in the handoff.
 **Failure modes of the lock.** A crashed holder releases the lock automatically (the kernel drops it with the file
 descriptor), so the lock itself never goes stale; only claims can. On network filesystems advisory locks may be
 local-only, so claims there are unreliable and reported as such. On platforms without `fcntl` (Windows), in a
-checkout whose filesystem cannot be identified, and inside a container (whose PID namespace makes holder identity
-unverifiable), claims are unavailable and the read-only activity check reports coordination as unavailable too. None
+checkout whose filesystem cannot be identified, and in an isolated PID namespace such as most containers (where
+holders and processes outside it cannot be verified), claims are unavailable and the read-only activity check reports coordination as unavailable too. None
 of these failures is ever reported as "no conflict" or "idle".
 
 ### Several machines

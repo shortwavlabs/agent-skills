@@ -18,7 +18,7 @@ found.
 
 | Evidence | How | Effect |
 |---|---|---|
-| Coordination availability | `fcntl`, the filesystem type, container detection, the registry's safety and git-ignore status | Unavailable: unknown, reported on its own line, never as idle |
+| Coordination availability | `fcntl`, the filesystem type, the PID namespace, the registry's safety and git-ignore status | Unavailable: unknown, reported on its own line, never as idle |
 | Other agents' claims overlapping the scope | The registry, read without the lock (claims are published atomically) | Live, expired-held, dead-unexpired or transfer-pending: busy. Unknown holder: unknown. Uninspectable registry: unknown |
 | A claim carrying your session token but another process identity | The registry | Busy: it is not this session's claim (accept a transfer or recover it first) |
 | Processes using the scope | `scripts/path_in_use.py`, a generated copy of `workspace-housekeeping`'s in-use check: every readable process's working directory **and** open files, including executables and mapped libraries, for every target of the scope | Active or passive: busy, unless an owner-accepted passive identity applies. Partial or failed visibility on any target: unknown |
@@ -45,8 +45,10 @@ over all targets.
 ## Disruptive and destructive checks
 
 - `--disruptive` (a branch switch, reset, rebase, commit in a shared tree, rebuild): requires this session's **live
-  exclusive** claim covering the scope, passed with `--session`; a shared claim or a branch claim never authorizes it.
-  Uncommitted work blocks.
+  exclusive** claim that **covers** the scope, passed with `--session`. Covering is stricter than overlapping: a
+  checkout claim covers everything, a paths claim only paths inside its own, a branch claim only that branch. A shared
+  claim never authorizes it, and neither does a `paths=docs/**` claim for a checkout-wide `git switch`. Uncommitted
+  work blocks.
 - `--destructive` (deleting files or directories, removing a worktree, discarding work): everything `--disruptive`
   requires, and no passive acceptance ever applies.
 
@@ -106,5 +108,6 @@ To judge such a report:
 - A process that will write into the checkout but has no working directory or open file there yet.
 - Activity between the check and your operation: chain the check with the command to narrow the window.
 - On Windows, or without `lsof` and `ps`, processes at all: the verdict is unknown.
-- Processes in another PID namespace. Inside a container the check reports coordination as unavailable, and an agent
-  there cannot hold claims; coordinate such setups manually.
+- Processes in another PID namespace. In a Linux PID namespace other than the kernel's initial one (most containers),
+  the check reports coordination as unavailable and an agent there cannot hold claims; coordinate such setups
+  manually. The detection is best effort: it compares this process's PID namespace with the initial one.

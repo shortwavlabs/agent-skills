@@ -57,8 +57,9 @@ Two optional fields record ownership changes. `transfer` is a pending offer: the
   ancestry and takes the nearest ancestor that is not a `sh -c`, `bash -lc`, `zsh -c` or `env` wrapper. Under Claude
   Code or Codex that is the agent process.
 - **It must be a session boundary.** A candidate is rejected if a process beneath it has a controlling terminal other
-  than its own (a terminal multiplexer, IDE or terminal application hosts several), or if a process beneath it holds
-  another registered claim (a shell that started two agents). These tests use the process tree, terminals and the registry;
+  than its own and those of this session's own process chain (a terminal multiplexer, IDE or terminal application
+  hosts several; an agent that runs each command in a fresh pty does not count against itself), or if a process
+  beneath it holds another registered claim (a shell that started two agents). These tests use the process tree, terminals and the registry;
   no process name is consulted. If the nearest candidate is not a boundary, there is no holder: the tool does not
   climb further, because anything higher is broader still.
 - **`--holder-pid`** overrides the choice, but only with this process or one of its ancestors, and only if it passes
@@ -92,7 +93,7 @@ run in.
 ## Acquisition
 
 1. Resolve the checkout root with git. Coordination must be available: `fcntl` exists, the filesystem is identified and
-   local, and the tool is not inside a container. Otherwise: unknown.
+   local, and the tool does not run in an isolated PID namespace (a container). Otherwise: unknown.
 2. Make sure the registry exists, is real directories and is ignored by git.
 3. Determine the holder identity and validate it as a session boundary (outside the lock). None: unknown.
 4. **Enter the critical section:** open `claims.lock` (no symlinks followed) and take `fcntl.flock(LOCK_EX | LOCK_NB)`,
@@ -104,7 +105,9 @@ run in.
 8. Otherwise write the new claim to a temporary file, flush it, rename it into place, flush the directory, and leave
    the critical section. The lock is held for milliseconds, never for the work.
 
-A request carrying `--session` of an existing claim held by this same process treats that claim as its own.
+A request carrying `--session` of an existing claim held by this same process treats that claim as its own. For a
+disruptive check, that claim must also be exclusive, live and **cover** the checked scope (see
+[activity check](activity-check.md#disruptive-and-destructive-checks)).
 
 ## Ownership lifecycle
 
@@ -161,7 +164,7 @@ identity (host, boot, PID, start time) both match the caller.
 | The lock stays busy beyond the timeout | Unknown: try again later |
 | `fcntl` is missing (Windows) or `flock` fails on this filesystem | Unknown: claims unavailable |
 | The checkout is on a network filesystem, or its filesystem cannot be identified | Unknown: advisory claims are unreliable there |
-| The tool runs inside a container | Unknown: holders in other PID namespaces cannot be verified |
+| The tool runs in a Linux PID namespace other than the initial one (most containers) | Unknown: processes and holders outside it cannot be verified |
 | This session's holder cannot be established as a session boundary | Unknown: no claim is written |
 
 None of these is ever reported as a grant, as "no conflict" or as "idle". The read-only `check` reports the same

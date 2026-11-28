@@ -108,8 +108,8 @@ immediately before pushing to a branch you did not create. These are signals, no
 - Cross-machine coordination and network filesystems are out of scope for the lock.
 - Process visibility is limited to what `lsof` can read; other users' processes need root.
 - Tested on macOS and Linux only; the Windows behaviour is a documented fallback (unknown), not a tested feature.
-- Agents in containers sharing the checkout see different PID namespaces: inside a container claims are unavailable
-  and the check reports unknown. Coordinate such setups manually.
+- Agents in containers sharing the checkout see different PID namespaces: in an isolated PID namespace claims are
+  unavailable and the check reports unknown (best-effort detection). Coordinate such setups manually.
 - A shell that started two agents is recognised as shared only once one of them holds a claim; until then an explicit
   `--holder-pid` naming that shell would be accepted. Leave `--holder-pid` unset unless the automatic choice is wrong.
 - A stray file in `.agent-state/claims/` other than a regular `.DS_Store` makes the registry uninspectable, so every

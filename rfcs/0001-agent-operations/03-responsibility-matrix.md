@@ -1,6 +1,6 @@
 # 3. Skill responsibility matrix
 
-Part of [RFC 0001: Operational Skills](README.md). Status: **approved** (owner decision D3; revision 3).
+Part of [RFC 0001: Operational Skills](README.md). Status: **approved** (owner decision D3; revision 3, amended in revision 5 after the Phase 1b review).
 
 ## Contents
 - [The family](#the-family)

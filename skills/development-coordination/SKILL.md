@@ -104,7 +104,8 @@ the command narrows it; nothing closes it. The protocol does not guarantee safet
 ## Platforms
 
 - **Tested:** macOS (locally) and Linux (CI), with `fcntl.flock`, `ps` and `lsof`.
-- **Documented fallback, not tested:** on Windows, on network or unidentified filesystems, inside containers and
+- **Documented fallback, not tested:** on Windows, on network or unidentified filesystems, in containers with their
+  own PID namespace and
   wherever locking or process inspection cannot be established, the tool reports coordination as unavailable and the
   result as unknown. It never reports a grant or "idle" it cannot back. Ordinary non-conflicting work continues; disruptive
   operations follow the manual procedure in [procedures](references/procedures.md#manual-coordination-fallback).

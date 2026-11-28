@@ -25,8 +25,8 @@ What this enforces, and what it does not:
   cooperating agents; they are not authentication against a hostile process of the same user.
 - A claim is stale only when it has expired, its holder is established to be dead and no transfer is pending.
 - Anything that cannot be inspected or relied on (a malformed record, an unexpected registry file, a symlinked or
-  git-tracked registry, a lock timeout, no `fcntl`, a network or unidentified filesystem, a container, partial process
-  visibility) yields unknown: never a grant, never "idle".
+  git-tracked registry, a lock timeout, no `fcntl`, a network or unidentified filesystem, an isolated PID namespace,
+  partial process visibility) yields unknown: never a grant, never "idle".
 - The activity check reuses `path_in_use.py` (a generated copy of `workspace-housekeeping`'s): working directories and
   open files of every readable process. It excludes only this session's own processes: its holder (found through
   ancestry and validated as a session boundary) and the holder's descendants. It never excludes a process by name.
@@ -180,13 +180,14 @@ def descendants(pid: int, table: dict) -> set[int]:
 def broad_reason(pid: int, table: dict, claims=(), chain=()) -> str | None:
     """Why pid cannot stand for one session (and so must not own its descendants), or None.
 
-    Name-free tests: a session boundary hosts no controlling terminal other than its own (terminal multiplexers, IDEs
-    and terminal applications do), and contains no other registered claim holder (sibling agents that coordinate)."""
-    own_tty = table[pid][1]
+    Name-free tests: a session boundary hosts no controlling terminal other than its own and those of this session's
+    own chain (terminal multiplexers, IDEs and terminal applications host others), and contains no other registered
+    claim holder (sibling agents that coordinate)."""
+    allowed = {table[pid][1]} | {table[p][1] for p in chain if p in table}   # its own terminal and this session's ptys
     below = descendants(pid, table)
     for d in sorted(below):
         tty = table[d][1]
-        if tty not in NO_TTY and tty != own_tty:
+        if tty not in NO_TTY and tty not in allowed:
             return f"it hosts another terminal ({tty}, process {d})"
     for claim in claims:
         other = claim["holder"]["pid"]
@@ -312,13 +313,15 @@ def filesystem_type(path: Path) -> str | None:
     return kind
 
 
-def in_container() -> bool:
-    if Path("/.dockerenv").exists() or Path("/run/.containerenv").exists():
-        return True
+def pid_namespace_isolated() -> bool:
+    """True when this process runs in a Linux PID namespace other than the kernel's initial one (most containers):
+    processes and claim holders outside it are then invisible or ambiguous. Best effort; macOS has no PID namespaces."""
     try:
-        return bool(re.search(r"docker|kubepods|containerd|libpod", Path("/proc/1/cgroup").read_text()))
-    except OSError:
+        return os.readlink("/proc/self/ns/pid") != "pid:[4026531836]"    # PROC_PID_INIT_INO
+    except FileNotFoundError:
         return False
+    except OSError:
+        return True
 
 
 def coordination_problem(root: Path) -> str | None:
@@ -330,8 +333,8 @@ def coordination_problem(root: Path) -> str | None:
         return "the checkout's filesystem type could not be identified"
     if kind in NETWORK_FS:
         return f"the checkout is on a network filesystem ({kind}): advisory claims are unreliable there"
-    if in_container():
-        return "this runs inside a container: holders in other PID namespaces cannot be verified"
+    if pid_namespace_isolated():
+        return "this runs in an isolated PID namespace (a container): processes and holders outside it cannot be verified"
     return None
 
 
@@ -408,16 +411,36 @@ def overlap(a: dict, b: dict, root: Path) -> bool:
         return a["type"] == b["type"] and a["value"] == b["value"]   # a branch is not the working tree
     if a["type"] == b["type"] == "resource" and a["value"] == b["value"]:
         return True
-    pa, pb = scope_paths(a, root), scope_paths(b, root)
-    if pa is None or pb is None:
+    ka, kb = prefix_keys(a, root), prefix_keys(b, root)
+    if ka is None or kb is None:
         return True
-    fold = case_insensitive(root)
-
-    def key(path: Path) -> PurePosixPath:
-        text = unicodedata.normalize("NFC", str(path))
-        return PurePosixPath(text.casefold() if fold else text)
-    ka, kb = [key(x) for x in pa], [key(y) for y in pb]
     return any(x == y or x in y.parents or y in x.parents for x in ka for y in kb)
+
+
+def prefix_keys(scope: dict, root: Path) -> list[PurePosixPath] | None:
+    paths = scope_paths(scope, root)
+    if paths is None:
+        return None
+    fold = case_insensitive(root)
+    out = []
+    for path in paths:
+        text = unicodedata.normalize("NFC", str(path))
+        out.append(PurePosixPath(text.casefold() if fold else text))
+    return out
+
+
+def covers(held: dict, wanted: dict, root: Path) -> bool:
+    """True only when everything the wanted scope touches lies inside the held scope; undeterminable: False."""
+    if held["type"] == "checkout":
+        return True
+    if held["type"] in ("branch", "resource"):
+        return wanted["type"] == held["type"] and wanted["value"] == held["value"]
+    if wanted["type"] not in ("paths", "resource") or (wanted["type"] == "resource" and not wanted.get("path")):
+        return False
+    hk, wk = prefix_keys(held, root), prefix_keys(wanted, root)
+    if not hk or not wk:
+        return False
+    return all(any(w == h or h in w.parents for h in hk) for w in wk)
 
 
 def conflicts_with(mode_a: str, mode_b: str) -> bool:
@@ -573,11 +596,13 @@ class Registry:
             if not regular:
                 problems.append(f"{name} is not a regular file")
                 continue
-            if entry.stat(follow_symlinks=False).st_size > MAX_CLAIM_BYTES:
-                problems.append(f"{name} is too large to be a claim")
-                continue
             try:
+                if entry.stat(follow_symlinks=False).st_size > MAX_CLAIM_BYTES:
+                    problems.append(f"{name} is too large to be a claim")
+                    continue
                 data = strict_json(Path(entry.path).read_text(encoding="utf-8"))
+            except FileNotFoundError:                 # released or archived while an unlocked reader scanned
+                continue
             except (OSError, ValueError, RecursionError) as e:
                 problems.append(f"{name} cannot be read: {e}")
                 continue
@@ -672,14 +697,13 @@ def acquire(repo, scope: dict, *, mode: str = "exclusive", intent: str, ttl_minu
     ttl = _ttl(ttl_minutes)
     try:
         registry = _registry(repo)
-        visible, _, _, _ = registry.read()            # unlocked, best effort: only to judge the session boundary
-        me = caller_identity(holder_pid, visible)
-        if me["pid"] is None:
-            return _unidentified()
         with registry.locked(lock_timeout):
             claims, _, problems, _ = registry.read()
             if problems:
                 return _uninspectable(problems)
+            me = caller_identity(holder_pid, claims)  # judged against the claims as they stand under the lock
+            if me["pid"] is None:
+                return _unidentified()
             now, conflicts, archived = utcnow(), [], []
             local = {"host": me["host"], "boot": me["boot"]}
             for claim in claims:
@@ -711,12 +735,11 @@ def _change(repo, claim_id: str, holder_pid: int | None, lock_timeout: float, ch
         raise Usage(f"invalid claim id {claim_id!r}")
     try:
         registry = _registry(repo)
-        visible, _, _, _ = registry.read()
-        me = caller_identity(holder_pid, visible)
         with registry.locked(lock_timeout):
             claims, _, problems, _ = registry.read()
             if problems:
                 return _uninspectable(problems)
+            me = caller_identity(holder_pid, claims)
             claim = next((c for c in claims if c["id"] == claim_id), None)
             if claim is None:
                 return {"status": "missing", "reason": f"no active claim {claim_id}"}
@@ -749,6 +772,8 @@ def renew(repo, claim_id: str, session: str, ttl_minutes=120, *, holder_pid: int
     def change(registry, claim, me, local, now):
         if not _token_ok(claim, session):
             return {"status": "refused", "reason": "the session token does not match this claim"}
+        if me["pid"] is None:
+            return _unidentified()
         if not same_holder(claim["holder"], me):
             return _not_holder(claim)
         claim["expires"] = stamp(now + ttl)
@@ -782,6 +807,8 @@ def offer_transfer(repo, claim_id: str, session: str, ttl_minutes=30, *, holder_
     def change(registry, claim, me, local, now):
         if not _token_ok(claim, session):
             return {"status": "refused", "reason": "the session token does not match this claim"}
+        if me["pid"] is None:
+            return _unidentified()
         if not same_holder(claim["holder"], me):
             return _not_holder(claim)
         token = secrets.token_hex(16)
@@ -962,8 +989,7 @@ def activity_check(repo, scope: dict | None = None, *, session: str | None = Non
             continue
         token_match = session is not None and claim["holder"]["session"] == session
         if token_match and same_holder(claim["holder"], me):
-            if (claim["mode"] == "exclusive" and blocks == "live" and claim["scope"]["type"] != "branch"
-                    and overlap(scope, claim["scope"], root)):
+            if claim["mode"] == "exclusive" and blocks == "live" and covers(claim["scope"], scope, root):
                 own_exclusive = True
             continue
         if token_match:
@@ -1139,6 +1165,7 @@ import json, os, sys, time
 sys.dont_write_bytecode = True
 sys.path.insert(0, sys.argv[1])
 import coordination as c
+c.pid_namespace_isolated = lambda: False              # the self-test's processes share one namespace wherever it runs
 repo, action, stop = sys.argv[2], sys.argv[3], sys.argv[4]
 args = json.loads(sys.argv[5])
 me = os.getpid()
@@ -1318,6 +1345,13 @@ def self_test() -> list[str]:
         if res.get("status", res.get("verdict")) != want or fragment not in text:
             fail(f"{label}: expected {want} {fragment!r}, got {text[:320]}")
 
+    def fake_lsof() -> Path:
+        """An lsof that sees only PID 1: every other process of the owner is uninspected (partial visibility)."""
+        fake = base / "fake-lsof"
+        fake.write_text("#!/bin/sh\necho p1\necho fcwd\necho n/\n")
+        fake.chmod(0o755)
+        return fake
+
     def refused_usage(label: str, call) -> None:
         try:
             call()
@@ -1331,6 +1365,9 @@ def self_test() -> list[str]:
     signal.alarm(300)
     checkout = parse_scope("checkout")
     me = os.getpid()
+    module = sys.modules[__name__]
+    real_namespace_test = module.pid_namespace_isolated
+    module.pid_namespace_isolated = lambda: False     # restored in finally; its own case below sets True
     try:
         # ---- races between independent agent processes (the first race also creates the registry)
         root = repo("race")
@@ -1465,6 +1502,14 @@ def self_test() -> list[str]:
         expect("a token match does not make another holder's claim one's own in a check",
                reply(agent(root, "check", session=token)), "busy", "carries your session token but another process")
         expect("renewal of a live claim with a wrong token", renew(root, cid, "not-the-token", holder_pid=me), "refused")
+        reused = fixture_claim(root, parse_scope("resource=reuse-test"), pid=me, start="lstart:Thu Jan  1 00:00:00 1970",
+                               session="reused-token")
+        expect("this PID with another start time is not this session's holder",
+               renew(root, reused, "reused-token", holder_pid=me), "refused", "does not establish ownership")
+        expect("a reused PID's claim is not this session's in a check",
+               activity_check(root, parse_scope("resource=reuse-test"), session="reused-token", holder_pid=me), "busy",
+               "carries your session token but another process")
+        (root / STATE / "claims" / f"{reused}.json").unlink()
         expect("release of a live claim with a wrong token", release(root, cid, "not-the-token", holder_pid=me),
                "refused")
         loop = agent(root, "renew-loop", child=True, id=cid, session=token)
@@ -1615,6 +1660,17 @@ def self_test() -> list[str]:
         for x, y, want in cases:
             if overlap(parse_scope(x), parse_scope(y), o) != want:
                 fail(f"overlap({x}, {y}) should be {want}")
+        for held, wanted, want in [("checkout", "paths=src/**", True), ("checkout", "branch=main", True),
+                                   ("paths=docs/**", "checkout", False), ("paths=docs/**", "paths=docs/x/**", True),
+                                   ("paths=docs/x/**", "paths=docs/**", False), ("paths=src/**", "paths=lnk/p/**", True),
+                                   ("paths=docs/**,src/**", "paths=src/a,docs/b", True),
+                                   ("paths=docs/**", "paths=docs/a,src/b", False), ("branch=main", "branch=main", True),
+                                   ("branch=main", "checkout", False), ("branch=main", "paths=src/**", False),
+                                   ("resource=build", "resource=build@x", True), ("resource=build", "checkout", False),
+                                   ("paths=src/**", "resource=build@src/build", True),
+                                   ("paths=src/**", "resource=build", False), ("paths=out/**", "paths=out/x/**", False)]:
+            if covers(parse_scope(held), parse_scope(wanted), o) != want:
+                fail(f"covers({held}, {wanted}) should be {want}")
         for bad in ["paths=../x", "paths=/etc", "paths=a//b", "paths=a\\b", "paths=./a", "resource=x@../y", "branch=a..b",
                     "nothing"]:
             refused_usage(f"scope {bad!r}", lambda: parse_scope(bad))
@@ -1632,12 +1688,16 @@ def self_test() -> list[str]:
                    403: (402, "??", "zsh -c x"), 404: (403, "??", "python tool"), 405: (402, "??", "helper"),
                    409: (400, "??", "terminal service"), 410: (409, "ttys004", "zsh -l")}
         hosting = {**ide, 105: (102, "pts/9", "pty child")}
+        own_ptys = {500: (1, "??", "app"), 502: (500, "pts/1", "agent"), 503: (502, "pts/7", "bash -lc x"),
+                    504: (503, "pts/7", "python tool"), 505: (502, "??", "helper"), 510: (500, "pts/2", "shell")}
         sibling_claim = [{"holder": {"pid": 310}}]
         for label, table, start, claims, auto, broad in [("IDE", ide, 104, (), 102, 100),
                                                          ("terminal multiplexer", tmux, 204, (), 202, 200),
                                                          ("sibling agents", siblings, 303, sibling_claim, 301, 300),
                                                          ("desktop app", desktop, 404, (), 402, 400),
-                                                         ("agent hosting a terminal", hosting, 104, (), None, 102)]:
+                                                         ("agent hosting a terminal", hosting, 104, (), None, 102),
+                                                         ("agent running commands in their own pty", own_ptys, 504, (),
+                                                          502, 500)]:
             if resolve_holder(None, table, claims, start=start) != auto:
                 fail(f"{label}: automatic holder should be {auto}, got {resolve_holder(None, table, claims, start=start)}")
             refused_usage(f"{label}: broad override {broad}",
@@ -1687,14 +1747,17 @@ def self_test() -> list[str]:
         expect_idle("ordinary isolated checkout", r)
         if (idle / STATE).exists():
             fail("the read-only activity check created a registry")
-        (idle / "draft.txt").write_text("work in progress")
-        before = tree_digest(idle)
-        activity_check(idle, holder_pid=me)
-        activity_check(idle, holder_pid=me, disruptive=True)
-        if tree_digest(idle) != before:
+        ro = repo("read-only")
+        (ro / "draft.txt").write_text("work in progress")
+        os.utime(ro / "src" / "parser" / "a.py", (time.time() - 3600, time.time() - 3600))   # stale index entry
+        before = tree_digest(ro)
+        activity_check(ro, holder_pid=me)
+        activity_check(ro, holder_pid=me, disruptive=True)
+        if tree_digest(ro) != before:
             fail("a read-only check changed the fixture tree (index or files)")
-        expect_idle("dirty tree, ordinary check", activity_check(idle, holder_pid=me), "uncommitted")
-        (idle / "draft.txt").unlink()
+        if (ro / STATE).exists():
+            fail("the read-only activity check created a registry")
+        expect_idle("dirty tree, ordinary check", activity_check(ro, holder_pid=me), "uncommitted")
         expect("disruptive check without a claim", activity_check(idle, holder_pid=me, disruptive=True), "busy",
                "need this session's exclusive claim")
         shared = acquire(idle, checkout, mode="shared", intent="read", holder_pid=me)
@@ -1702,6 +1765,14 @@ def self_test() -> list[str]:
                                                                            holder_pid=me, disruptive=True), "busy",
                "shared claims never authorize writes")
         release(idle, shared["claim"]["id"], shared["session"], holder_pid=me)
+        narrow = acquire(idle, parse_scope("paths=docs/**"), intent="docs", holder_pid=me)
+        expect("a narrow claim does not cover a checkout-wide disruptive check",
+               activity_check(idle, session=narrow["session"], holder_pid=me, disruptive=True), "busy",
+               "no live exclusive claim covering the scope")
+        expect_idle("a narrow claim covers a disruptive check inside it",
+                    activity_check(idle, parse_scope("paths=docs/x/**"), session=narrow["session"], holder_pid=me,
+                                   disruptive=True))
+        release(idle, narrow["claim"]["id"], narrow["session"], holder_pid=me)
         mine = acquire(idle, checkout, intent="switch branches", holder_pid=me)
         session = mine["session"]
         expect_idle("disruptive check with this session's exclusive claim",
@@ -1754,6 +1825,14 @@ def self_test() -> list[str]:
                activity_check(idle, session=session, holder_pid=me, disruptive=True, accept_passive=[ident]), "busy",
                "preserve or attribute")
         (idle / "new.txt").unlink()
+        other = fixture_claim(idle, parse_scope("paths=docs/**"), pid=holder)
+        expect("an acceptance never hides another agent's claim",
+               activity_check(idle, session=session, holder_pid=me, disruptive=True, accept_passive=[ident]), "busy",
+               f"claim {other}")
+        (idle / STATE / "claims" / f"{other}.json").unlink()
+        expect("an acceptance never hides partial visibility",
+               activity_check(idle, session=session, holder_pid=me, disruptive=True, accept_passive=[ident],
+                              lsof=str(fake_lsof())), "unknown", "partial")
         expect("an acceptance never stands in for this session's claim",
                activity_check(idle, holder_pid=me, disruptive=True, accept_passive=[ident]), "busy",
                "exclusive claim")
@@ -1787,13 +1866,10 @@ def self_test() -> list[str]:
         fixture_claim(idle, checkout, pid=holder)
         expect("another agent's live claim", activity_check(idle, holder_pid=me), "busy", "live")
         clear(idle)
-        fake = base / "fake-lsof"
-        fake.write_text("#!/bin/sh\necho p1\necho fcwd\necho n/\n")
-        fake.chmod(0o755)
-        expect("partial process visibility", activity_check(idle, holder_pid=me, lsof=str(fake)), "unknown", "partial")
+        expect("partial process visibility", activity_check(idle, holder_pid=me, lsof=str(fake_lsof())), "unknown",
+               "partial")
         expect("process inspection unavailable", activity_check(idle, holder_pid=me, lsof="lsof-not-installed"),
                "unknown", "failed")
-        module = sys.modules[__name__]
         saved_pin = module.load_path_in_use
 
         def one_target_partial():
@@ -1827,7 +1903,8 @@ def self_test() -> list[str]:
                                              ("network filesystem", "filesystem_type", lambda p: "nfs", "network"),
                                              ("unidentified filesystem", "filesystem_type", lambda p: None,
                                               "could not be identified"),
-                                             ("inside a container", "in_container", lambda: True, "container")]:
+                                             ("isolated PID namespace", "pid_namespace_isolated", lambda: True,
+                                              "PID namespace")]:
             saved = getattr(module, attr)
             setattr(module, attr, value)
             try:
@@ -1845,6 +1922,7 @@ def self_test() -> list[str]:
     except Exception as e:  # noqa: BLE001 - an unexpected state is a failure, reported rather than raised
         fail(f"unexpected {type(e).__name__}: {e}")
     finally:
+        module.pid_namespace_isolated = real_namespace_test
         signal.alarm(0)
         signal.signal(signal.SIGALRM, previous)
         stop.touch()

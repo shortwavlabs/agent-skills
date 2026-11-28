@@ -417,14 +417,18 @@ Approved by the owner on 2026-11-27, after the Phase 1b review:
   terminal and no other registered claim holder beneath it). Broad shared ancestors (terminal multiplexers, IDEs,
   terminal applications, a shell hosting sibling agents) are rejected without consulting names; the fallback is no
   holder, and then no claim.
-- **Ownership lifecycle:** renew by the current holder only; release; transfer under the lock to a named successor
-  with a one-time token, auditable, after which the former holder cannot renew; recovery only after verified holder
+- **Ownership lifecycle:** renew by the current holder only; release; transfer under the lock to the successor that
+  presents a one-time transfer token (a bearer token, not a named identity), auditable, after which the former holder
+  cannot renew; recovery only after verified holder
   death. A token alone is never ownership, and shared claims never authorize writes. Where no safe transfer exists:
   release and reacquire, with the gap reported.
-- **Fail closed, check and acquire alike:** missing locking, network or unidentified filesystems, containers, an
+- **Fail closed, check and acquire alike:** missing locking, network or unidentified filesystems, isolated PID
+  namespaces (containers), an
   unsafe or git-tracked registry, malformed identities and partial visibility (on any target) give unknown in both.
   An unavailable capability is reported as coordination being unavailable, never as an idle checkout. The read-only
   check writes nothing: no registry, no optional git locks, no bytecode.
+- **Disruptive checks** need this session's live exclusive claim that covers the checked scope; overlapping is not
+  enough.
 - **Reporting:** the verdict uses every matching process; the output gives the total and the number omitted, and
   `--all` lists every one.
 
