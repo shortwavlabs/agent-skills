@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Revision 5 approved by the owner, with all 14 decisions and the Phase 1a and Phase 1b review decisions recorded (2026-11-27). Phases 1a (#19) and 1b (#20) merged. Revision 6 (Phase 1c design, accepted with the corrections of the Phase 1c review, 2026-11-28) |
+| **Status** | Revision 5 approved by the owner, with all 14 decisions and the Phase 1a and Phase 1b review decisions recorded (2026-11-27). Phases 1a (#19) and 1b (#20) merged. Revision 6 (Phase 1c design, accepted with the corrections of the Phase 1c review, 2026-11-28). Revision 7 (Phase 1d design, accepted 2026-11-28; implementation in review) |
 | **Created** | 2026-11-27 |
 | **Scope** | The Operational Skills family for coding agents, alongside the existing `workspace-housekeeping` skill |
 | **Terms** | "Operational Skills" is the family name. "Agent Operations" is a descriptive architectural term only ([D1](#d1-family-name)) |
@@ -402,6 +402,36 @@ Approved by the owner on 2026-11-27, after the Phase 1a review:
 Runtime authorization verification and its regression fixtures belong to Phase 1c; budget enforcement belongs to
 Phase 2.
 
+### Decisions for Phase 1d (revision 7)
+
+Accepted by the owner on 2026-11-28:
+
+- **Hierarchy:** seven levels: system, security and harness constraints; owner instructions in the session;
+  verified standing authorizations; canonical operational policy; project-specific guidance; third-party
+  documentation and skills; agent-generated records and proposals. Conflicts are resolved by level, then scope, then
+  risk; same level, the more protective rule.
+- **Trust root:** the trust policy (`trust-policy` version 1: revisions chained by digest, owner identities with
+  stable account IDs, agent accounts, trusted repositories with their authorizations files, optional provenance) is
+  trusted only as a root-owned file at a fixed system location that only the owner can install; owners are
+  identified by stable account IDs (logins are labels), repositories by name and, where practical, stable ID; rollback,
+  replacement and trust expansion are refused until the owner reviews a revision. Anything an agent's account can
+  write, including user-level configuration, is never the trust root. Missing, invalid or insecure: no trust. The
+  protected file is not a security boundary for the user-writable verifier, and verification enforces nothing
+  unless the executor does. Agents never run `sudo`.
+- **Operation completeness:** each class of consequential action states its required parameters (spending: amount
+  and budget scope; branch: repository and branch; files: paths; publication: destination and artifact); missing
+  information is unknown.
+- **Credentials:** a host account is not a person. Agents never approve or merge authority changes with the owner's
+  credentials; shared credentials cannot establish independent approval; an implementation merge is not a
+  permission grant. A dedicated agent identity is documented as a deployment option only.
+- **Instructions:** one canonical source of instruction blocks (`operational/instructions.md`), marked blocks in each
+  runtime's global file, read-only drift audits, exact-diff updates approved by digest, backups and rollback.
+- **Ignore rules:** an authorized exception changes what is kept, never how: never `git add -f`, only a commented
+  negation pattern (core revision 3).
+- **RFC 0002** records the owner-approved workflow integration requirements, without a design.
+- **Deferred:** installing instruction markers and any change to real global configuration wait until Phase 1d is
+  reviewed; standing authorizations stay inactive; no trust policy is installed.
+
 ### Decisions from the Phase 1c review (revision 6)
 
 Approved by the owner on 2026-11-28, after the Phase 1c review:
@@ -523,3 +553,4 @@ These are implementation details within the approved design, to be settled in th
 | 4 | 2026-11-27 | Phase 1a review decisions recorded: approved interpretations, fresh approval for reintroduced authorizations, inapplicable approvals grant nothing, GitHub PR URLs as the initial `approved_in` capability, the 1.25 factor as a reassessment threshold, stale claims require expiry and holder death |
 | 5 | 2026-11-27 | Phase 1b review decisions recorded: passive processes and owner-accepted identities for reversible operations only, `.DS_Store` tolerated in the registry, holders validated as session boundaries, the ownership lifecycle (renew, release, transfer, recovery) with token rotation and history, fail-closed parity between check and acquire, full-set reporting |
 | 6 | 2026-11-28 | Phase 1c, accepted after review with corrections (structured operation scope, ancestry-based provenance with a pinned default-branch revision, handoff identity and safe persistence, an allowlisted summary draft): the runtime verification conditions and GitHub reads, approvals bound to the PR that introduced the entry, `actions` on standing entries, the designated authorizations file, optional handoff parts (transfer token, artifacts, jobs, budget, lessons) within version 1 |
+| 7 | 2026-11-28 | Phase 1d design, accepted: the seven-level hierarchy, the owner-installed trust root, owner-versus-agent credentials, canonical instruction blocks with drift audits and exact-diff updates, the ignore-rule clarification, RFC 0002 requirements |

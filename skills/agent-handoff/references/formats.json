@@ -1,4 +1,4 @@
-{"$generated": "Generated from operational/formats.json (sha256 9fe85b02ed863733e77508efbfd72fa7cf92c529d7c5691b777caf0b4db37c6f). Do not edit this copy: change the source and regenerate.",
+{"$generated": "Generated from operational/formats.json (sha256 942b62826cb99be5fc5481deb5dee545a81d3c3af213573ae567f002ebeadd1e). Do not edit this copy: change the source and regenerate.",
 "content":
 {
   "kind": "formats",
@@ -265,6 +265,21 @@
         "purposes": "list+:str",
         "max_usd": "usd"
       }
+    },
+    "trust-owner": {
+      "required": {
+        "identity": "identity",
+        "account_id": "pid"
+      }
+    },
+    "trust-repository": {
+      "required": {
+        "identity": "str"
+      },
+      "optional": {
+        "repository_id": "pid",
+        "authorizations_file": "str"
+      }
     }
   },
   "json": {
@@ -343,6 +358,24 @@
         "forbidden": "list:str",
         "authorization": "enum:none_needed,must_request,must_not_request,must_not_proceed_without_owner",
         "overhead": "obj:overhead"
+      }
+    },
+    "trust-policy": {
+      "versions": [
+        1
+      ],
+      "required": {
+        "kind": "str",
+        "version": "int",
+        "revision": "pid",
+        "owners": "list+:obj:trust-owner",
+        "repositories": "list+:obj:trust-repository"
+      },
+      "optional": {
+        "previous_sha256": "sha256?",
+        "agent_accounts": "list:identity",
+        "provenance": "any",
+        "notes": "str"
       }
     }
   },

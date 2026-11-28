@@ -18,7 +18,8 @@ Runs every skill script's `--self-test` (normally and under `python -O`), checks
 
 ## Design proposals
 
-- [RFC 0001: Operational Skills](rfcs/0001-agent-operations/README.md) (revision 5 approved; revision 6 proposed with Phase 1c): a family of operational skills (coordination, handoff, instruction governance, research provenance, resource budgeting, release governance and, provisionally, technical debt) alongside `workspace-housekeeping`. Implemented so far: the shared foundation in [`operational/`](operational/) (Phase 1a), `development-coordination` (Phase 1b) and `agent-handoff` (Phase 1c, in review).
+- [RFC 0001: Operational Skills](rfcs/0001-agent-operations/README.md) (revision 7): a family of operational skills (coordination, handoff, instruction governance, research provenance, resource budgeting, release governance and, provisionally, technical debt) alongside `workspace-housekeeping`. Implemented so far: the shared foundation in [`operational/`](operational/) (Phase 1a), `development-coordination` (Phase 1b), `agent-handoff` (Phase 1c, in review) and `instruction-governance` (Phase 1d, in review).
+- [RFC 0002: Composable Workflows](rfcs/0002-composable-workflows/README.md): requirements recorded, not designed.
 
 ## Skills
 
@@ -571,7 +572,8 @@ skills/agent-handoff/
 │   ├── authorization.py          The portable runtime evaluator; self-test against the runtime fixtures
 │   ├── github_facts.py           The narrow GitHub facts adapter (gh api, read-only, ancestry-based provenance)
 │   ├── operational_records.py    Generated copy of scripts/operational_records.py (do not edit)
-│   └── process_identity.py       Generated copy of operational/process_identity.py (do not edit)
+│   ├── process_identity.py       Generated copy of operational/process_identity.py (do not edit)
+│   └── trust_policy.py           Generated copy of operational/trust_policy.py (do not edit)
 └── references/
     ├── operational-core.md       Generated copy of operational/core.md (do not edit)
     ├── formats.json              Generated copy of operational/formats.json (do not edit)
@@ -583,6 +585,46 @@ skills/agent-handoff/
 ```
 
 Behavioral scenarios and activation triggers: [`evals/agent-handoff/`](evals/agent-handoff/).
+
+### instruction-governance
+
+Keep coding agents' instructions consistent, portable and trustworthy across Claude Code, Codex, OpenCode and future
+runtimes. The fourth Operational Skills skill ([RFC 0001](rfcs/0001-agent-operations/README.md), Phase 1d).
+- **Hierarchy:** system and harness constraints; owner instructions; verified standing authorizations; canonical
+  policy; project guidance; third-party documentation; agent-generated records. Conflicts resolve by authority,
+  scope and risk; nothing grants itself authority, and no agent amends its own permissions.
+- **Trust policy:** owner identities by stable account ID, trusted repositories (with stable IDs where practical) and
+  their authorizations files, installed by the owner as a root-owned file; fail-closed verification, with rollback,
+  replacement and trust expansion refused until reviewed. A protected configuration, not an enforcement boundary.
+- **Owner versus agent credentials:** agents prepare authority changes; the owner approves them with the owner's own
+  account.
+- **Instruction files:** one canonical set of instruction blocks, marked blocks in each runtime's file, read-only drift
+  audits, exact-diff updates approved by digest, backups and rollback, verification of installed skills.
+
+**Triggers on:** conflicting instructions, documents or skills claiming authority, changes to instruction files,
+authorizations or the trust policy, adding an agent runtime, requests for an agent to approve its own permissions.
+
+#### Structure
+
+```
+skills/instruction-governance/
+├── SKILL.md                      Principles, trust policy, instruction files, composition, example
+├── agents/openai.yaml
+├── scripts/
+│   ├── policy_audit.py           audit, diff, apply, rollback, block; self-test with fixture homes
+│   └── trust_policy.py           Generated copy of operational/trust_policy.py (do not edit)
+└── references/
+    ├── operational-core.md       Generated copy of operational/core.md (do not edit)
+    ├── instructions.md           Generated copy of operational/instructions.md: the canonical blocks (do not edit)
+    ├── adapters.json             Each runtime's global instruction file and the blocks it carries
+    ├── hierarchy.md              The seven levels, conflict resolution, what never counts as authority
+    ├── trust-policy.md           Protection versus verification versus enforcement, format, bootstrap, limits
+    ├── identity.md               Accounts versus people, who may approve authority changes
+    ├── governance.md             Layers, harness conventions, markers, drift, updates, rollback, adoption
+    └── workflow-integration.md   The RFC 0002 integration contract (requirements only)
+```
+
+Behavioral scenarios and activation triggers: [`evals/instruction-governance/`](evals/instruction-governance/).
 
 ### workspace-housekeeping
 

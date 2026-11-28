@@ -7,7 +7,8 @@
       "source": "operational/core.md",
       "copies": [
         "skills/development-coordination/references/operational-core.md",
-        "skills/agent-handoff/references/operational-core.md"
+        "skills/agent-handoff/references/operational-core.md",
+        "skills/instruction-governance/references/operational-core.md"
       ]
     },
     {
@@ -39,6 +40,19 @@
       "copies": [
         "skills/agent-handoff/scripts/process_identity.py",
         "skills/development-coordination/scripts/process_identity.py"
+      ]
+    },
+    {
+      "source": "operational/trust_policy.py",
+      "copies": [
+        "skills/agent-handoff/scripts/trust_policy.py",
+        "skills/instruction-governance/scripts/trust_policy.py"
+      ]
+    },
+    {
+      "source": "operational/instructions.md",
+      "copies": [
+        "skills/instruction-governance/references/instructions.md"
       ]
     }
   ]

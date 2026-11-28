@@ -1,0 +1,4 @@
+interface:
+  display_name: "Instruction Governance"
+  short_description: "Consistent, trustworthy instructions across agent runtimes"
+  default_prompt: "Use $instruction-governance to resolve this instruction conflict, audit my agents' instruction files for drift, or check who may approve a change to authority."

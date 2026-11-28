@@ -1,0 +1,27 @@
+{
+  "kind": "trust-policy",
+  "version": 1,
+  "revision": 1,
+  "previous_sha256": null,
+  "owners": [
+    {
+      "identity": "github:example-owner",
+      "account_id": 1234567
+    }
+  ],
+  "agent_accounts": [
+    "github:example-agent-bot"
+  ],
+  "repositories": [
+    {
+      "identity": "github.com/example/repo",
+      "authorizations_file": "ops/authorizations.json",
+      "repository_id": 7654321
+    }
+  ],
+  "provenance": {
+    "repository": "github.com/example/policy",
+    "path": "trust-policy.json",
+    "commit": "0123456789abcdef0123456789abcdef01234567"
+  }
+}

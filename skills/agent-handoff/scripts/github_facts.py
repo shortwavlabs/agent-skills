@@ -154,8 +154,8 @@ def approvals(api, slug: str, number: str) -> tuple[dict, list[dict]]:
         raise HostError("malformed pull request answer")
     out = []
     if pr.get("merged") is True and isinstance(pr.get("merged_by"), dict) and SHA.match(str(pr.get("merge_commit_sha"))):
-        out.append({"kind": "merge", "by": f"github:{pr['merged_by']['login']}", "revision": pr["merge_commit_sha"],
-                    "at": pr.get("merged_at"), "state": "active"})
+        out.append({"kind": "merge", "by": f"github:{pr['merged_by']['login']}", "by_id": pr["merged_by"].get("id"),
+                    "revision": pr["merge_commit_sha"], "at": pr.get("merged_at"), "state": "active"})
     reviews = api(f"repos/{slug}/pulls/{number}/reviews?per_page={MAX_REVIEWS}")
     if not isinstance(reviews, list) or len(reviews) >= MAX_REVIEWS:
         raise HostError("reviews missing, malformed, or too many to inspect")
@@ -172,8 +172,8 @@ def approvals(api, slug: str, number: str) -> tuple[dict, list[dict]]:
         state = {"APPROVED": "active", "DISMISSED": "dismissed", "CHANGES_REQUESTED": "superseded"}[last["state"]]
         basis = last if last["state"] != "CHANGES_REQUESTED" else approved[-1]
         revision = basis.get("commit_id") if SHA.match(str(basis.get("commit_id"))) else None
-        out.append({"kind": "approval", "by": f"github:{login}", "revision": revision, "at": basis.get("submitted_at"),
-                    "state": state})
+        out.append({"kind": "approval", "by": f"github:{login}", "by_id": basis["user"].get("id"), "revision": revision,
+                    "at": basis.get("submitted_at"), "state": state})
     return pr, out
 
 
@@ -248,7 +248,8 @@ def gather(reference: dict, root: Path, owners=(), api=gh_api, remote: str = "or
         info = api(f"repos/{slug}")
         if not isinstance(info, dict) or not info.get("full_name") or not info.get("default_branch"):
             raise HostError("malformed repository answer")
-        facts.update(host_reachable=True, repository=f"github.com/{info['full_name']}".lower())
+        facts.update(host_reachable=True, repository=f"github.com/{info['full_name']}".lower(),
+                     repository_id=info.get("id") if type(info.get("id")) is int else None)
         head = host.commit(info["default_branch"])["sha"]
         facts["default_revision"] = head
         if pin is not None:
@@ -282,7 +283,8 @@ def gather(reference: dict, root: Path, owners=(), api=gh_api, remote: str = "or
                   and shared["merged_into_default_branch"] is True and shared["introduced_entry"] is True]
         chosen = (usable or owned or candidates or [{"kind": "none", "by": None, "state": "active",
                                                      "entry_at_approved_revision": None}])[0]
-        facts["approval"] = {**{k: chosen.get(k) for k in ("kind", "by", "state", "entry_at_approved_revision", "at")},
+        facts["approval"] = {**{k: chosen.get(k) for k in ("kind", "by", "by_id", "state", "entry_at_approved_revision",
+                                                          "at")},
                              "introduced_entry": shared["introduced_entry"],
                              "merged_into_default_branch": shared["merged_into_default_branch"]}
         for key in ("entry_on_default_branch", "reinstated_after_approval", "changed_after_approval"):
@@ -316,6 +318,7 @@ class FakeGitHub:
         self.pr: dict = {"merged": False}
         self.reviews: list[dict] = []
         self.down = False
+        self.repository_id = 7
         self.calls: list[str] = []
 
     def add(self, sha, parents, doc, prs=(), date="2026-11-27T00:00:00Z", files=None):
@@ -341,7 +344,7 @@ class FakeGitHub:
         if not parsed.path.startswith(base):
             raise NotFound(path)
         if rest == "":
-            return {"full_name": self.slug, "default_branch": self.default}
+            return {"full_name": self.slug, "default_branch": self.default, "id": self.repository_id}
         if rest.startswith("/commits/") and rest.endswith("/pulls"):
             sha = rest.split("/")[2]
             return [{"number": n} for n in self.commits.get(sha, {}).get("prs", [])]
@@ -399,12 +402,13 @@ def self_test() -> list[str]:
                  "granted_by": "github:example-owner", "approved_in": "https://github.com/example/repo/pull/1",
                  "expires": "2027-06-30T00:00:00Z"}
         changed = {**entry, "scope": {"branches": ["*"], "destinations": ["origin"]}}
-        policy = {"owners": ["github:example-owner"], "repositories": ["github.com/example/repo"]}
+        policy = {"owners": ["github:example-owner"], "repositories": ["github.com/example/repo"],
+                  "owner_account_ids": {"github:example-owner": 42}, "repository_ids": {"github.com/example/repo": 7}}
         owners = policy["owners"]
         now = datetime.datetime(2026, 11, 28, tzinfo=datetime.timezone.utc)
         request = {"action": "push-branch", "level": "R2", "repository": "github.com/example/repo",
                    "branch": "feature/x", "destination": "origin"}
-        merged = {"number": 1, "merged": True, "merged_by": {"login": "example-owner"}, "commits": 1,
+        merged = {"number": 1, "merged": True, "merged_by": {"login": "example-owner", "id": 42}, "commits": 1,
                   "merged_at": "2026-11-27T18:00:00Z", "base": {"ref": "main"}}
 
         def reference(at):
@@ -440,7 +444,10 @@ def self_test() -> list[str]:
              linear(before_doc=doc(entry)), "inapplicable"),
             ("the PR was never merged", linear(pr={"merged": False}), "inapplicable"),
             ("the merge commit is not associated with the PR (ambiguous)", linear(assoc=()), "unknown"),
-            ("merged by a non-owner, no owner review", linear(pr={"merged_by": {"login": "someone"}}), "inapplicable"),
+            ("merged by a non-owner, no owner review", linear(pr={"merged_by": {"login": "someone", "id": 99}}),
+             "inapplicable"),
+            ("merged by an account reusing the owner's login", linear(pr={"merged_by": {"login": "example-owner",
+                                                                                         "id": 1001}}), "inapplicable"),
         ]
         for label, gh, want in cases:
             got = outcome(gh, sha("1"))
@@ -523,7 +530,7 @@ def self_test() -> list[str]:
                 or still_current(gh, "example/repo", "main", sha("1")) is not False:
             failures.append("revalidation of the pinned revision does not work")
         # Reviews: the owner's active approval of identical content counts; dismissed, superseded or stale do not.
-        review = {"user": {"login": "example-owner"}, "state": "APPROVED", "commit_id": sha("e"),
+        review = {"user": {"login": "example-owner", "id": 42}, "state": "APPROVED", "commit_id": sha("e"),
                   "submitted_at": "2026-11-27T17:00:00Z"}
         for label, reviews, docs_at, want in [
                 ("owner's approval, merged by someone else", [review], doc(entry), "verified"),
@@ -531,11 +538,16 @@ def self_test() -> list[str]:
                 ("owner's approval superseded", [review, {**review, "state": "CHANGES_REQUESTED"}], doc(entry),
                  "inapplicable"),
                 ("owner approved other content", [review], doc(changed), "inapplicable")]:
-            gh = linear(pr={"merged_by": {"login": "someone"}})
+            gh = linear(pr={"merged_by": {"login": "someone", "id": 99}})
             gh.reviews, gh.docs = reviews, {sha("e"): docs_at}
             got = outcome(gh, sha("1"))
             if got[0] != want:
                 failures.append(f"{label}: expected {want}, got {got}")
+        # A recreated repository under the trusted name: another stable id.
+        gh = linear()
+        gh.repository_id = 8
+        if outcome(gh, sha("1"))[0] != "inapplicable":
+            failures.append("a recreated repository with the trusted name was accepted")
         # Malformed or missing host answers are never positive evidence.
         for label, breakage in [("host down", lambda g: setattr(g, "down", True)),
                                 ("malformed PR", lambda g: setattr(g, "pr", ["not", "an", "object"])),

@@ -1,9 +1,9 @@
-{"$generated": "Generated from operational/fixtures/authorization-runtime.json (sha256 b91ff2bb5f78117fbd87f792ed196d030e957322870f53dbd1fefb47829a2130). Do not edit this copy: change the source and regenerate.",
+{"$generated": "Generated from operational/fixtures/authorization-runtime.json (sha256 5e795893f0d484f65de68dc22fa31721656261ac1d5d1399d84999942b7b7b60). Do not edit this copy: change the source and regenerate.",
 "content":
 {
   "kind": "authorization-fixtures",
   "version": 1,
-  "about": "Expected outcomes for authorization references (RFC 0001: D6, D14; document 04, 'Host-recorded approvals'). 'structural' is what scripts/operational_records.py reports (checked by its --self-test); nothing structural ever grants authority. 'runtime' is implemented by skills/agent-handoff/scripts/authorization.py and checked by its --self-test, which reads a generated copy of this file. Each case's 'action' is the operation being authorized; entries list the 'actions' they cover. A case may set 'policy' (null: no canonical policy) instead of 'trusted_policy'.",
+  "about": "Expected outcomes for authorization references (RFC 0001: D6, D14; document 04, 'Host-recorded approvals'). 'structural' is what scripts/operational_records.py reports (checked by its --self-test); nothing structural ever grants authority. 'runtime' is implemented by skills/agent-handoff/scripts/authorization.py and checked by its --self-test, which reads a generated copy of this file. Each case's 'action' is the operation being authorized; entries list the 'actions' they cover. A case may set 'policy' (null: no canonical policy) instead of 'trusted_policy'; a policy may carry owner_account_ids and authorization_files as the trust policy loader produces them.",
   "now": "2026-11-27T20:00:00Z",
   "trusted_policy": {
     "owners": [
@@ -11,7 +11,10 @@
     ],
     "repositories": [
       "github.com/example/repo"
-    ]
+    ],
+    "owner_account_ids": {
+      "github:example-owner": 42
+    }
   },
   "cases": [
     {
@@ -57,7 +60,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -118,7 +122,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -159,7 +164,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -220,7 +226,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -281,7 +288,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "absent",
         "host_reachable": true,
@@ -342,7 +350,8 @@
           "entry_at_approved_revision": "changed",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -403,7 +412,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "changed",
         "host_reachable": true,
@@ -464,7 +474,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 99
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -586,7 +597,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -641,7 +653,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -703,7 +716,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -791,7 +805,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": false,
@@ -852,7 +867,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -914,7 +930,8 @@
           "entry_at_approved_revision": "identical",
           "state": "dismissed",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -975,7 +992,8 @@
           "entry_at_approved_revision": "identical",
           "state": "superseded",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -1036,7 +1054,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -1097,7 +1116,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -1158,7 +1178,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -1216,7 +1237,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -1277,7 +1299,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -1338,7 +1361,8 @@
           "entry_at_approved_revision": null,
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -1399,7 +1423,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": false,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -1460,7 +1485,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -1521,7 +1547,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -1582,7 +1609,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -1643,7 +1671,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -1699,7 +1728,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -1756,7 +1786,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -1814,7 +1845,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -1872,7 +1904,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -1929,7 +1962,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -1986,7 +2020,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -2042,7 +2077,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -2103,7 +2139,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -2165,7 +2202,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -2225,7 +2263,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -2277,7 +2316,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -2335,7 +2375,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -2393,7 +2434,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -2454,7 +2496,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -2514,7 +2557,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -2575,7 +2619,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -2636,7 +2681,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": false
+          "merged_into_default_branch": false,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -2697,7 +2743,8 @@
           "entry_at_approved_revision": "identical",
           "state": "active",
           "introduced_entry": true,
-          "merged_into_default_branch": true
+          "merged_into_default_branch": true,
+          "by_id": 42
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -2714,6 +2761,1093 @@
         "repository": "github.com/example/repo",
         "branch": "phase-1b",
         "destination": "origin"
+      }
+    },
+    {
+      "id": "owner-account-id-matches",
+      "title": "The approver's stable account id matches the policy",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true,
+          "by_id": 42
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "verified",
+      "reason": "positive control for account ids",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      },
+      "policy": {
+        "owners": [
+          "github:example-owner"
+        ],
+        "repositories": [
+          "github.com/example/repo"
+        ],
+        "owner_account_ids": {
+          "github:example-owner": 42
+        }
+      }
+    },
+    {
+      "id": "owner-account-id-differs",
+      "title": "The approving login now belongs to another account",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true,
+          "by_id": 99
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "a renamed or reused login is not the owner",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      },
+      "policy": {
+        "owners": [
+          "github:example-owner"
+        ],
+        "repositories": [
+          "github.com/example/repo"
+        ],
+        "owner_account_ids": {
+          "github:example-owner": 42
+        }
+      }
+    },
+    {
+      "id": "owner-account-id-unrecorded",
+      "title": "The policy records an account id, the facts do not",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "unknown",
+      "reason": "the stable identity cannot be established",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      },
+      "policy": {
+        "owners": [
+          "github:example-owner"
+        ],
+        "repositories": [
+          "github.com/example/repo"
+        ],
+        "owner_account_ids": {
+          "github:example-owner": 42
+        }
+      }
+    },
+    {
+      "id": "per-repository-authorizations-file",
+      "title": "The policy designates another authorizations file",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true,
+          "by_id": 42
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "invalid",
+      "reason": "only the designated file holds standing authorizations",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      },
+      "policy": {
+        "owners": [
+          "github:example-owner"
+        ],
+        "repositories": [
+          "github.com/example/repo"
+        ],
+        "authorization_files": {
+          "github.com/example/repo": "policy/authorizations.json"
+        },
+        "owner_account_ids": {
+          "github:example-owner": 42
+        }
+      }
+    },
+    {
+      "id": "owner-without-account-id",
+      "title": "The policy names an owner without a stable account id",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true,
+          "by_id": 42
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "unknown",
+      "reason": "a login alone never establishes an owner",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      },
+      "policy": {
+        "owners": [
+          "github:example-owner"
+        ],
+        "repositories": [
+          "github.com/example/repo"
+        ],
+        "owner_account_ids": {}
+      }
+    },
+    {
+      "id": "owner-login-renamed",
+      "title": "The owner's account was renamed; its id is unchanged",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner-renamed",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true,
+          "by_id": 42
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "verified",
+      "reason": "the stable id establishes the owner; the new login is only a label",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "owner-login-reused",
+      "title": "Another account now uses the owner's former login",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true,
+          "by_id": 1001
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "a reused login with another id is not the owner",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "repository-id-matches",
+      "title": "The repository's stable id matches the policy",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true,
+          "by_id": 42
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false,
+        "repository_id": 7
+      },
+      "structural": "unverified",
+      "runtime": "verified",
+      "reason": "positive control for repository ids",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      },
+      "policy": {
+        "owners": [
+          "github:example-owner"
+        ],
+        "repositories": [
+          "github.com/example/repo"
+        ],
+        "owner_account_ids": {
+          "github:example-owner": 42
+        },
+        "repository_ids": {
+          "github.com/example/repo": 7
+        }
+      }
+    },
+    {
+      "id": "repository-recreated",
+      "title": "The trusted name now belongs to a recreated repository",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true,
+          "by_id": 42
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false,
+        "repository_id": 8
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "a new id under the same name is not the trusted repository",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      },
+      "policy": {
+        "owners": [
+          "github:example-owner"
+        ],
+        "repositories": [
+          "github.com/example/repo"
+        ],
+        "owner_account_ids": {
+          "github:example-owner": 42
+        },
+        "repository_ids": {
+          "github.com/example/repo": 7
+        }
+      }
+    },
+    {
+      "id": "repository-id-unrecorded",
+      "title": "The policy pins a repository id the facts do not carry",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true,
+          "by_id": 42
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "unknown",
+      "reason": "the stable identity cannot be established",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      },
+      "policy": {
+        "owners": [
+          "github:example-owner"
+        ],
+        "repositories": [
+          "github.com/example/repo"
+        ],
+        "owner_account_ids": {
+          "github:example-owner": 42
+        },
+        "repository_ids": {
+          "github.com/example/repo": 7
+        }
+      }
+    },
+    {
+      "id": "repository-renamed",
+      "title": "The trusted repository was renamed",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/renamed",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true,
+          "by_id": 42
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false,
+        "repository_id": 7
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "a renamed repository is outside the policy until the owner updates it",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      },
+      "policy": {
+        "owners": [
+          "github:example-owner"
+        ],
+        "repositories": [
+          "github.com/example/repo"
+        ],
+        "owner_account_ids": {
+          "github:example-owner": 42
+        },
+        "repository_ids": {
+          "github.com/example/repo": 7
+        }
+      }
+    },
+    {
+      "id": "incomplete-branch-operation",
+      "title": "A push that names no branch, against an entry that does not limit branches",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push to origin",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-to-origin",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-to-origin",
+          "level": "R2",
+          "operations": "Push to origin",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch"
+          ],
+          "scope": {
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true,
+          "by_id": 42
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "unknown",
+      "reason": "branch operations must name their branch",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "publication-complete",
+      "title": "A publication naming its destination and artifact",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Publish release v1.0.0 to GitHub Releases",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#publish-releases",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "publish-releases",
+          "level": "R2",
+          "operations": "Publish release v1.0.0 to GitHub Releases",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "publish-release"
+          ],
+          "scope": {
+            "destinations": [
+              "github-releases"
+            ],
+            "targets": [
+              "v1.0.0"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true,
+          "by_id": 42
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "verified",
+      "reason": "positive control for publication",
+      "request": {
+        "action": "publish-release",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "destination": "github-releases",
+        "target": "v1.0.0"
+      }
+    },
+    {
+      "id": "incomplete-publication",
+      "title": "A publication that names no artifact",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Publish release v1.0.0 to GitHub Releases",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#publish-releases",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "publish-releases",
+          "level": "R2",
+          "operations": "Publish release v1.0.0 to GitHub Releases",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "publish-release"
+          ],
+          "scope": {
+            "destinations": [
+              "github-releases"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true,
+          "by_id": 42
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "unknown",
+      "reason": "publication must name its destination and artifact",
+      "request": {
+        "action": "publish-release",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "destination": "github-releases"
+      }
+    },
+    {
+      "id": "incomplete-file-operation",
+      "title": "A deletion that names no paths",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Delete the named caches",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#clean-caches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "clean-caches",
+          "level": "R2",
+          "operations": "Delete the named caches",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "delete-files"
+          ],
+          "scope": {
+            "targets": [
+              "build-cache"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true,
+          "by_id": 42
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "unknown",
+      "reason": "file operations must name their paths",
+      "request": {
+        "action": "delete-files",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "target": "build-cache"
+      }
+    },
+    {
+      "id": "incomplete-spend",
+      "title": "Spending that states no amount",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true,
+          "by_id": 42
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "unknown",
+      "reason": "spending must state its amount",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin",
+        "aspect": "spend"
       }
     }
   ]
