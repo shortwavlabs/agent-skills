@@ -9,7 +9,9 @@
 `operational/copies.json` lists each source and the paths of its copies. A copy is exactly one generated header line,
 naming the source, its revision and its SHA-256, then a blank line, then the source text unchanged. The check reports
 copies that are missing, edited or outdated (generated from another revision or digest), and unlisted files that carry
-a generated header. `--write` never touches an unlisted file or a symlink, and never creates a missing directory.
+a generated header. Every copy must be a plain relative path under `skills/` that resolves without passing through a
+symlink; anything else is refused. `--write` never touches an unlisted or refused file, never creates a missing
+directory, and writes copies with mode 0644.
 Markdown sources only. Standard library only.
 """
 
@@ -28,7 +30,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = "operational/copies.json"
 HEADER = ("<!-- Generated from {source} (revision {revision}, sha256 {digest}). Do not edit this copy: change the source "
-          "and regenerate with scripts/operational_sync.py --write. -->")
+          "and regenerate. -->")
 HEADER_RE = re.compile(r"^<!-- Generated from (\S+) \(revision (\d+), sha256 ([0-9a-f]{64})\)\. Do not edit")
 
 
@@ -73,10 +75,10 @@ def plan(root: Path) -> tuple[list[str], list[tuple[Path, str]]]:
         for copy in copies:
             listed.add(copy)
             path = root / copy
-            if copy == source:
-                problems.append(f"{copy}: a source cannot be its own copy")
-            elif path.is_symlink():
-                problems.append(f"symlink: {copy} (refusing to write through a symlink)")
+            parts = Path(copy).parts
+            if (Path(copy).is_absolute() or ".." in parts or parts[:1] != ("skills",)
+                    or path.resolve() != root.resolve() / copy):
+                problems.append(f"refused: {copy} (a copy must be a plain path under skills/, not through a symlink)")
             elif not path.exists():
                 problems.append(f"missing: {copy}")
                 writes.append((path, want))
@@ -112,6 +114,7 @@ def write(writes: list[tuple[Path, str]]) -> list[str]:
         fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=".operational-sync-")
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(text)
+        os.chmod(tmp, 0o644)              # mkstemp creates 0600; copies are ordinary repository files
         os.replace(tmp, path)
     return refused
 
@@ -159,6 +162,8 @@ def self_test() -> list[str]:
             failures.append("a copy does not start with the generated header")
         if not a.read_text(encoding="utf-8").endswith(source.read_text(encoding="utf-8")):
             failures.append("a copy does not end with the unchanged source text")
+        if a.stat().st_mode & 0o777 != 0o644:
+            failures.append(f"a written copy has mode {a.stat().st_mode & 0o777:o}, expected 644")
 
         # Drift: an edited copy.
         a.write_text(a.read_text(encoding="utf-8").replace("Rule one.", "Rule one, relaxed."), encoding="utf-8")
@@ -194,13 +199,30 @@ def self_test() -> list[str]:
             failures.append("--write modified an unlisted file")
         stray.unlink()
 
-        # A symlinked copy is refused.
+        # Copies that are symlinks, sit under a symlinked directory or leave skills/ are refused, never written.
+        outside = Path(tempfile.mkdtemp(prefix="operational-sync-outside-"))
+        try:
+            (root / "skills" / "d").symlink_to(outside, target_is_directory=True)
+            (outside / "references").mkdir()
+            b.unlink()
+            b.symlink_to(a)
+            bad = ["skills/b/references/operational-core.md", "skills/d/references/operational-core.md",
+                   str(outside / "absolute.md"), "../escape.md", "skills/../operational/escape.md", "operational/x.md"]
+            (root / MANIFEST).write_text(json.dumps({"kind": "copies", "version": 1, "sources": [
+                {"source": "operational/core.md", "copies": bad}]}), encoding="utf-8")
+            problems, writes = plan(root)
+            for copy in bad:
+                if not any(p.startswith(f"refused: {copy} ") for p in problems):
+                    failures.append(f"copy path {copy!r} was not refused: {problems}")
+            write(writes)
+            if writes or any(outside.rglob("*.md")) or (root.parent / "escape.md").exists():
+                failures.append(f"--write wrote outside skills/ or through a symlink: {writes}")
+        finally:
+            shutil.rmtree(outside, ignore_errors=True)
+        (root / "skills" / "d").unlink()
         b.unlink()
-        b.symlink_to(a)
-        problems, writes = plan(root)
-        if not any(p.startswith("symlink:") for p in problems) or any(path == b for path, _ in writes):
-            failures.append(f"a symlinked copy was not refused: {problems}")
-        b.unlink()
+        (root / MANIFEST).write_text(json.dumps({"kind": "copies", "version": 1, "sources": [
+            {"source": "operational/core.md", "copies": copies}]}), encoding="utf-8")
 
         # A missing directory is never created.
         shutil.rmtree(root / "skills" / "b")

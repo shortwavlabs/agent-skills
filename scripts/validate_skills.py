@@ -317,7 +317,12 @@ def check_operational(problems: list[str], skills: list[Path]) -> int:
     sync, records = (load_script(p) for p in REPO_SCRIPTS)
     copy_problems, _ = sync.plan(ROOT)
     problems.extend(f"operational copies: {p}" for p in copy_problems)
-    checker = records.Checker(records.load_formats(), known_skills={s.name for s in skills})
+    try:
+        formats = records.load_formats()
+    except (OSError, ValueError) as e:
+        problems.append(f"operational formats: {e}")
+        return 0
+    checker = records.Checker(formats, known_skills={s.name for s in skills})
     examples = sorted(p for p in (OPERATIONAL / "examples").glob("*") if p.is_file())
     for path in examples:
         problems.extend(checker.check_text(path.read_text(encoding="utf-8"), str(path.relative_to(ROOT))))

@@ -17,6 +17,7 @@ import datetime
 import json
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -26,7 +27,11 @@ EXPIRY_WORDS = ("task-end", "until revoked")
 
 
 def load_formats(path: Path = FORMATS) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
+    """The format definitions. Raises ValueError for an unknown kind or version: readers never guess."""
+    formats = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(formats, dict) or formats.get("kind") != "formats" or formats.get("version") != 1:
+        raise ValueError(f"{path}: incompatible format definitions (expected kind 'formats', version 1)")
+    return formats
 
 
 def parse_timestamp(value) -> datetime.datetime | None:
@@ -343,6 +348,17 @@ def self_test() -> list[str]:
     expect_bad("version true", problems_of(mutate(VALID["claim"], "version", True)), "incompatible")
     expect_bad("version string", problems_of(mutate(VALID["scenario"], "version", "1")), "incompatible")
     expect_bad("handoff Version 2", Checker(formats).check_handoff(handoff([], version="2"), "h.md"), "incompatible")
+    with tempfile.TemporaryDirectory() as tmp:
+        for label, definitions in [("definitions version 2", dict(formats, version=2)),
+                                   ("definitions of another kind", dict(formats, kind="schema"))]:
+            path = Path(tmp) / "formats.json"
+            path.write_text(json.dumps(definitions), encoding="utf-8")
+            try:
+                load_formats(path)
+                failures.append(f"{label}: accepted")
+            except ValueError as e:
+                if "incompatible format definitions" not in str(e):
+                    failures.append(f"{label}: unexpected error {e}")
 
     # Authorization references: established, unestablished, invalid.
     def classify(reference) -> tuple[list[str], list[str]]:
