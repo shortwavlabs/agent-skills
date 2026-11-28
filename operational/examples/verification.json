@@ -1,0 +1,10 @@
+{
+  "kind": "verification",
+  "version": 1,
+  "claim": "The repository validator passes",
+  "label": "VERIFIED",
+  "method": "python3 scripts/validate_skills.py exited 0 and printed ALL CHECKS PASSED",
+  "artifact": { "type": "commit", "id": "0123456789abcdef0123456789abcdef01234567" },
+  "verified_at": "2026-11-27T19:40:00Z",
+  "by": "example-agent"
+}
