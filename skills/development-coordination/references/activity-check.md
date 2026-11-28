@@ -67,6 +67,9 @@ the operation does not by itself make the shell idle.
 
 - Agents or processes on other machines (remote branches and PRs are the only signals there).
 - Processes of other users, unless run as root (reported as owner-complete visibility).
+- Processes of this user that the system does not let `lsof` read (non-dumpable processes, as on GitHub-hosted
+  Linux runners). Visibility is then partial, and the check answers unknown, never idle, unless run with more
+  privilege. Ordinary work is unaffected; only disruptive steps wait for the owner.
 - A process that will write into the checkout but has no working directory or open file there yet.
 - Activity between the check and your operation: chain the check with the command to narrow the window.
 - On Windows, or without `lsof` and `ps`, processes at all: the verdict is unknown.

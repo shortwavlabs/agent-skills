@@ -1141,7 +1141,19 @@ def self_test() -> list[str]:
         # ---- activity checks
         idle = repo("idle")
         result = activity_check(idle, holder_pid=os.getpid())
-        expect("ordinary isolated checkout", result, "idle")
+        # Some machines (GitHub's Linux runners, for one) have processes of this user that lsof cannot read. There the
+        # correct answer for an untouched checkout is unknown with partial visibility, never idle.
+        partial_env = result["verdict"] == "unknown" and all(
+            e.startswith("process visibility: partial") for e in result["evidence"])
+
+        def expect_idle(label: str, res: dict, fragment: str = "") -> None:
+            if not partial_env:
+                expect(label, res, "idle", fragment)
+            elif res["verdict"] != "unknown" or fragment not in json.dumps(res) or not all(
+                    e.startswith("process visibility: partial") or "uncommitted" in e for e in res["evidence"]):
+                fail(f"{label} (partial-visibility machine): expected unknown with only partial-visibility evidence, "
+                     f"got {json.dumps(res)[:300]}")
+        expect_idle("ordinary isolated checkout", result)
         if (idle / STATE).exists():
             fail("the read-only activity check created a registry")
         git_dir = idle / ".git"
@@ -1151,14 +1163,14 @@ def self_test() -> list[str]:
             expect(f"git {name}", activity_check(idle, holder_pid=os.getpid()), "busy", name)
             marker.rmdir() if name.startswith("rebase") else marker.unlink()
         (idle / "new.txt").write_text("work in progress")
-        expect("dirty tree, ordinary check", activity_check(idle, holder_pid=os.getpid()), "idle", "uncommitted")
+        expect_idle("dirty tree, ordinary check", activity_check(idle, holder_pid=os.getpid()), "uncommitted")
         expect("dirty tree, disruptive check", activity_check(idle, holder_pid=os.getpid(), disruptive=True), "busy",
                "preserve or attribute")
         (idle / "new.txt").unlink()
         served = idle / "src" / "parser" / "a.py"
         own = spawn(["tail", "-f", str(served)], cwd=base, stdout=subprocess.DEVNULL)
         time.sleep(0.5)
-        expect("own session's process holding a file", activity_check(idle, holder_pid=os.getpid()), "idle")
+        expect_idle("own session's process holding a file", activity_check(idle, holder_pid=os.getpid()))
         own.kill()
         own.wait()
         out = subprocess.run(["sh", "-c", 'tail -f "$1" </dev/null >/dev/null 2>&1 & echo $!', "sh", str(served)],
