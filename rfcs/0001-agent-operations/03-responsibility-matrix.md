@@ -1,7 +1,6 @@
 # 3. Skill responsibility matrix
 
-Part of [RFC 0001: Operational Skills](README.md). Status: **boundaries approved** (owner decision D3); the
-coordination and audit-tool details are new in revision 2, for owner review.
+Part of [RFC 0001: Operational Skills](README.md). Status: **approved** (owner decision D3; revision 3).
 
 ## Contents
 - [The family](#the-family)
@@ -48,7 +47,7 @@ Each skill names its siblings by name and states a minimum fallback for when a s
 
 | | |
 |---|---|
-| **Owns** | Handoff records; the resume procedure (verify the record against the repository before acting); verification of authorization references on resume (established, unestablished, invalid); evidence labels in records; refreshing the record before compaction where the harness allows |
+| **Owns** | Handoff records; the resume procedure (verify the record against the repository before acting); runtime verification of authorization references on resume (invalid, unverified, verified, inapplicable, unknown; only verified proceeds), including host-recorded approval evidence (D14); evidence labels in records; refreshing the record before compaction where the harness allows |
 | **Does not own** | Authority: a handoff is never an independent source of it ([D6](README.md#d6-authorization-across-handoffs)); claims (`development-coordination`); run manifests and release decisions (their skills) |
 | **Triggers** | Ending a session with unfinished work; passing work to another agent or model; leaving long-running jobs; blocking on an owner decision; resuming someone else's work; approaching the context limit |
 | **Inputs** | Git and PR state; test and CI results; processes the agent started; decisions and authorization references from the session |
@@ -59,7 +58,7 @@ Each skill names its siblings by name and states a minimum fallback for when a s
 
 | | |
 |---|---|
-| **Owns** | The canonical operational policy, its revision and digest; the trust boundaries for the [canonical policy](04-risk-and-authorization.md#trust-boundary-for-the-canonical-policy) and for [standing authorizations](04-risk-and-authorization.md#trust-boundary-for-standing-authorizations); the [precedence rule](04-risk-and-authorization.md#instruction-precedence); adapters (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, rule files) and how they import or carry the policy; the consultation-trigger table; documentation of opt-in enforcement adapters |
+| **Owns** | The canonical operational policy, its revision and digest; the owner identities and trusted repositories it declares (D14); the trust boundaries for the [canonical policy](04-risk-and-authorization.md#trust-boundary-for-the-canonical-policy) and for [standing authorizations](04-risk-and-authorization.md#trust-boundary-for-standing-authorizations); the [precedence rule](04-risk-and-authorization.md#instruction-precedence); adapters (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, rule files) and how they import or carry the policy; the consultation-trigger table; documentation of opt-in enforcement adapters |
 | **Does not own** | The content of domain policies (`workspace-housekeeping` owns its policy text); runtime coordination |
 | **Triggers** | Creating or editing an agent instruction file; installing, renaming or removing a skill; finding conflicting rules; setting up a new agent, machine or repository; an agent behaving as if it had not seen a rule |
 | **Inputs** | The canonical policy; the adapter files the owner names; the installed skills list |

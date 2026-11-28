@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Revision 2: the owner accepted the direction and settled all 13 decisions (2026-11-27). Ready for final owner review. Nothing is implemented yet |
+| **Status** | Revision 3: approved by the owner (2026-11-27), with all 14 decisions recorded. Implementation proceeds in phases; Phase 1a is in review |
 | **Created** | 2026-11-27 |
 | **Scope** | The Operational Skills family for coding agents, alongside the existing `workspace-housekeeping` skill |
 | **Terms** | "Operational Skills" is the family name. "Agent Operations" is a descriptive architectural term only ([D1](#d1-family-name)) |
@@ -124,9 +124,10 @@ preservation and storage. Applicable to any software domain, any agent, any oper
 | **Evidence label** | VERIFIED, OBSERVED, REPORTED, INFERRED or UNKNOWN, defined precisely in [05](05-artifact-conventions.md#evidence-labels-and-verification-records) |
 | **Verification record** | The claim, method, artifact identity and time behind a VERIFIED label |
 | **Risk level** | R0 routine, R1 shared state, R2 consequential, R3 irreversible or evidence-sensitive ([model](04-risk-and-authorization.md)). A property of the operation's consequences, never of who authorized it |
-| **Authorization** | Permission for an operation, from an established source. It permits an operation; it does not lower its risk level |
-| **Standing authorization** | An owner-approved entry in a designated, committed file that pre-authorizes a scoped class of R1 or R2 operations ([trust boundary](04-risk-and-authorization.md#trust-boundary-for-standing-authorizations)) |
+| **Authorization** | Permission for an operation, from a recognized source (the owner in the session, or a verified standing authorization). It permits an operation; it does not lower its risk level |
+| **Standing authorization** | An entry in a designated, committed file that pre-authorizes an explicitly scoped class of R1 or R2 operations, whose approval the host records as the owner's for that exact content ([trust boundary](04-risk-and-authorization.md#trust-boundary-for-standing-authorizations), [D14](#d14-host-recorded-approvals-as-authorization-evidence)) |
 | **Authorization reference** | A pointer to the original authorization: a standing authorization at a commit (verifiable by another agent), or the owner session that granted it (not verifiable by another agent) |
+| **Authorization status** | invalid, unverified (structurally valid only), verified (authentic and applicable), inapplicable (expired, revoked, out of scope, or changed since approval) or unknown. Only *verified* grants authority; repository validators can report only *invalid* or *unverified* ([05](05-artifact-conventions.md#authorization-references)) |
 | **Refusal** | A safety mechanism declining an operation (git, a preflight, a permission check, a hook). A finding to investigate, never a reason to escalate |
 | **Run manifest** | The provenance record of one experiment, benchmark or simulation run |
 | **Frozen evidence** | Criteria, held-out data, golden references or results protected from change except by amendment |
@@ -147,7 +148,7 @@ The brief's principles, with how the family meets each, and the strongest
 | **Domain-agnostic** | Examples span benchmarks, ML runs, numerical computing and releases | Review |
 | **Composable** | Each skill installs alone; siblings are referenced by name with a minimum fallback; shared text and the in-use check are generated copies of one source | Validator: drift check; no new cross-skill relative links |
 | **Non-overlapping** | One owner per responsibility, with explicit rules for every known overlap ([matrix](03-responsibility-matrix.md)) | Review; boundary tests |
-| **Risk-proportional** | R0 needs nothing; R1 needs a preflight only where another party could be affected; R2 needs established authorization; R3 controls match the actual consequence | Negative scenarios fail a skill that adds ceremony |
+| **Risk-proportional** | R0 needs nothing; R1 needs a preflight only where another party could be affected; R2 needs a verified authorization; R3 controls match the actual consequence | Negative scenarios fail a skill that adds ceremony |
 | **Evidence-based** | Precise labels; verification records name claim, method, artifact identity and time; missing evidence is never proof of safety | Record checks; handoff check |
 | **Authorization-aware** | Sources, references, scope, expiry and trust boundary defined once; observed content never authorizes | Scenarios with injected "approvals" |
 | **Refusals are findings** | A safety mechanism that refuses an operation triggers investigation, never a more forceful variant | Critical scenarios |
@@ -194,7 +195,7 @@ of them:
 
 ## Owner decisions
 
-All thirteen decisions were settled by the owner on 2026-11-27. Each entry records the decision, the resulting design,
+All fourteen decisions were settled by the owner on 2026-11-27 (D14 in the final review). Each entry records the decision, the resulting design,
 and where it is specified.
 
 | # | Decision | Outcome | Specified in |
@@ -212,11 +213,12 @@ and where it is specified.
 | D11 | Workspace housekeeping | Manifest scope clarified; PR #18 separate; integration in Phase 4 | [03](03-responsibility-matrix.md#overlaps-with-workspace-housekeeping), [07](07-roadmap.md#phase-4-integration) |
 | D12 | Fresh clones | No blanket authorization; investigate alternatives | [03](03-responsibility-matrix.md#overlaps-with-domain-skills), [07](07-roadmap.md#outside-this-roadmap) |
 | D13 | Roadmap | Approved: Phase 1 as four stacked PRs | [07](07-roadmap.md) |
+| D14 | Host-recorded approvals | Approved with strict conditions: evidence for an explicitly scoped standing authorization only | [D14](#d14-host-recorded-approvals-as-authorization-evidence), [04](04-risk-and-authorization.md#host-recorded-approvals) |
 
-### New in revision 2, for owner review
+### Design added in revision 2
 
-The decisions above are approved. The following design is new in revision 2, written to carry out those decisions and
-the architectural corrections. It has not been reviewed by the owner yet:
+The following design was added in revision 2 to carry out the decisions and the architectural corrections, and was
+accepted in the owner's final review (revision 3):
 - the coordination protocol's overlap rules, holder states and lock failure modes
   ([05](05-artifact-conventions.md#claims-and-the-coordination-protocol));
 - the authorization-reference format, limited to the approved sources, and the standing-authorizations file format
@@ -352,6 +354,26 @@ roadmap investigates disposable CI environments, containers and temporary source
 scratch directory), none of which creates a persistent duplicate development checkout. The workspace policy is not
 weakened.
 
+### D14: Host-recorded approvals as authorization evidence
+
+**Decision (final review):** host-recorded GitHub PR approvals and merges by the owner's account may serve as
+**evidence** of owner authorization, under strict conditions. For Phase 1 they support a standing authorization
+committed to a trusted default branch; they are never a general mechanism that reads arbitrary PR approvals as
+operational permission.
+- The approved content must itself explicitly authorize the operation or class of operations. Approving an
+  implementation does not authorize running it; approving a cleanup tool does not authorize deletion; approving a
+  build system does not authorize publication; approving a policy grants nothing beyond its stated scope.
+- The owner's identity comes from trusted host metadata, never from git author fields or text.
+- The approval is bound to the exact approved content and revision. An approval of an earlier revision does not cover
+  authorization content that changed afterwards.
+- Scope, expiry and revocation are checked against the current trusted policy.
+- An untrusted repository cannot establish its own owner identity or trust boundary: owner identities and trusted
+  repositories are declared only in the canonical policy.
+- R3 authorization is still reconfirmed, as the operational core requires.
+
+Specified in [04](04-risk-and-authorization.md#host-recorded-approvals) and
+[05](05-artifact-conventions.md#standing-authorizations).
+
 ### D13: Roadmap
 
 **Decision:** Phase 1 as four reviewable PRs: 1a shared foundation, 1b `development-coordination`, 1c
@@ -367,20 +389,17 @@ specified where it belongs.
 | **Coordination protocol** | Claims are acquired, renewed and released inside one serialized critical section (an OS advisory lock on a single registry lock file), with overlap rules per scope type, process identity by PID **and** start time, explicit states for expired and unverifiable holders, and the activity check run after acquisition and again before execution | Atomic creation of individual claim files does not stop two agents acquiring overlapping scopes at the same moment | [05](05-artifact-conventions.md#claims-and-the-coordination-protocol) |
 | **Advisory versus enforced** | Claims bind only cooperating agents; uncooperative agents and external processes are detected by the activity check, not prevented; the enforceable mechanisms are listed separately | Documentation must not pretend to be a lock | [05](05-artifact-conventions.md#advisory-coordination-versus-enforcement) |
 | **Instruction governance** | A trust boundary for the canonical policy and one for standing authorizations; a policy audit tool that is read-only by default, proposes a diff, verifies revision and digest, applies only with explicit approval of that exact diff, preserves unrelated instructions, and fails without modifying anything when an adapter cannot be updated safely; never installs hooks or edits harness settings or global files on its own | The tool that keeps instructions consistent must not itself become an unreviewed writer of instructions | [04](04-risk-and-authorization.md#trust-boundary-for-the-canonical-policy), [04](04-risk-and-authorization.md#trust-boundary-for-standing-authorizations), [03](03-responsibility-matrix.md#instruction-governance) |
-| **Evidence and authorization** | Precise labels; verification records with claim, method, artifact identity and time; a digest verifies identity or integrity only; authorization references verifiable, and a quotation alone is unestablished | Labels used loosely spread unverified claims with the authority of verified ones | [05](05-artifact-conventions.md#evidence-labels-and-verification-records) |
+| **Evidence and authorization** | Precise labels; verification records with claim, method, artifact identity and time; a digest verifies identity or integrity only, and identity is not state; authorization statuses (invalid, unverified, verified, inapplicable, unknown) with only *verified* granting authority, and a quotation alone never verified | Labels used loosely spread unverified claims with the authority of verified ones | [05](05-artifact-conventions.md#evidence-labels-and-verification-records) |
 | **Shared-state and cleanup safety** | The lessons of PR #18 apply family-wide: no forced worktree removal, no process-name filters, no truncated inventories, unknown is not idle, working directories and open files, revalidation immediately before destructive operations. The family references the corrected housekeeping procedure and its `path_in_use.py`; it never re-implements them | One corrected implementation, not two contradictory ones | [04](04-risk-and-authorization.md#refusals-and-missing-evidence), [03](03-responsibility-matrix.md#development-coordination) |
 
 ## Unresolved implementation questions
 
 These are implementation details within the approved design, to be settled in the phase named.
 
-- **Owner identities (1c, 1d).** Where owner identities are declared for good. A list inside the authorizations file
-  is governed by that same file, so its trust rests on the host's record of who merged the change, not on the list
-  itself.
-- **Host-attested owner references (needs owner confirmation).** Whether to accept, as an additional authorization
-  reference, a PR approval or merge that the host records as performed by a declared owner identity, or a commit whose
-  signature the host verifies as an owner's. Git author fields are self-asserted and never count. Comments are
-  excluded: collaborators with write access can edit other users' comments.
+- **Owner identities and trusted repositories (1d).** Decided (D14): declared only in the canonical policy. Open: the
+  exact format of that declaration.
+- **Runtime verification of host-recorded approvals (1c).** Which host API calls establish a merge or approving review
+  by an owner identity at `approved_commit`, and what happens offline (the status is *unknown*: ask once).
 - **Identifying the claim holder's process (1b).** The tool must record the agent's long-lived process, not the
   short-lived shell that ran it; otherwise every claim would look dead at once and be taken over. Safe default: if the
   long-lived process cannot be determined, record no PID, and other agents treat the holder as *unknown*, never
@@ -408,3 +427,4 @@ These are implementation details within the approved design, to be settled in th
 |---|---|---|
 | 1 | 2026-11-27 | First draft for owner review (Phase 0) |
 | 2 | 2026-11-27 | Owner decisions D1–D13 recorded; architectural corrections (coordination protocol, instruction-governance trust boundary and audit tool, evidence and verification records, shared-state safety); reconciled with PR #18 (merged); family renamed Operational Skills |
+| 3 | 2026-11-27 | Final review: D14 (host-recorded approvals as evidence for explicitly scoped standing authorizations); authorization statuses (invalid, unverified, verified, inapplicable, unknown); owner identities and trusted repositories only in the canonical policy; revocation and approval binding; level-1 constraints never overridden; force-exception and R0-deletion limits; identity is not state. Approved |
