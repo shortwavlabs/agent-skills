@@ -30,8 +30,9 @@ ceremony. This strategy covers both, and keeps paid model evaluations out of rou
 
 ## Tier 0: repository checks on every CI run
 
-The repository validator stays the entry point (`python3 scripts/validate_skills.py`). Phase 1a adds, each with
-fixtures in a `--self-test` that runs normally and under `python -O`:
+The repository validator stays the entry point (`python3 scripts/validate_skills.py`). Phase 1a adds checks 1 to 5,
+each with fixtures in a `--self-test` that runs normally and under `python -O`. Check 6 arrives with the first family
+skill (1b). Check 7 is proposed for a later phase; it is outside 1a's approved scope.
 
 1. **Scan `rfcs/`** for broken links, broken anchors and leaked paths (today the validator scans only `README.md` and
    `skills/`).
