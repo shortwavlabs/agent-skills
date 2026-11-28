@@ -29,6 +29,7 @@ HERE = Path(__file__).resolve().parent
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 PR_URL = re.compile(r"^https://github\.com/([^/\s]+)/([^/\s]+)/pull/([0-9]+)$")
 RANK = {"R0": 0, "R1": 1, "R2": 2, "R3": 3}
+DEFAULT_FILE = "ops/authorizations.json"             # the canonical policy may name another (RFC 0001, document 05)
 FIXTURES = HERE.parent / "references" / "authorization-runtime.json"
 _records = None
 
@@ -89,13 +90,17 @@ def evaluate(reference, operation, facts: dict, policy: dict | None, now: dateti
         return "unknown", ("no canonical policy declares owner identities and trusted repositories yet: ask the owner "
                            "once")
     owners, trusted = set(policy.get("owners", [])), {r.lower() for r in policy.get("repositories", [])}
+    path, commit, entry_id = parse_ref(reference["ref"])
+    designated = policy.get("authorizations_file", DEFAULT_FILE)
+    if path != designated:
+        return "invalid", (f"a standing reference must name the designated authorizations file {designated}, not "
+                           f"{path}: an authorizations-shaped file elsewhere is not one")
     if not facts.get("host_reachable"):
         return "unknown", facts.get("why") or "the host cannot be reached now: ask the owner once"
     repository = str(facts.get("repository") or "").lower()
     if repository not in trusted:
         return "inapplicable", (f"{repository or 'this repository'} is not a trusted repository in the canonical "
                                 "policy: an untrusted repository cannot establish its own trust boundary")
-    path, commit, entry_id = parse_ref(reference["ref"])
     if facts.get("commit_exists") is None:
         return "unknown", "whether the referenced commit exists cannot be established: ask the owner once"
     if facts["commit_exists"] is not True:
@@ -122,6 +127,12 @@ def evaluate(reference, operation, facts: dict, policy: dict | None, now: dateti
         return "inapplicable", f"the host records the approval by {by}, not by an owner identity of the canonical policy"
     if state != "active":
         return "inapplicable", f"the owner's approval was {state}: a dismissed or superseded approval grants nothing"
+    introduced = approval.get("introduced_entry")
+    if introduced is None:
+        return "unknown", "whether the approved PR introduced or changed this entry cannot be established: ask once"
+    if introduced is not True:
+        return "inapplicable", ("the approved PR did not introduce or change this entry: approving or merging an "
+                                "unrelated PR approves nothing here")
     revision = approval.get("entry_at_approved_revision")
     if revision is None:
         return "unknown", "the entry's content at the approved revision cannot be read: ask the owner once"
@@ -223,6 +234,8 @@ def self_test() -> list[str]:
         "R3 operation": lambda c: c.update(operation_extra={"level": "R3"}),
         "level above entry": lambda c: c["state"]["entry_at_reference"].update(level="R1"),
         "approval state": lambda c: c["state"]["approval"].update(state="superseded"),
+        "approval binding": lambda c: c["state"]["approval"].pop("introduced_entry"),
+        "designated file": lambda c: c["reference"].update(ref=c["reference"]["ref"].replace("ops/", "docs/", 1)),
         "approval kind": lambda c: c["state"]["approval"].update(kind="comment"),
         "string truthiness": lambda c: c["state"].update(reinstated_after_approval="false"),
     }

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Revision 5: approved by the owner, with all 14 decisions and the Phase 1a and Phase 1b review decisions recorded (2026-11-27). Phase 1a merged (#19); Phase 1b in final review |
+| **Status** | Revision 5 approved by the owner, with all 14 decisions and the Phase 1a and Phase 1b review decisions recorded (2026-11-27). Phases 1a (#19) and 1b (#20) merged. Revision 6, proposed with Phase 1c, records its implementation details for owner review |
 | **Created** | 2026-11-27 |
 | **Scope** | The Operational Skills family for coding agents, alongside the existing `workspace-housekeeping` skill |
 | **Terms** | "Operational Skills" is the family name. "Agent Operations" is a descriptive architectural term only ([D1](#d1-family-name)) |
@@ -475,6 +475,14 @@ These are implementation details within the approved design, to be settled in th
 - **Several machines (1b).** Beyond the PR-and-branch convention and git's own refusal of non-fast-forward pushes,
   whether any cross-machine signal is worth adding without publishing private state.
 - **Handoff refresh before compaction (1c).** Some harnesses offer a pre-compaction hook; others give no warning.
+- **Proposed in Phase 1c** (revision 6, see `skills/agent-handoff/references/`): runtime verification reads, through
+  `gh api` only, the repository, the referenced commit (HTTP 422 means it does not exist), the authorizations file at
+  the referenced commit, the PR's base, each approved revision and the default branch, the PR's merge and reviews, and
+  the file's history on the default branch since the approval; offline or unreadable is unknown. The `approved_in` PR
+  must have introduced or changed the entry. Standing entries list `actions` (exact slugs) that an operation must
+  match; an entry without them is unknown. Handoffs are refreshed at milestones; Claude Code and Codex document
+  `PreCompact` hooks the owner may configure, and this family installs none. Owner identities still come only from
+  the canonical policy, so until Phase 1d standing references are unknown.
 - **Related operations (Phase 2).** How a task is identified for cumulative budget accounting (a PR, a run series, a
   declared task ID), and whether a per-period ledger is needed beyond providers' own spending limits.
 - **Hook adapters (1d).** Whether opt-in hook examples live in `instruction-governance`'s references or outside the
@@ -492,3 +500,4 @@ These are implementation details within the approved design, to be settled in th
 | 3 | 2026-11-27 | Final review: D14 (host-recorded approvals as evidence for explicitly scoped standing authorizations); authorization statuses (invalid, unverified, verified, inapplicable, unknown); owner identities and trusted repositories only in the canonical policy; revocation and approval binding; level-1 constraints never overridden; force-exception and R0-deletion limits; identity is not state. Approved |
 | 4 | 2026-11-27 | Phase 1a review decisions recorded: approved interpretations, fresh approval for reintroduced authorizations, inapplicable approvals grant nothing, GitHub PR URLs as the initial `approved_in` capability, the 1.25 factor as a reassessment threshold, stale claims require expiry and holder death |
 | 5 | 2026-11-27 | Phase 1b review decisions recorded: passive processes and owner-accepted identities for reversible operations only, `.DS_Store` tolerated in the registry, holders validated as session boundaries, the ownership lifecycle (renew, release, transfer, recovery) with token rotation and history, fail-closed parity between check and acquire, full-set reporting |
+| 6 (proposed) | 2026-11-28 | Phase 1c implementation details for owner review: the runtime verification conditions and GitHub reads, approvals bound to the PR that introduced the entry, `actions` on standing entries, the designated authorizations file, optional handoff parts (transfer token, artifacts, jobs, budget, lessons) within version 1 |

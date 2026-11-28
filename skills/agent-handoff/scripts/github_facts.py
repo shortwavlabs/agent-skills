@@ -45,13 +45,18 @@ def gh_api(path: str):
     except (OSError, subprocess.SubprocessError) as e:
         raise HostError(f"gh is not available: {e}")
     if r.returncode != 0:
-        if "HTTP 404" in r.stderr:
+        if not_found(r.stderr):
             raise NotFound(path)
         raise HostError((r.stderr.strip().splitlines() or ["gh api failed"])[-1][:200])
     try:
         return json.loads(r.stdout)
     except ValueError as e:
         raise HostError(f"unreadable answer for {path}: {e}")
+
+
+def not_found(stderr: str) -> bool:
+    """GitHub answers a missing file with 404, and a missing or malformed commit with 422 "No commit found"."""
+    return "HTTP 404" in stderr or ("HTTP 422" in stderr and "No commit found" in stderr)
 
 
 def repository_slug(root: Path, remote: str = "origin") -> str | None:
@@ -88,8 +93,9 @@ def same(a, b) -> bool:
     return json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
 
 
-def approvals(api, slug: str, number: str) -> list[dict]:
-    """Every host-recorded approval candidate on the PR: its merge, and each reviewer's latest decisive review."""
+def approvals(api, slug: str, number: str) -> tuple[list[dict], str | None]:
+    """(every host-recorded approval candidate on the PR: its merge and each reviewer's latest decisive review,
+    the PR's base commit)."""
     pr = api(f"repos/{slug}/pulls/{number}")
     out = []
     if pr.get("merged") and pr.get("merged_by") and pr.get("merge_commit_sha"):
@@ -111,7 +117,7 @@ def approvals(api, slug: str, number: str) -> list[dict]:
         basis = last if last["state"] != "CHANGES_REQUESTED" else approved[-1]
         out.append({"kind": "approval", "by": f"github:{login}", "revision": basis.get("commit_id"),
                     "at": basis.get("submitted_at"), "state": state})
-    return out
+    return out, (pr.get("base") or {}).get("sha")
 
 
 def reinstated(api, slug: str, branch: str, path: str, entry_id: str, since: str | None):
@@ -149,16 +155,21 @@ def gather(reference: dict, root: Path, owners=(), api=gh_api, remote: str = "or
         m = PR_URL.match(str(entry.get("approved_in", "")))
         if not m:
             return facts
-        candidates = approvals(api, f"{m.group(1)}/{m.group(2)}", m.group(3))
+        candidates, base = approvals(api, f"{m.group(1)}/{m.group(2)}", m.group(3))
+        at_base = entry_at(api, slug, path, base, entry_id) if base else None
         for c in candidates:
             at_revision = entry_at(api, slug, path, c["revision"], entry_id) if c["revision"] else None
             c["entry_at_approved_revision"] = None if at_revision is None and c["revision"] is None else \
                 ("identical" if at_revision is not None and same(at_revision, entry) else "changed")
+            # The approval binds the entry only if this PR introduced or changed it (not an unrelated PR merged later).
+            c["introduced_entry"] = None if base is None or c["revision"] is None else \
+                (at_revision is not None and (at_base is None or not same(at_base, at_revision)))
         owned = [c for c in candidates if c["by"] in owners]
         usable = [c for c in owned if c["state"] == "active" and c["entry_at_approved_revision"] == "identical"]
         chosen = (usable or owned or candidates or [{"kind": "none", "by": None, "state": "active",
                                                      "entry_at_approved_revision": None}])[0]
-        facts["approval"] = {k: chosen.get(k) for k in ("kind", "by", "state", "entry_at_approved_revision", "at")}
+        facts["approval"] = {k: chosen.get(k) for k in ("kind", "by", "state", "entry_at_approved_revision",
+                                                        "introduced_entry", "at")}
         current = entry_at(api, slug, path, info["default_branch"], entry_id)
         facts["entry_on_default_branch"] = "absent" if current is None else (
             "identical" if same(current, entry) else "changed")
@@ -246,7 +257,7 @@ def self_test() -> list[str]:
         subprocess.run(["git", "-C", str(root), "init", "-q"], check=True, env=env)
         subprocess.run(["git", "-C", str(root), "remote", "add", "origin", "git@github.com:example/repo.git"],
                        check=True, env=env)
-        ref_commit, merge_commit, review_commit, head = "a" * 40, "b" * 40, "c" * 40, "d" * 40
+        ref_commit, merge_commit, review_commit, head, base_commit = "a" * 40, "b" * 40, "c" * 40, "d" * 40, "0" * 40
         entry = {"id": "push-feature-branches", "level": "R2",
                  "operations": "Push feature branches of this repository to origin and open draft PRs",
                  "actions": ["push-branch", "open-draft-pr"], "granted_by": "github:example-owner",
@@ -260,12 +271,15 @@ def self_test() -> list[str]:
 
         def host(**kw) -> FakeGitHub:
             gh = FakeGitHub()
-            gh.files = {ref_commit: doc(entry), merge_commit: doc(entry), review_commit: doc(entry), head: doc(entry)}
+            gh.files = {ref_commit: doc(entry), merge_commit: doc(entry), review_commit: doc(entry), head: doc(entry),
+                        base_commit: doc()}
             gh.branch_history = [head]
             gh.pr = {"merged": True, "merged_by": {"login": "example-owner"}, "merge_commit_sha": merge_commit,
                      "merged_at": "2026-11-27T18:00:00Z"}
             for k, v in kw.items():
                 setattr(gh, k, v)
+            gh.pr.setdefault("base", {"sha": base_commit})
+            gh.files.setdefault(base_commit, doc())
             return gh
 
         def outcome(gh, action="push-branch") -> tuple[str, str]:
@@ -307,6 +321,12 @@ def self_test() -> list[str]:
              host(files={ref_commit: doc(entry), merge_commit: doc(entry), "f" * 40: doc(), head: doc(entry)},
                   branch_history=[head, "f" * 40]), "inapplicable"),
             ("approval names another repository's PR", host(), "inapplicable"),
+            ("owner merged a PR that never touched the entry",
+             host(files={ref_commit: doc(entry), merge_commit: doc(entry), head: doc(entry), base_commit: doc(entry)}),
+             "inapplicable"),
+            ("the PR changed the entry the owner merged",
+             host(files={ref_commit: doc(entry), merge_commit: doc(entry), head: doc(entry),
+                         base_commit: doc({**entry, "expires": "2026-12-31T00:00:00Z"})}), "verified"),
         ]
         for label, gh, want in cases:
             if label == "approval names another repository's PR":
@@ -331,6 +351,11 @@ def self_test() -> list[str]:
                        check=True, env=env)
         if gather(reference, root, owners, api=host())["host_reachable"]:
             failures.append("a non-GitHub remote was treated as reachable")
+        for stderr, want in [("gh: No commit found for SHA: 1111 (HTTP 422)", True), ("gh: Not Found (HTTP 404)", True),
+                             ("gh: Validation Failed (HTTP 422)", False), ("gh: Bad credentials (HTTP 401)", False),
+                             ("error connecting to api.github.com", False)]:
+            if not_found(stderr) != want:
+                failures.append(f"host answer {stderr!r} classified as not-found={not not want}")
         for url, want in [("https://github.com/a/b.git", "a/b"), ("git@github.com:a/b.git", "a/b"),
                           ("ssh://git@github.com/a/b", "a/b"), ("https://github.com/a/b/", "a/b")]:
             m = REMOTE.match(url)

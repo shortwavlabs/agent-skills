@@ -34,18 +34,21 @@ The first condition that fails decides.
 2. An `owner-session` reference (a quotation) cannot be verified by another agent: **unknown**.
 3. The operation names an action, and is not R3. Otherwise unknown, or inapplicable for R3.
 4. A trusted policy exists. Otherwise **unknown** (see [the trusted policy](#the-trusted-policy)).
-5. The host was reached. Otherwise **unknown**.
-6. The repository is trusted by the policy. Otherwise **inapplicable**: a repository cannot establish its own trust.
-7. The referenced commit exists, and holds the referenced entry. Otherwise **invalid** (fabricated or missing).
-8. The entry is well formed, matches the reference (who granted it, its level), was granted by an owner identity, and
+5. The reference names the designated authorizations file (`ops/authorizations.json`, or the file the canonical
+   policy names). An authorizations-shaped file elsewhere (an example, a fixture) is not one: **invalid**.
+6. The host was reached. Otherwise **unknown**.
+7. The repository is trusted by the policy. Otherwise **inapplicable**: a repository cannot establish its own trust.
+8. The referenced commit exists, and holds the referenced entry. Otherwise **invalid** (fabricated or missing).
+9. The entry is well formed, matches the reference (who granted it, its level), was granted by an owner identity, and
    names an `approved_in` PR in the same repository.
-9. The host records an approval or merge of that PR by an owner identity, still active (not dismissed, not superseded
-   by a later change request), and the entry's content at the approved revision equals the referenced content.
-   Git author fields never count.
-10. The entry is unchanged on the current default branch (absent: revoked; changed: not covered), and was not removed
+10. The host records an approval or merge of that PR by an owner identity, still active (not dismissed, not superseded
+    by a later change request). **That PR introduced or changed the entry** (its content at the PR's base is absent or
+    different): merging an unrelated PR approves nothing already on the branch. The entry's content at the approved
+    revision equals the referenced content. Git author fields never count.
+11. The entry is unchanged on the current default branch (absent: revoked; changed: not covered), and was not removed
     and reintroduced after the approval (a reinstatement needs fresh approval).
-11. Neither the entry nor the reference has expired.
-12. The entry lists the operation's action, and the operation's level does not exceed the entry's.
+12. Neither the entry nor the reference has expired.
+13. The entry lists the operation's action, and the operation's level does not exceed the entry's.
 
 Only then: **verified**. Content is compared, not commit IDs, so squash merges are handled.
 
@@ -73,8 +76,9 @@ it: an entry for `merge-pr` does not cover `delete-files`.
 ## The GitHub integration
 
 `github_facts.gather()` reads, through `gh api` and nothing else: the repository and its default branch; the
-referenced commit; the authorizations file at the referenced commit, at each approved revision and on the default
-branch; the PR named in `approved_in` (its merge and merged-by) and its reviews; and the commits that touched the file
+referenced commit (GitHub answers a missing one with HTTP 422, read as "does not exist"); the authorizations file at
+the referenced commit, at the PR's base, at each approved revision and on the default branch; the PR named in
+`approved_in` (its merge, merged-by and base) and its reviews; and the commits that touched the file
 on the default branch since the approval (up to 100; more is unknown). It writes nothing. Each reviewer's latest
 decisive review counts: an approval later dismissed is `dismissed`, one followed by a change request is
 `superseded`. Any failure to reach or parse the host gives `host_reachable: false`, hence unknown.
@@ -85,12 +89,16 @@ It is deliberately narrow: no general reading of PR approvals as permission, no 
 
 Owner identities and trusted repositories come only from the canonical policy (RFC 0001, D14), whose format Phase 1d
 defines. Until then `authorization.canonical_policy()` returns none, and `verify-auth` reports every standing
-reference as unknown, with the facts it found, so the owner can decide quickly. No flag, environment variable,
+reference as unknown, still gathering and printing the facts the host records (a `facts:` line per reference), so the
+owner can decide quickly. No flag, environment variable,
 repository file or handoff record can supply the policy instead: a trust root the agent could write is not one.
 
 ## Limitations
 
-- Evaluation is as good as the host's records: an owner account that is compromised approves as the owner.
+- Evaluation is as good as the host's records. The host records **an account**, not a person: an agent running with
+  the owner's credentials (a `gh` login, a token) approves or merges as the owner, and nothing here can tell the
+  difference. Approvals of authorization PRs therefore mean something only if agents do not approve or merge them
+  with the owner's credentials; that is a rule for the owner's setup, not something this tool can enforce.
 - `gh` must be installed and authenticated for live facts; otherwise every standing reference is unknown.
 - A dismissed approval is recognised only when the host records the dismissal.
 - Time comes from the local clock.

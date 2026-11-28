@@ -175,6 +175,7 @@ Committed in `ops/authorizations.json` (or the file the canonical policy names),
       "id": "push-feature-branches",
       "level": "R2",
       "operations": "Push feature branches of this repository to origin and open draft PRs",
+      "actions": ["push-branch", "open-draft-pr"],
       "granted_by": "github:<owner login>",
       "approved_in": "https://github.com/<owner>/<repo>/pull/<n>",
       "expires": "2027-06-30T00:00:00Z"
@@ -193,6 +194,11 @@ Committed in `ops/authorizations.json` (or the file the canonical policy names),
 ```
 
 - `level` is R1 or R2, never R3. A `cost_only` entry authorizes spending alone, never publication or deletion.
+- `actions` (Phase 1c) lists the operations the entry covers as exact slugs; runtime verification matches the
+  operation's action against it, because whether a sentence covers an operation is not decided mechanically. An entry
+  without `actions` verifies as unknown.
+- **Bound to its PR.** The `approved_in` PR must have introduced or changed the entry: an owner merging an unrelated
+  PR approves nothing already on the branch. Standing references must name the designated file.
 - Existing authorized workflows that cost money (D9) are entries here; the budget file only holds thresholds.
 - **No owner list here.** Owner identities and trusted repositories are declared only in the canonical policy (D14);
   a repository cannot establish its own owner identity.
@@ -337,8 +343,11 @@ non-fast-forward pushes, and that refusal is investigated, never forced.
 
 ## Handoff record
 
-Owner: `agent-handoff` (Phase 1c). Location: `.agent-state/handoffs/<branch>.md`. Refreshed at milestones and at the
-end of a session with unfinished work. Phase 1a defines its required header lines and headings.
+Owner: `agent-handoff` (Phase 1c). Location: `.agent-state/handoffs/<branch>.md` (`/` in a branch name becomes
+`--`). Refreshed at milestones and at the end of a session with unfinished work. Phase 1a defines its required header
+lines and headings; Phase 1c adds optional parts, still version 1: a `Transfer:` header (the one-time claim transfer
+token), `## Artifacts` (a JSON list of artifacts), a JSON list of jobs under `## Running processes and jobs`,
+`## Budget` and `## Lessons and proposals`. See `skills/agent-handoff/references/record.md`.
 
 ````markdown
 # Handoff: <one-line task title>

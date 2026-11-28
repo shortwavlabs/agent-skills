@@ -44,7 +44,8 @@
           "kind": "merge",
           "by": "github:example-owner",
           "entry_at_approved_revision": "identical",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -87,7 +88,8 @@
           "kind": "merge",
           "by": "github:example-owner",
           "entry_at_approved_revision": "identical",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -119,7 +121,8 @@
           "kind": "merge",
           "by": "github:example-owner",
           "entry_at_approved_revision": "identical",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -162,7 +165,8 @@
           "kind": "merge",
           "by": "github:example-owner",
           "entry_at_approved_revision": "identical",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -205,7 +209,8 @@
           "kind": "merge",
           "by": "github:example-owner",
           "entry_at_approved_revision": "identical",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "absent",
         "host_reachable": true,
@@ -248,7 +253,8 @@
           "kind": "approval",
           "by": "github:example-owner",
           "entry_at_approved_revision": "changed",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -291,7 +297,8 @@
           "kind": "merge",
           "by": "github:example-owner",
           "entry_at_approved_revision": "identical",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "changed",
         "host_reachable": true,
@@ -334,7 +341,8 @@
           "kind": "merge",
           "by": "github:someone-else",
           "entry_at_approved_revision": "identical",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -377,7 +385,8 @@
           "kind": "none",
           "by": null,
           "entry_at_approved_revision": "identical",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -420,7 +429,8 @@
           "kind": "merge",
           "by": "github:example-owner",
           "entry_at_approved_revision": "identical",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -462,7 +472,8 @@
           "kind": "merge",
           "by": "github:example-owner",
           "entry_at_approved_revision": "identical",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -505,7 +516,8 @@
           "kind": "merge",
           "by": "github:example-owner",
           "entry_at_approved_revision": "identical",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -570,7 +582,8 @@
           "kind": "merge",
           "by": "github:example-owner",
           "entry_at_approved_revision": "identical",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": false,
@@ -613,7 +626,8 @@
           "kind": "merge",
           "by": "github:example-owner",
           "entry_at_approved_revision": "identical",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -656,7 +670,8 @@
           "kind": "approval",
           "by": "github:example-owner",
           "entry_at_approved_revision": "identical",
-          "state": "dismissed"
+          "state": "dismissed",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -699,7 +714,8 @@
           "kind": "approval",
           "by": "github:example-owner",
           "entry_at_approved_revision": "identical",
-          "state": "superseded"
+          "state": "superseded",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -742,7 +758,8 @@
           "kind": "merge",
           "by": "github:example-owner",
           "entry_at_approved_revision": "identical",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -785,7 +802,8 @@
           "kind": "merge",
           "by": "github:example-owner",
           "entry_at_approved_revision": "identical",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -828,7 +846,8 @@
           "kind": "merge",
           "by": "github:example-owner",
           "entry_at_approved_revision": "identical",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -868,7 +887,8 @@
           "kind": "merge",
           "by": "github:example-owner",
           "entry_at_approved_revision": "identical",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -911,7 +931,8 @@
           "kind": "merge",
           "by": "github:example-owner",
           "entry_at_approved_revision": "identical",
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -954,7 +975,8 @@
           "kind": "merge",
           "by": "github:example-owner",
           "entry_at_approved_revision": null,
-          "state": "active"
+          "state": "active",
+          "introduced_entry": true
         },
         "entry_on_default_branch": "identical",
         "host_reachable": true,
@@ -963,6 +985,94 @@
       "structural": "unverified",
       "runtime": "unknown",
       "reason": "cannot be established now: ask the owner once",
+      "action": "push-branch"
+    },
+    {
+      "id": "approval-of-unrelated-pr",
+      "title": "The owner merged a PR that did not introduce or change the entry",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ]
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": false
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "an approval binds only the content its PR introduced or changed",
+      "action": "push-branch"
+    },
+    {
+      "id": "non-designated-file",
+      "title": "The reference names an authorizations-shaped file outside the designated one",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "operational/examples/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ]
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "invalid",
+      "reason": "only the designated authorizations file holds standing authorizations",
       "action": "push-branch"
     }
   ]

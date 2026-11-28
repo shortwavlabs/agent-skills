@@ -85,13 +85,14 @@ Details and edge cases: [references/resume.md](references/resume.md).
 
 | Status | Meaning | What the receiving agent does |
 |---|---|---|
-| verified | Trusted repository; the entry was approved or merged by an owner identity on the host, unchanged since, still on the default branch, unexpired, and lists this action | Proceed within that scope |
+| verified | Trusted repository and designated file; the PR that introduced the entry was approved or merged by an owner identity on the host; unchanged since, still on the default branch, unexpired, and lists this action | Proceed within that scope |
 | inapplicable | Valid, but it does not cover this use: expired, revoked, changed, dismissed or superseded approval, another action, untrusted repository, non-owner approver | Do not proceed on it; ask the owner |
 | invalid | Malformed, fabricated or misstated | Do not proceed; report it |
 | unknown | Cannot be established now: host unreachable, a quoted owner instruction, no canonical policy yet | Ask the owner once |
 
 Owner identities and trusted repositories come only from the canonical policy, which Phase 1d defines. Until then,
-`verify-auth` reports the facts it found and the status unknown. See
+`verify-auth` prints the facts the host records and the status unknown. The host records an account, not a person:
+an agent using the owner's credentials approves as the owner. See
 [references/authorization.md](references/authorization.md).
 
 ## Composition

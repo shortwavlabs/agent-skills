@@ -38,7 +38,8 @@ sys.dont_write_bytecode = True
 HERE = Path(__file__).resolve().parent
 STATE = ".agent-state"
 PLACEHOLDER = re.compile(r"<[a-z][^<>\n]{2,}>")
-REDACT = [(re.compile(r"(?<![\w/])(?:/Users|/home|/private|/var|/tmp|/opt|/mnt|[A-Za-z]:\\\\)[^\s`'\")\]]*"), "<path>"),
+CLAIM_ID = re.compile(r"^\d{8}T\d{6}Z-[0-9a-f]{8}$")
+REDACT = [(re.compile(r"(?<![\w/])(?:/Users|/home|/private|/var|/tmp|/opt|/mnt|[A-Za-z]:\\)[^\s`'\")\]]*"), "<path>"),
           (re.compile(r"\b[0-9a-f]{32}\b"), "<token>"),
           (re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b"), "<email>")]
 SUMMARY_SECTIONS = ("Goal", "State", "Done", "Pending", "Blockers and decisions needed", "Verification",
@@ -196,7 +197,7 @@ Supersedes: {supersedes}
 """
 
 
-def new(root: Path, title: str, author: str, claim: str, transfer: str, supersede: bool) -> Path:
+def new(root: Path, title: str, author: str, claim: str, transfer: str, supersede: bool, pr: str | None = None) -> Path:
     state = repo_state(root)
     target = default_path(root, state["branch"])
     folder = ensure_state_dir(root)
@@ -210,13 +211,13 @@ def new(root: Path, title: str, author: str, claim: str, transfer: str, supersed
         history.mkdir(mode=0o700, exist_ok=True)
         os.replace(target, history / f"{target.stem}-{old_created.replace(':', '')}.md")
         supersedes = old_created
-    pr = "none"
-    try:
-        r = subprocess.run(["gh", "pr", "view", "--json", "url", "-q", ".url"], cwd=root, capture_output=True,
-                           text=True, timeout=30)
-        pr = r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else "none"
-    except (OSError, subprocess.SubprocessError):
-        pr = "unknown (gh unavailable)"
+    if pr is None:
+        try:
+            r = subprocess.run(["gh", "pr", "view", "--json", "url", "-q", ".url"], cwd=root, capture_output=True,
+                               text=True, timeout=30)
+            pr = r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else "none"
+        except (OSError, subprocess.SubprocessError):
+            pr = "unknown (gh unavailable)"
     remote = git(root, "remote").stdout.split()
     dirty = "".join(f"\n- {p}" for p in state["dirty"])
     target.write_text(TEMPLATE.format(
@@ -284,8 +285,11 @@ def check(path: Path, root: Path) -> tuple[str, list[str]]:
         else:
             finding(f"HEAD {now['head'][:12]} does not descend from the recorded {recorded[:12]}")
     for key, value in (("Upstream", now["upstream"]), ("Working tree", now["worktree"])):
-        if not headers[key].startswith(value.split(" (")[0]):
+        if headers[key] != value:
             finding(f"{key.lower()} was '{headers[key]}', now '{value}'")
+    recorded_dirty = {line[2:].strip() for line in sections.get("State", []) if line.startswith("- ")}
+    if headers["Working tree"].startswith("dirty") and now["dirty"] and recorded_dirty != set(now["dirty"]):
+        finding(f"the uncommitted paths differ from those listed under State (now: {', '.join(now['dirty'][:5])})")
     for heading, lines in sections.items():
         for line in lines:
             if PLACEHOLDER.search(line) and not line.lstrip().startswith(("```", "{", "[", "\"")):
@@ -323,7 +327,9 @@ def check(path: Path, root: Path) -> tuple[str, list[str]]:
             finding(f"{label} has ended since the record: inspect its output and logs before deciding; never rerun "
                     "an expensive job whose inputs are unchanged without checking its results")
     claim = headers.get("Claim", "none")
-    if claim != "none":
+    if claim != "none" and not CLAIM_ID.match(claim):
+        finding(f"'Claim: {claim[:40]}' is not a claim id")
+    elif claim != "none":
         file = root / STATE / "claims" / f"{claim}.json"
         if not file.is_file():
             finding(f"claim {claim} is no longer active (released, archived or never made here): acquire anew with "
@@ -347,22 +353,45 @@ def check(path: Path, root: Path) -> tuple[str, list[str]]:
 # ------------------------------------------------------------------------------------------------ verify-auth
 
 def verify_auth(path: Path, root: Path, action: str, level: str | None, gather=None, policy_source=None,
-                now: datetime.datetime | None = None) -> list[tuple[dict, str, str]]:
-    """[(reference, status, reason)] for every reference in the record, evaluated for one operation."""
-    auth, facts_mod = module("authorization"), module("github_facts")
-    headers, sections = parse(path.read_text(encoding="utf-8"))
-    references = json_block(sections.get("Authorizations in force", [])) or []
+                now: datetime.datetime | None = None) -> list[tuple[object, str, str, dict]]:
+    """[(reference, status, reason, facts)] for every reference in the record, evaluated for one operation. Every
+    reference in a structurally invalid record is invalid. Facts are gathered (read-only) even without a trusted
+    policy, so the owner sees what the host records; without the policy nothing verifies."""
+    auth, facts_mod, rec = module("authorization"), module("github_facts"), module("operational_records")
+    text = path.read_text(encoding="utf-8")
+    problems = rec.Checker(rec.load_formats()).check_text(text, path.name)
+    try:
+        references = json_block(parse(text)[1].get("Authorizations in force", [])) or []
+    except ValueError as e:
+        problems = problems + [f"the authorization block does not parse: {e}"]
+        references = []
+    if problems:
+        why = "the record is invalid, so every reference in it is invalid: " + "; ".join(problems)[:300]
+        return [(r, "invalid", why, {}) for r in references] or [(None, "invalid", why, {})]
     policy, _ = (policy_source or auth.canonical_policy)()
     owners = policy.get("owners", []) if policy else []
     out = []
     for reference in references:
         facts = {}
-        if isinstance(reference, dict) and reference.get("source") == "standing" and policy is not None:
+        if isinstance(reference, dict) and reference.get("source") == "standing":
             facts = (gather or facts_mod.gather)(reference, root, owners)
         status, reason = auth.evaluate(reference, {"action": action, **({"level": level} if level else {})}, facts,
                                        policy, now or utcnow())
-        out.append((reference, status, reason))
+        out.append((reference, status, reason, facts))
     return out
+
+
+def describe_facts(facts: dict) -> str:
+    if not facts:
+        return "no host facts (not a standing reference)"
+    if not facts.get("host_reachable"):
+        return f"host not reached: {facts.get('why', 'unknown')}"
+    approval = facts.get("approval") or {}
+    return (f"repository {facts.get('repository')}; commit exists: {facts.get('commit_exists')}; entry found: "
+            f"{facts.get('entry_at_reference') is not None}; approval: {approval.get('kind')} by {approval.get('by')} "
+            f"({approval.get('state')}, content {approval.get('entry_at_approved_revision')}, introduced by the PR: "
+            f"{approval.get('introduced_entry')}); default branch: {facts.get('entry_on_default_branch')}; "
+            f"reinstated: {facts.get('reinstated_after_approval')}")
 
 
 # ---------------------------------------------------------------------------------------------------- summary
@@ -381,7 +410,7 @@ def summary(path: Path) -> str:
     out = [f"### Status: {redact(title)}", "", f"From the handoff record of {headers.get('Created', 'unknown')} "
            f"(HEAD `{headers.get('HEAD', '?')[:12]}`, upstream {headers.get('Upstream', 'unknown')}).", ""]
     for heading in SUMMARY_SECTIONS:
-        body = [line for line in sections.get(heading, []) if line.strip() and "token" not in line.lower()]
+        body = [line for line in sections.get(heading, []) if line.strip()]
         if heading == "State":
             body = body[:1]
         if body:
@@ -429,12 +458,14 @@ def main(argv: list[str]) -> int:
         return {"matches": 0, "drift": 1}.get(verdict, 2)
     if args.command == "verify-auth":
         results = verify_auth(path, root, args.action, args.level)
-        for reference, status, reason in results:
+        for reference, status, reason, facts in results:
             ref = reference.get("ref", "?") if isinstance(reference, dict) else "?"
             print(f"{status}: {ref}: {reason}")
+            if facts:
+                print(f"  facts: {describe_facts(facts)}")
         if not results:
             print("no authorization references in the record: ask the owner for anything above R1")
-        return 0 if any(s == "verified" for _, s, _ in results) else 1
+        return 0 if any(r[1] == "verified" for r in results) else 1
     print(summary(path), end="")
     return 0
 
@@ -490,7 +521,7 @@ def self_test() -> list[str]:
         run(root, "commit", "-q", "-m", "init")
         saved_env = {k: os.environ.get(k) for k in env if k.startswith("GIT_")}
         os.environ.update({k: v for k, v in env.items() if k.startswith("GIT_")})   # restored in finally
-        path = new(root, "Parser refactor", "claude-code / test-model / s1", "", "", False)
+        path = new(root, "Parser refactor", "claude-code / test-model / s1", "", "", False, pr="none")
         if path != root / STATE / "handoffs" / "feature--parser.md":
             fail(f"record path: {path}")
         if git(root, "status", "--porcelain").stdout.strip():
@@ -527,6 +558,22 @@ def self_test() -> list[str]:
         verdict, lines = check(path, root)
         if not any("src/parser.py changed" in line for line in lines) or not any("working tree" in line for line in lines):
             fail(f"a changed artifact or working tree was not reported: {lines}")
+        dirty_record = path.read_text(encoding="utf-8")
+        tampered = dirty_record.replace("Working tree: clean", "Working tree: dirty (1 paths, listed under State)")
+        tampered = tampered.replace("Refactor half done; tests pass on HEAD.", "Refactor half done.\n- notes.txt")
+        path.write_text(tampered, encoding="utf-8")
+        _, lines = check(path, root)
+        if not any("uncommitted paths differ" in line for line in lines):
+            fail(f"a different set of dirty paths with the same count was not reported: {lines}")
+        path.write_text(dirty_record.replace("Upstream: not pushed", "Upstream: ahead 12"), encoding="utf-8")
+        _, lines = check(path, root)
+        if not any("upstream was 'ahead 12'" in line for line in lines):
+            fail(f"a changed upstream was not reported: {lines}")
+        path.write_text(dirty_record.replace("Claim: none", "Claim: ../../etc/passwd"), encoding="utf-8")
+        _, lines = check(path, root)
+        if not any("is not a claim id" in line for line in lines):
+            fail(f"a malformed claim id was not reported: {lines}")
+        path.write_text(dirty_record, encoding="utf-8")
         run(root, "commit", "-qam", "more work")
         verdict, lines = check(path, root)
         if not any("1 commits since the record" in line for line in lines):
@@ -565,27 +612,30 @@ def self_test() -> list[str]:
             fail("an incompatible version was not invalid")
         # Superseding keeps the previous record as history.
         try:
-            new(root, "Again", "codex", "", "", False)
+            new(root, "Again", "codex", "", "", False, pr="none")
             fail("an existing record was overwritten without --supersede")
         except SystemExit:
             pass
         old_created = parse(path.read_text(encoding="utf-8"))[0]["Created"]
         time.sleep(1.1)
-        again = new(root, "Again", "codex / test-model / s2", "", "", True)
+        again = new(root, "Again", "codex / test-model / s2", "", "", True, pr="none")
         history = list((root / STATE / "handoffs" / "history").glob("*.md"))
         if len(history) != 1 or parse(again.read_text(encoding="utf-8"))[0]["Supersedes"] != old_created:
             fail(f"superseding: history {history}")
         # The PR summary is public-safe.
         leaky = again.read_text(encoding="utf-8")
-        leaky = leaky.replace("<one line of status>", "Logs at /home/someone/project/out.log; mail me@example.com")
+        leaky = leaky.replace("<one line of status>", "Logs at /home/someone/project/out.log; mail me@example.com; "
+                              "copy at C:\\Users\\someone\\out.log; the tokenizer is fixed")
         leaky = leaky.replace("Transfer: none", "Transfer: 0123456789abcdef0123456789abcdef")
         leaky = leaky.replace("- [REPORTED] <what was", "- [REPORTED] session 0123456789abcdef0123456789abcdef <what was")
         again.write_text(leaky, encoding="utf-8")
         text = summary(again)
         for secret in ("/home/someone", "me@example.com", "0123456789abcdef0123456789abcdef", "Transfer",
-                       "Authorizations", "Running processes", "codex / test-model"):
+                       "Authorizations", "Running processes", "codex / test-model", "Users\\someone"):
             if secret in text:
                 fail(f"the PR summary leaks {secret!r}")
+        if "tokenizer is fixed" not in text:
+            fail("the PR summary dropped a line that merely mentions a token-like word")
         if "**Goal**" not in text or "<path>" not in text:
             fail(f"the PR summary lost its content: {text}")
         # Authorization references through the evaluator, with a fake host and an explicit test policy.
@@ -607,21 +657,32 @@ def self_test() -> list[str]:
                                                  "approved_in": "https://github.com/example/repo/pull/1",
                                                  "expires": "2027-06-30T00:00:00Z"},
                           "approval": {"kind": "merge", "by": "github:example-owner", "state": "active",
-                                       "entry_at_approved_revision": "identical"},
+                                       "entry_at_approved_revision": "identical", "introduced_entry": True},
                           "entry_on_default_branch": "identical", "reinstated_after_approval": False}
         test_policy = lambda: ({"owners": ["github:example-owner"], "repositories": ["github.com/example/repo"]}, "test")
         now = datetime.datetime(2026, 11, 28, tzinfo=datetime.timezone.utc)
         results = verify_auth(again, root, "push-branch", None, gather=lambda *a: verified_facts,
                               policy_source=test_policy, now=now)
-        if [s for _, s, _ in results] != ["verified", "unknown"]:
-            fail(f"verify-auth with a test policy: {[(s, r) for _, s, r in results]}")
+        if [r[1] for r in results] != ["verified", "unknown"]:
+            fail(f"verify-auth with a test policy: {[r[1:3] for r in results]}")
         results = verify_auth(again, root, "publish-release", None, gather=lambda *a: verified_facts,
                               policy_source=test_policy, now=now)
         if results[0][1] != "inapplicable":
             fail(f"verify-auth for another action: {results[0][1:]}")
         results = verify_auth(again, root, "push-branch", None, gather=lambda *a: verified_facts, now=now)
-        if any(s == "verified" for _, s, _ in results):
-            fail("without the canonical policy, a reference was verified")
+        if any(r[1] == "verified" for r in results) or not results[0][3].get("host_reachable"):
+            fail("without the canonical policy, a reference was verified, or its facts were not reported")
+        broken = base / "broken.md"
+        broken.write_text(record.replace("## Resume", "## Next"), encoding="utf-8")
+        results = verify_auth(broken, root, "push-branch", None, gather=lambda *a: verified_facts,
+                              policy_source=test_policy, now=now)
+        if [r[1] for r in results] != ["invalid", "invalid"]:
+            fail(f"references inside an invalid record were not all invalid: {[r[1] for r in results]}")
+        broken.write_text(record.replace('"level": "R2"', '"level": "R2", "level": "R1"', 1), encoding="utf-8")
+        results = verify_auth(broken, root, "push-branch", None, gather=lambda *a: verified_facts,
+                              policy_source=test_policy, now=now)
+        if not results or any(r[1] != "invalid" for r in results):
+            fail(f"a duplicate JSON key did not make the references invalid: {results}")
         if auth.canonical_policy()[0] is not None:
             fail("a canonical policy appeared before Phase 1d defines one")
         if facts_mod.REMOTE.match("git@github.com:example/repo.git") is None:

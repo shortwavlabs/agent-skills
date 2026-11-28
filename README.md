@@ -18,7 +18,7 @@ Runs every skill script's `--self-test` (normally and under `python -O`), checks
 
 ## Design proposals
 
-- [RFC 0001: Operational Skills](rfcs/0001-agent-operations/README.md) (revision 5, approved): a family of operational skills (coordination, handoff, instruction governance, research provenance, resource budgeting, release governance and, provisionally, technical debt) alongside `workspace-housekeeping`. Implemented so far: the shared foundation in [`operational/`](operational/) (Phase 1a) and `development-coordination` (Phase 1b).
+- [RFC 0001: Operational Skills](rfcs/0001-agent-operations/README.md) (revision 5 approved; revision 6 proposed with Phase 1c): a family of operational skills (coordination, handoff, instruction governance, research provenance, resource budgeting, release governance and, provisionally, technical debt) alongside `workspace-housekeeping`. Implemented so far: the shared foundation in [`operational/`](operational/) (Phase 1a), `development-coordination` (Phase 1b) and `agent-handoff` (Phase 1c, in review).
 
 ## Skills
 
@@ -536,6 +536,50 @@ skills/development-coordination/
 ```
 
 Behavioral scenarios and activation triggers: [`evals/development-coordination/`](evals/development-coordination/).
+
+### agent-handoff
+
+Hand unfinished coding work from one agent session to another and resume it safely. The second Operational Skills
+skill ([RFC 0001](rfcs/0001-agent-operations/README.md), Phase 1c).
+- **The record:** a local, self-ignoring `.agent-state/handoffs/<branch>.md` with objective and scope, repository
+  state, done and pending work with evidence labels, artifacts with digests, decisions and rejected approaches, tests,
+  defects, running jobs (PID and start time), the claim and its transfer token, authorization references, budget and
+  resume steps; a public-safe PR summary.
+- **Verified resumption:** the record is evidence, not authority. `handoff.py check` compares it with the repository
+  (branch, HEAD, upstream, working tree, artifact digests, jobs, claim) and reports every difference; jobs are never
+  restarted, duplicated or stopped, and expensive work with unchanged inputs is not repeated.
+- **Runtime authorization verification:** a pure evaluator of standing authorizations (trusted repository, owner
+  identity, host-recorded approval or merge of the exact content, default branch, revocation and reinstatement,
+  expiry, listed actions), with a narrow GitHub facts adapter. Only `verified` grants authority; until Phase 1d
+  declares owner identities in the canonical policy, standing references report unknown.
+- **Continuity** across compaction, interruption, outages, quota exhaustion, model and agent switches, restarts and
+  long-running jobs; an extension point for lessons, skill defects and proposals.
+
+**Triggers on:** ending a session with unfinished work, approaching the context limit, switching agent or model,
+leaving a job running, blocking on an owner decision, resuming someone else's work.
+
+#### Structure
+
+```
+skills/agent-handoff/
+├── SKILL.md                      Principles, writing and resuming, authorization at resume, example
+├── agents/openai.yaml
+├── scripts/
+│   ├── handoff.py                new, check, verify-auth, summary; self-test with real repositories and processes
+│   ├── authorization.py          The portable runtime evaluator; self-test against the runtime fixtures
+│   ├── github_facts.py           The narrow GitHub facts adapter (gh api, read-only); self-test with a fake host
+│   └── operational_records.py    Generated copy of scripts/operational_records.py (do not edit)
+└── references/
+    ├── operational-core.md       Generated copy of operational/core.md (do not edit)
+    ├── formats.json              Generated copy of operational/formats.json (do not edit)
+    ├── authorization-runtime.json Generated copy of the runtime fixtures (do not edit)
+    ├── record.md                 Location, format, fields, artifacts and jobs, claim transfer, what stays local
+    ├── resume.md                 The eight resumption steps, reading check output, claims, jobs, qualification
+    ├── authorization.md          The model, its conditions in order, actions, the GitHub adapter, the trusted policy
+    └── continuity.md             Harness events, harnesses, long-running jobs, lessons and proposals
+```
+
+Behavioral scenarios and activation triggers: [`evals/agent-handoff/`](evals/agent-handoff/).
 
 ### workspace-housekeeping
 
