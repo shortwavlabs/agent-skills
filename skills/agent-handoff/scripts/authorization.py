@@ -326,6 +326,14 @@ def self_test() -> list[str]:
         "cost limit": lambda c: c["request"].update(cost_usd=5),
         "narrowing reference": lambda c: c["reference"].update(limits={"branches": ["feature/*"]}),
         "cost-only entry": lambda c: c["state"]["entry_at_reference"].update(cost_only=True),
+        "a trusted repository holding the entry": lambda c: (
+            c["state"].update(repository="github.com/other/repo"),
+            c["state"]["entry_at_reference"].update(approved_in="https://github.com/other/repo/pull/1"),
+            c["state"]["entry_at_reference"]["scope"].update(repositories=["github.com/example/repo"])),
+        "the entry's own repository by default": lambda c: (
+            c.update(policy={"owners": policy["owners"], "repositories": [*policy["repositories"],
+                                                                          "github.com/example/second"]}),
+            c["request"].update(repository="github.com/example/second")),
         "trusted operation repository": lambda c: (
             c["state"]["entry_at_reference"]["scope"].update(repositories=["github.com/example/untrusted"]),
             c["request"].update(repository="github.com/example/untrusted")),
@@ -364,6 +372,8 @@ def self_test() -> list[str]:
         case = copy.deepcopy(control)
         edit(case)
         return evaluate(case["reference"], case["request"], case["state"], case.get("policy", policy), now)[1]
+    if "does not state its branch" not in reason_with(lambda c: c["request"].pop("branch")):
+        failures.append("an unstated, limited dimension is not reported as unstated")
     if "reconfirm with the owner" not in reason_with(lambda c: c["request"].update(level="R3")):
         failures.append("an R3 operation is not sent back to the owner for reconfirmation")
     missing = next(c for c in fixtures["cases"] if c["id"] == "missing-entry")

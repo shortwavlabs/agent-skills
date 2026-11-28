@@ -802,6 +802,41 @@ def self_test() -> list[str]:
         verdict, lines = check(path, root)
         if verdict != "drift" or not drifted(lines, "has ended"):
             fail(f"an ended job was not reported: {lines}")
+        # Invalid records, branch, commits, artifacts, claims and the working-tree header.
+        filled = path.read_text(encoding="utf-8")
+        for label, broken in [("without '## Resume'", filled.replace("## Resume", "## Next")),
+                              ("of an incompatible version", filled.replace("Version: 1", "Version: 2"))]:
+            bad.write_text(broken, encoding="utf-8")
+            if check(bad, root)[0] != "invalid":
+                fail(f"a record {label} was not invalid")
+        run(root, "checkout", "-q", "-b", "other")
+        if not drifted(check(path, root)[1], "the checkout is on other"):
+            fail("a branch change was not reported")
+        run(root, "checkout", "-q", "feature/parser")
+        artifact.write_text("x = 2\n")
+        if not drifted(check(path, root)[1], "src/parser.py changed"):
+            fail("a changed artifact was not reported")
+        publish(path, filled.replace("Working tree: clean", "Working tree: dirty (12 paths, listed under State)")
+                .replace("Refactor half done; tests pass on HEAD.",
+                         "Refactor half done.\n- src/parser.py sha256:" + sha256_file(artifact)).encode())
+        if not drifted(check(path, root)[1], "working tree was 'dirty (12 paths"):
+            fail("a different count of uncommitted paths was not reported")
+        publish(path, filled.encode())
+        run(root, "commit", "-qam", "more work")
+        if not drifted(check(path, root)[1], "1 commits since the record"):
+            fail("commits since the record were not reported")
+        claims = root / STATE / "claims"
+        claims.mkdir()
+        cid = "20261127T184000Z-7f3a1c2b"
+        (claims / f"{cid}.json").write_text(json.dumps({"kind": "claim", "holder": {"agent": "claude-code", "pid": 1},
+                                                        "transfer": {"token_sha256": "0" * 64}}))
+        publish(path, filled.replace("Claim: none", f"Claim: {cid}").encode())
+        if not any("transfer is pending" in l for l in check(path, root)[1]):
+            fail("a pending claim transfer was not reported")
+        (claims / f"{cid}.json").unlink()
+        if not drifted(check(path, root)[1], f"claim {cid} is no longer active"):
+            fail("a vanished claim was not reported")
+        publish(path, filled.encode())
         # Dirty trees: same inventory, different content.
         (root / "notes.txt").write_text("draft 1\n")
         dirty = new(root, "Dirty", "a", "", "", True, pr="none")

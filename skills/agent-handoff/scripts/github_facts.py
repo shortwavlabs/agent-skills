@@ -443,6 +443,10 @@ def self_test() -> list[str]:
             got = outcome(gh, sha("1"))
             if got[0] != want:
                 failures.append(f"{label}: expected {want}, got {got}")
+        facts = gather(reference(sha("1")), root, owners, pin=None, api=linear(after=[
+            (doc(), "2020-01-01T00:00:00Z"), (doc(entry), "2020-01-02T00:00:00Z")]))
+        if facts.get("reinstated_after_approval") is not True or facts.get("changed_after_approval") is not False:
+            failures.append(f"a removal and reinstatement was not reported as such: {facts}")
         # A side branch that removed and re-added the entry, merged with no net change: not a default-branch state.
         gh = FakeGitHub()
         gh.add(sha("0"), [], doc())
