@@ -1,0 +1,23 @@
+{
+  "kind": "authorizations",
+  "version": 1,
+  "authorizations": [
+    {
+      "id": "push-feature-branches",
+      "level": "R2",
+      "operations": "Push feature branches of this repository to origin and open draft PRs",
+      "granted_by": "github:example-owner",
+      "approved_in": "https://github.com/example/repo/pull/1",
+      "expires": "2027-06-30T00:00:00Z"
+    },
+    {
+      "id": "nightly-benchmarks",
+      "level": "R2",
+      "operations": "The nightly benchmark workflow as committed, up to USD 10 per run",
+      "cost_only": true,
+      "granted_by": "github:example-owner",
+      "approved_in": "https://github.com/example/repo/pull/2",
+      "expires": "until revoked"
+    }
+  ]
+}

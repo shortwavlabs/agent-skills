@@ -1,0 +1,18 @@
+{
+  "kind": "claim",
+  "version": 1,
+  "id": "20261127T184000Z-7f3a",
+  "holder": {
+    "agent": "example-agent",
+    "session": "4b1f0c9e6a2d4e7f",
+    "host": "example-host",
+    "pid": 41237,
+    "process_start": "2026-11-27T18:02:11Z"
+  },
+  "scope": { "type": "checkout", "value": "." },
+  "mode": "exclusive",
+  "intent": "Commit the reconciled RFC and push it",
+  "created": "2026-11-27T18:40:00Z",
+  "expires": "2026-11-27T19:40:00Z",
+  "handoff": ".agent-state/handoffs/rfc-agent-operations.md"
+}

@@ -14,7 +14,11 @@ npx skills add shortwavlabs/agent-skills
 python3 scripts/validate_skills.py
 ```
 
-Runs every skill script's `--self-test` (normally and under `python -O`), checks every relative Markdown link and anchor, validates SKILL.md frontmatter (including that each `description` is a one-line YAML scalar that parses as the complete intended string; `python3 scripts/validate_skills.py --self-test` runs the parser's fixtures) and `agents/openai.yaml`, and scans for leaked absolute user paths and embedded vendor model text. Standard library only; exits non-zero on any problem. The same command runs in GitHub Actions ([`.github/workflows/validate-skills.yml`](.github/workflows/validate-skills.yml)) on every pull request and on pushes to `main`.
+Runs every skill script's `--self-test` (normally and under `python -O`), checks every relative Markdown link and anchor, validates SKILL.md frontmatter (including that each `description` is a one-line YAML scalar that parses as the complete intended string; `python3 scripts/validate_skills.py --self-test` runs the parser's fixtures) and `agents/openai.yaml`, and scans for leaked absolute user paths and embedded vendor model text. It applies the link and leak checks to the design documents in [`rfcs/`](rfcs/) and the shared operational sources in [`operational/`](operational/) too, rejects any new relative link from one skill into another ([`scripts/cross-skill-links.json`](scripts/cross-skill-links.json) lists the existing ones, and that list only shrinks), checks that generated copies of `operational/` sources are in sync (`scripts/operational_sync.py`, read-only by default) and that the example records are valid (`scripts/operational_records.py`). Standard library only; exits non-zero on any problem. The same command runs in GitHub Actions ([`.github/workflows/validate-skills.yml`](.github/workflows/validate-skills.yml)) on every pull request and on pushes to `main`.
+
+## Design proposals
+
+- [RFC 0001: Operational Skills](rfcs/0001-agent-operations/README.md) (revision 3, approved): a family of operational skills (coordination, handoff, instruction governance, research provenance, resource budgeting, release governance and, provisionally, technical debt) alongside `workspace-housekeeping`. Not yet implemented.
 
 ## Design proposals
 

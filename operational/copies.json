@@ -1,0 +1,8 @@
+{
+  "kind": "copies",
+  "version": 1,
+  "about": "Each source in operational/ and the paths of its generated copies. Phase 1a lists no copies: the family skills that will carry them do not exist yet. Phase 1b adds the first.",
+  "sources": [
+    { "source": "operational/core.md", "copies": [] }
+  ]
+}
