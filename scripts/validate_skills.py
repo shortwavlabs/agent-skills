@@ -19,7 +19,8 @@ Checks:
      not listed fails, and a listed link that no longer exists fails too (the list only shrinks);
   9. the generated copies of approved sources are in sync (scripts/operational_sync.py, read-only), and every example
      record in operational/examples/ and every scenario in evals/ is valid (scripts/operational_records.py); both
-     scripts' --self-test runs with the skills' scripts. evals/ Markdown gets checks 2 and 5.
+     scripts' --self-test runs with the skills' scripts. evals/ Markdown gets checks 2 and 5;
+ 10. an Operational Skills family skill (one carrying references/operational-core.md) keeps SKILL.md under 500 lines.
 Standard library only. Exit status 1 on any failure.
 """
 
@@ -362,6 +363,10 @@ def main() -> int:
     for skill in skills:
         check_frontmatter(skill, problems)
         check_agent_yaml(skill, problems)
+        if (skill / "references" / "operational-core.md").exists():      # an Operational Skills family member
+            lines = len((skill / "SKILL.md").read_text(encoding="utf-8").splitlines())
+            if lines > 500:
+                problems.append(f"{skill.name}/SKILL.md: {lines} lines; family skills stay under the specification's 500")
     links = check_links(problems)
     check_leaks(problems)
     cross = check_cross_skill_links(problems)

@@ -47,13 +47,18 @@ C=skills/development-coordination/scripts/coordination.py      # or this skill's
 python3 $C check                                                 # read-only: idle, busy or unknown, with evidence
 python3 $C acquire --scope checkout --intent "Refactor the parser" --ttl 120
 # -> {"status": "granted", "claim": {"id": "20261127T184000Z-7f3a1c2b", ...}, "session": "<token>"}
+python3 $C check --session <token>                               # after acquiring: catches non-participants
 # ... edit, build and test normally: no further checks ...
 python3 $C check --session <token> --disruptive && git switch release/1.4     # before a disruptive step
 python3 $C renew --id <id> --session <token> --ttl 120                         # long task
 python3 $C release --id <id> --session <token>                                 # task ends or is handed over
 ```
 
-Record the claim ID and session token in your handoff record so another session can renew or release it.
+Record the claim ID and session token in your handoff record so another session can renew or release it. The tool
+records the session's long-lived process as holder automatically; use `--holder-pid` only with your own agent process,
+never a shared ancestor such as a terminal multiplexer or IDE, whose other sessions `check` would then treat as yours.
+An interactive shell sitting in the checkout is reported as busy (marked "no child processes"): a person may type a
+command there at any moment, so ask the owner before a disruptive step rather than treating it as idle.
 
 | Command | Purpose | Exit status |
 |---|---|---|

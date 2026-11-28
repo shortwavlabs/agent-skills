@@ -8,6 +8,7 @@ and changes nothing. It answers **idle**, **busy** or **unknown**, with the evid
 - [Verdicts](#verdicts)
 - [This session's own processes](#this-sessions-own-processes)
 - [Interpreting benign system activity](#interpreting-benign-system-activity)
+- [Interactive shells](#interactive-shells)
 - [What it cannot detect](#what-it-cannot-detect)
 
 ## What it inspects
@@ -53,6 +54,15 @@ To judge such a report:
    the owner decides.
 5. Record what you saw and decided in the handoff or report. Do not add the process to any allowlist: there is none.
 
+## Interactive shells
+
+A terminal tab whose shell sits in the checkout (for example the Terminal panel of an agent app, opened at the
+project) is a process with its working directory there, and it is reported as busy. The evidence adds "no child
+processes" when nothing runs under it. That hint is evidence, not a verdict: a person may run `git switch` in that
+shell a second later. Before a disruptive step, tell the owner which shell was found and ask whether it is theirs and
+idle, or whether they can move it out of the checkout. The tool has no switch to ignore it, and the owner's approval of
+the operation does not by itself make the shell idle.
+
 ## What it cannot detect
 
 - Agents or processes on other machines (remote branches and PRs are the only signals there).
@@ -60,3 +70,5 @@ To judge such a report:
 - A process that will write into the checkout but has no working directory or open file there yet.
 - Activity between the check and your operation: chain the check with the command to narrow the window.
 - On Windows, or without `lsof` and `ps`, processes at all: the verdict is unknown.
+- Processes in another PID namespace (a container sharing the checkout through a bind mount): their PIDs mean nothing
+  here, so a live holder inside a container can look dead from the host, and the reverse.

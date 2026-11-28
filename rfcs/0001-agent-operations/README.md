@@ -430,6 +430,11 @@ These are implementation details within the approved design, to be settled in th
   short-lived shell that ran it; otherwise every claim would look dead at once and be taken over. Safe default: if the
   long-lived process cannot be determined, record no PID, and other agents treat the holder as *unknown*, never
   *dead*.
+- **Settled in Phase 1b** (see `skills/development-coordination/references/protocol.md`): process start time comes
+  from `/proc/<pid>/stat` on Linux and `ps -o lstart=` (C locale, UTC) elsewhere; the holder is the nearest
+  non-wrapper ancestor, with an override limited to ancestors and a null (unknown) fallback; Windows and network
+  filesystems report claims as unavailable (unknown) with a manual procedure; across machines, remote branches and PRs
+  are signals only. The original questions follow for the record.
 - **Process start time (1b).** `ps -o lstart=` output is locale-dependent; Linux has `/proc/<pid>/stat`. The portable
   choice, and the behaviour when neither is readable (the holder's status is then unknown).
 - **Windows (1b).** `fcntl` is unavailable; whether `msvcrt.locking` is an adequate substitute, or claims are

@@ -92,3 +92,8 @@ immediately before pushing to a branch you did not create. These are signals, no
 - Cross-machine coordination and network filesystems are out of scope for the lock.
 - Process visibility is limited to what `lsof` can read; other users' processes need root.
 - Tested on macOS and Linux only; the Windows behaviour is a documented fallback (unknown), not a tested feature.
+- Agents in containers sharing the checkout see different PID namespaces: holder liveness is unreliable across that
+  boundary. Coordinate such setups manually.
+- Any stray file in `.agent-state/claims/` (a `.DS_Store` written by Finder, for example) makes the registry
+  uninspectable, so every acquisition reports unknown until it is removed. This is deliberate: an unrecognized entry
+  is never skipped silently.

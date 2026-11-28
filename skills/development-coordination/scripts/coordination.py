@@ -49,6 +49,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import unicodedata
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 
@@ -314,6 +315,14 @@ def scope_paths(scope: dict, root: Path) -> list[Path] | None:
     return out
 
 
+def case_insensitive(root: Path) -> bool:
+    """Whether the checkout's filesystem folds case (macOS and Windows defaults): probed through `.git`."""
+    try:
+        return (root / ".GIT").exists() and os.path.samefile(root / ".GIT", root / ".git")
+    except OSError:
+        return False
+
+
 def overlap(a: dict, b: dict, root: Path) -> bool:
     """Conservative: True when the scopes may touch the same thing, or when that cannot be determined."""
     if "checkout" in (a["type"], b["type"]):
@@ -325,7 +334,13 @@ def overlap(a: dict, b: dict, root: Path) -> bool:
     pa, pb = scope_paths(a, root), scope_paths(b, root)
     if pa is None or pb is None:
         return True
-    return any(x == y or x in y.parents or y in x.parents for x in pa for y in pb)
+    fold = case_insensitive(root)
+
+    def key(path: Path) -> PurePosixPath:                 # aliases by case or Unicode form compare equal
+        text = unicodedata.normalize("NFC", str(path))
+        return PurePosixPath(text.casefold() if fold else text)
+    ka, kb = [key(x) for x in pa], [key(y) for y in pb]
+    return any(x == y or x in y.parents or y in x.parents for x in ka for y in kb)
 
 
 def conflicts_with(mode_a: str, mode_b: str) -> bool:
@@ -391,7 +406,12 @@ class Registry:
         if not d.exists():
             if not create:
                 return False
-            d.mkdir(mode=0o700)
+            try:
+                d.mkdir(mode=0o700)
+            except FileExistsError:                   # another agent created it first: verify what is there now
+                pass
+            if d.is_symlink() or not d.is_dir():
+                raise Unknown(f"{d.relative_to(self.root)} is a symlink or not a directory: unsafe registry location")
         if d.resolve() != self.root / d.relative_to(self.root):
             raise Unknown(f"{d.relative_to(self.root)} resolves outside the checkout: unsafe registry location")
         return True
@@ -654,7 +674,7 @@ def activity_check(repo, scope: dict | None = None, *, session: str | None = Non
                    holder_pid: int | None = None, lsof: str = "lsof") -> dict:
     """Read-only. {"verdict": "idle"|"busy"|"unknown", "visibility": ..., "evidence": [...], "excluded": [...]}"""
     scope = scope or {"type": "checkout", "value": "."}
-    evidence, busy, unknown, visibility, excluded = [], False, False, "not checked", []
+    evidence, busy, unknown, visibility, excluded, holder_info = [], False, False, "not checked", [], None
     try:
         root = checkout_root(repo)
     except Unknown as e:
@@ -710,6 +730,7 @@ def activity_check(repo, scope: dict | None = None, *, session: str | None = Non
         own = set(ancestry(os.getpid(), table))
         if holder is not None:
             own |= {holder} | descendants(holder, table)
+            holder_info = f"pid {holder} ({table[holder][1][:80]})"
         excluded = sorted(own)
         pin = load_path_in_use()
         targets = [root] if scope["type"] in ("checkout", "branch") else (scope_paths(scope, root) or [root])
@@ -719,7 +740,8 @@ def activity_check(repo, scope: dict | None = None, *, session: str | None = Non
             verdict, visibility, matches = pin.classify(str(target), os.stat(root).st_uid, procs, records,
                                                         own | {os.getpid(), lsof_pid})
             for pid, cmd, fd, name in matches[:10]:
-                evidence.append(f"process {pid} ({cmd}) {'works in' if fd == 'cwd' else 'has open'} {name}")
+                idle_hint = "" if any(parent == pid for parent, _ in table.values()) else " (no child processes)"
+                evidence.append(f"process {pid} ({cmd}) {'works in' if fd == 'cwd' else 'has open'} {name}{idle_hint}")
             busy = busy or bool(matches)
             if verdict == pin.UNKNOWN:
                 unknown = True
@@ -729,7 +751,8 @@ def activity_check(repo, scope: dict | None = None, *, session: str | None = Non
         visibility = f"failed ({e})"
         evidence.append(f"process inspection failed: {e}")
     verdict = "busy" if busy else "unknown" if unknown else "idle"
-    return {"verdict": verdict, "visibility": visibility, "evidence": evidence, "excluded": excluded}
+    return {"verdict": verdict, "visibility": visibility, "evidence": evidence, "excluded": excluded,
+            "holder": holder_info}
 
 
 # ---------------------------------------------------------------------------------------------------------- CLI
@@ -788,6 +811,7 @@ def main(argv: list[str]) -> int:
         print(f"visibility: {result['visibility']}")
         for line in result["evidence"]:
             print(f"evidence: {line}")
+        print(f"session holder: {result['holder'] or 'not determined (only this command excluded)'}")
         print(f"excluded as this session's own processes: {len(result['excluded'])}")
         return {"idle": 0, "busy": 1}.get(result["verdict"], 2)
     except Usage as e:
@@ -894,20 +918,24 @@ def self_test() -> list[str]:
     signal.alarm(240)
     try:
         # ---- races between real processes
-        root = repo("race")
+        root = repo("race")                            # no registry yet: the racers also race to create it
         go, stop = base / "go", base / "stop"
 
         def race(scopes: list[tuple[str, str]]) -> list[str]:
             go.unlink(missing_ok=True)
             stop.unlink(missing_ok=True)
             racers = [spawn([sys.executable, "-c", RACER, str(HERE), str(root), s, m, str(go), str(stop)],
-                            stdout=subprocess.PIPE, text=True) for s, m in scopes]
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) for s, m in scopes]
             time.sleep(0.5)
             go.touch()
             results = []
             for r in racers:
                 line = r.stdout.readline()
-                results.append(json.loads(line)["status"] if line else "no-output")
+                if line:
+                    results.append(json.loads(line)["status"])
+                else:
+                    r.wait()
+                    results.append("crashed: " + (r.stderr.read().strip().splitlines() or ["?"])[-1][:120])
             return results
 
         results = race([("checkout", "exclusive")] * 8)
@@ -923,6 +951,20 @@ def self_test() -> list[str]:
         stop.touch()
         time.sleep(0.2)
         clear(root)
+
+        # ---- registry created concurrently: another agent's mkdir wins between our check and our mkdir
+        racing = repo("mkdir-race")
+        original_mkdir = Path.mkdir
+
+        def mkdir_after_another_agent(self, *args, **kwargs):
+            original_mkdir(self, *args, **{**kwargs, "exist_ok": True})     # the other agent creates it first
+            return original_mkdir(self, *args, **kwargs)                     # ours then raises FileExistsError
+        Path.mkdir = mkdir_after_another_agent
+        try:
+            expect("registry created concurrently by another agent",
+                   acquire(racing, checkout, intent="x", holder_pid=os.getpid()), "granted")
+        finally:
+            Path.mkdir = original_mkdir
 
         # ---- shared and exclusive
         holder = sleeper()
@@ -1018,23 +1060,30 @@ def self_test() -> list[str]:
         # ---- concurrent renewal and release
         result = acquire(root, checkout, intent="renew race", holder_pid=os.getpid())
         cid, token = result["claim"]["id"], result["session"]
-        code = ("import json, sys; sys.path.insert(0, sys.argv[1]); import coordination as c\n"
-                "out = [c.renew(sys.argv[2], sys.argv[3], sys.argv[4], 30)['status'] for _ in range(25)]\n"
-                "print(json.dumps(out), flush=True)")
+        code = ("import json, sys, time; sys.path.insert(0, sys.argv[1]); import coordination as c\n"
+                "print('started', flush=True)\nout = []\n"
+                "for _ in range(40):\n    out.append(c.renew(sys.argv[2], sys.argv[3], sys.argv[4], 30)['status'])\n"
+                "    time.sleep(0.01)\nprint(json.dumps(out), flush=True)")
         renewer = spawn([sys.executable, "-c", code, str(HERE), str(root), cid, token], stdout=subprocess.PIPE, text=True)
-        time.sleep(0.05)
+        renewer.stdout.readline()
+        time.sleep(0.3)                                   # some renewals land before the release
         rel = release(root, cid, token)
         renewed = json.loads(renewer.stdout.readline() or "[]")
         renewer.wait()
         if rel["status"] != "released" or (root / STATE / "claims" / f"{cid}.json").exists():
             fail(f"release during renewals: {rel}")
-        if "renewed" in renewed[renewed.index("missing"):] if "missing" in renewed else False:
+        if "renewed" not in renewed or "missing" not in renewed:
+            fail(f"the renew/release race did not interleave: {renewed}")
+        elif "renewed" in renewed[renewed.index("missing"):]:
             fail(f"a claim was renewed after its release: {renewed}")
         if any(p.name.startswith(TMP_PREFIX) and "interrupted" not in p.name for p in (root / STATE / "claims").iterdir()):
             fail("renewal left a temporary file behind")
-        expect("renewal with a wrong token", renew(root, cid, "wrong"), "missing")
+        expect("renewal of a released claim", renew(root, cid, token), "missing")
         result = acquire(root, checkout, intent="x", holder_pid=os.getpid())
-        expect("release with a wrong token", release(root, result["claim"]["id"], "not-the-token"), "refused")
+        expect("renewal of a live claim with a wrong token", renew(root, result["claim"]["id"], "not-the-token"),
+               "refused")
+        expect("release of a live claim with a wrong token", release(root, result["claim"]["id"], "not-the-token"),
+               "refused")
         release(root, result["claim"]["id"], result["session"])
         clear(root)
 
@@ -1077,6 +1126,7 @@ def self_test() -> list[str]:
                  ("resource=build", "resource=dev-server", False), ("paths=out/x/**", "paths=docs/**", True),
                  ("branch=main", "paths=src/**", False), ("branch=main", "branch=main", True),
                  ("branch=a", "branch=b", False), ("checkout", "resource=port:5173", True)]
+        cases.append(("paths=SRC/**", "paths=src/parser/**", case_insensitive(o)))   # same directory only if case folds
         for a, b, want in cases:
             if overlap(parse_scope(a), parse_scope(b), o) != want:
                 fail(f"overlap({a}, {b}) should be {want}")
@@ -1136,6 +1186,12 @@ def self_test() -> list[str]:
             expect("no fcntl", acquire(root, checkout, intent="x", holder_pid=os.getpid()), "unknown", "unavailable")
         finally:
             module.fcntl = saved
+        saved_fs, module.filesystem_type = module.filesystem_type, lambda path: "nfs"
+        try:
+            expect("network filesystem", acquire(root, checkout, intent="x", holder_pid=os.getpid()), "unknown",
+                   "network filesystem")
+        finally:
+            module.filesystem_type = saved_fs
         try:
             acquire(root, checkout, intent="x", holder_pid=holder.pid)
             fail("a holder PID that is not an ancestor was accepted")
