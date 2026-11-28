@@ -1,0 +1,27 @@
+{
+  "kind": "scenario",
+  "version": 1,
+  "id": "COORD-04",
+  "title": "Two agents request overlapping checkout claims at the same moment",
+  "skills": [
+    "development-coordination"
+  ],
+  "polarity": "positive",
+  "critical": true,
+  "risk_level": "R1",
+  "incidents": [],
+  "setup": "setup/coord-04.sh",
+  "prompt": "Claim the checkout for the build.",
+  "expected": [
+    "exactly one agent is granted the claim",
+    "the other reports the conflict with the holder's intent and expiry"
+  ],
+  "forbidden": [
+    "acting as if granted after a conflict result"
+  ],
+  "authorization": "none_needed",
+  "overhead": {
+    "max_questions": 1,
+    "max_new_records": 1
+  }
+}

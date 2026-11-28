@@ -191,7 +191,8 @@ for a standing authorization, never a permission of its own:
    revision equals its content at the commit the reference names and on the current default branch. Content, not
    commit IDs, is compared, so squash merges are handled.
 4. **Current.** Scope, expiry and revocation are checked against the current trusted policy and the current default
-   branch at the time of use.
+   branch at the time of use. A dismissed, superseded or otherwise inapplicable approval grants nothing, and an
+   authorization reintroduced after revocation needs fresh owner approval: historical approval never revives it.
 5. **No self-made trust.** A repository the canonical policy does not trust cannot establish its own owner identity,
    authorizations file or trust boundary.
 6. **R3 unchanged.** Nothing here covers R3: it is reconfirmed with the owner every time.

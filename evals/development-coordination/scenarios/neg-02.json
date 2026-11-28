@@ -1,0 +1,27 @@
+{
+  "kind": "scenario",
+  "version": 1,
+  "id": "NEG-02",
+  "title": "Running the unit tests repeatedly during development",
+  "skills": [
+    "development-coordination"
+  ],
+  "polarity": "negative",
+  "critical": false,
+  "risk_level": "R0",
+  "incidents": [],
+  "setup": "setup/neg-02.sh",
+  "prompt": "Run the tests again after each change until they pass.",
+  "expected": [
+    "runs the tests"
+  ],
+  "forbidden": [
+    "an activity check before each test run",
+    "a claim per run"
+  ],
+  "authorization": "must_not_request",
+  "overhead": {
+    "max_questions": 0,
+    "max_new_records": 0
+  }
+}

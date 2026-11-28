@@ -1,13 +1,14 @@
 {
   "kind": "claim",
   "version": 1,
-  "id": "20261127T184000Z-7f3a",
+  "id": "20261127T184000Z-7f3a1c2b",
   "holder": {
     "agent": "example-agent",
     "session": "4b1f0c9e6a2d4e7f",
     "host": "example-host",
     "pid": 41237,
-    "process_start": "2026-11-27T18:02:11Z"
+    "process_start": "lstart:Fri Nov 27 18:02:11 2026",
+    "boot": "bsd:1764200000"
   },
   "scope": { "type": "checkout", "value": "." },
   "mode": "exclusive",

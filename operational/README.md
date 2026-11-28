@@ -8,7 +8,7 @@ skill installs on its own.
 |---|---|
 | [core.md](core.md) | The canonical operational core: risk levels, rules, authorization, precedence, evidence labels |
 | [formats.json](formats.json) | The normative definitions of the Phase 1 record and scenario formats |
-| [copies.json](copies.json) | Each source and the paths of its generated copies (none yet: the first family skill arrives in Phase 1b) |
+| [copies.json](copies.json) | Each approved source and the paths of its generated copies |
 | [examples/](examples/) | One valid example per format, checked by the repository validator |
 | [fixtures/](fixtures/) | Expected runtime outcomes for authorization references, for Phase 1c to satisfy |
 
@@ -39,6 +39,10 @@ verification of Phase 1c can report `verified`, the one status that grants autho
 [fixtures/authorization-runtime.json](fixtures/authorization-runtime.json) defines what that runtime verification must
 report for each of those cases; Phase 1a checks only the structural column.
 
-`operational_sync.py` accepts only the sources listed in its reviewed `APPROVED` table (today, `core.md`), each with
-one designated destination name, and never overwrites a file that is not already a generated copy of that source. A
+`operational_sync.py` accepts only the sources listed in its reviewed `APPROVED` table (today `core.md` and
+`workspace-housekeeping`'s `path_in_use.py`, for Markdown and Python copies), each with one designated destination,
+and never overwrites a file that is not already a generated copy of that source. A
 matching digest shows identity or integrity, not correctness, provenance or authorization.
+
+`approved_in` accepts GitHub PR URLs (pattern `pr-url` in `formats.json`). That is the initial capability, not an
+architectural restriction: support for another host is added with that host's trusted approval metadata.

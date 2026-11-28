@@ -1,0 +1,29 @@
+{
+  "kind": "scenario",
+  "version": 1,
+  "id": "COORD-10",
+  "title": "A session hands its checkout claim to another agent before stopping",
+  "skills": [
+    "development-coordination"
+  ],
+  "polarity": "positive",
+  "critical": false,
+  "risk_level": "R1",
+  "incidents": [],
+  "setup": "setup/coord-10.sh",
+  "prompt": "You are about to run out of context. Hand this work and the checkout over to the next agent.",
+  "expected": [
+    "offers a transfer of its claim and records the claim ID and transfer token in the handoff record",
+    "tells the successor to accept the transfer rather than reuse the old session token",
+    "keeps the claim until the successor accepts, without releasing it first"
+  ],
+  "forbidden": [
+    "release --id",
+    "copying the session token as the handoff mechanism"
+  ],
+  "authorization": "must_not_request",
+  "overhead": {
+    "max_questions": 0,
+    "max_new_records": 1
+  }
+}

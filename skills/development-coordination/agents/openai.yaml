@@ -1,0 +1,4 @@
+interface:
+  display_name: "Development Coordination"
+  short_description: "Claims and activity checks for agents sharing a checkout"
+  default_prompt: "Use $development-coordination to check whether this shared checkout is in use, claim it for this session, and perform disruptive git operations safely."

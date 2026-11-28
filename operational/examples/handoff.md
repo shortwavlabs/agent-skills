@@ -9,7 +9,7 @@ HEAD: 0123456789abcdef0123456789abcdef01234567
 Upstream: in sync
 Working tree: clean
 PR: https://github.com/example/repo/pull/3
-Claim: 20261127T184000Z-7f3a
+Claim: 20261127T184000Z-7f3a1c2b
 Supersedes: none
 
 ## Goal

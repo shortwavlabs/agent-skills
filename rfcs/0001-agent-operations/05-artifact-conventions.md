@@ -1,6 +1,6 @@
 # 5. Shared artifact conventions and the coordination protocol
 
-Part of [RFC 0001: Operational Skills](README.md). Status: **approved** (owner decisions D8 and D14; revision 3).
+Part of [RFC 0001: Operational Skills](README.md). Status: **approved** (owner decisions D8 and D14; revision 3, amended in revision 5 after the Phase 1b review).
 protocol's details, the reference format and the standing-authorizations format are new in revision 2, for owner
 review.
 
@@ -58,7 +58,7 @@ Every record carries `kind` and `version` (JSON) or a `Version:` header line (Ma
   .gitignore        contains "*": ignores everything here, itself included
   claims.lock       the claim registry lock (an empty file)
   claims/<id>.json  live claims
-  claims/stale/     claims taken over from dead holders, kept until reviewed
+  claims/stale/     claims archived after expiry with a dead holder, kept until reviewed
   handoffs/<branch>.md
 ```
 
@@ -69,7 +69,8 @@ Every record carries `kind` and `version` (JSON) or a `Version:` header line (Ma
 - **Ignored is not disposable.** `git clean -x` (and `-X`) deletes the directory. Handoffs are not caches: no agent
   runs `git clean -x` in a checkout that may hold them, and housekeeping classifies them as evidence until reviewed.
 - **Claims are ephemeral.** A released claim is deleted by its holder. Stale claims are moved to `claims/stale/`, not
-  deleted, until reviewed.
+  deleted, until reviewed. Any other entry in `claims/` makes the registry uninspectable (unknown), except a regular
+  `.DS_Store` file, which is reported, ignored and never deleted.
 - **Handoffs are valuable.** They are never deleted automatically. The preservation path: a public-safe summary in
   the PR description; a copy in the owner's private backup (`workspace-housekeeping`); or, in a **private**
   repository whose owner chooses it, a committed `ops/handoffs/` directory that is not ignored. Never force-add an
@@ -200,7 +201,8 @@ Committed in `ops/authorizations.json` (or the file the canonical policy names),
   only if its content at that revision equals its content at the referenced commit and on the current default branch;
   an entry changed after approval is not covered until approved again.
 - **Revocation** is removal: an entry that no longer appears, unchanged, on the current default branch is revoked, and
-  older commits that still contain it grant nothing.
+  older commits that still contain it grant nothing. Reintroducing it needs fresh owner approval.
+- **Hosts.** `approved_in` accepts GitHub PR URLs: the initial capability, not an architectural restriction.
 
 ## Claims and the coordination protocol
 
@@ -213,13 +215,14 @@ for **cooperating** agents, without a daemon, database or service.
 {
   "kind": "claim",
   "version": 1,
-  "id": "20261127T184000Z-7f3a",
+  "id": "20261127T184000Z-7f3a1c2b",
   "holder": {
     "agent": "<agent product>",
     "session": "<random token generated when the claim is created>",
     "host": "<host name>",
     "pid": 41237,
-    "process_start": "<start time of that process>"
+    "process_start": "<start time of that process>",
+    "boot": "<boot identity of the host>"
   },
   "scope": { "type": "checkout", "value": "." },
   "mode": "exclusive",
@@ -233,10 +236,17 @@ for **cooperating** agents, without a daemon, database or service.
 - `holder.pid` is the agent's long-lived process, not the short-lived shell that ran the tool. `process_start`
   defends against **PID reuse**: a holder is alive only if a process with that PID exists **and** started at that
   time. `session` distinguishes two sessions of the same agent.
-- **Fail closed on identity.** If the tool cannot determine the agent's long-lived process, it records `pid` and
-  `process_start` as `null`. Other agents then treat the holder as *unknown*, never *dead*, so a claim can never be
-  taken over merely because its holder was recorded wrongly. How the long-lived process is found is settled in
-  Phase 1b.
+- **The holder is a session boundary.** The tool takes the nearest ancestor that is not a `sh -c`-style wrapper,
+  and accepts it only if it stands for one session: it hosts no controlling terminal other than its own (terminal
+  multiplexers, IDEs and terminal applications do) and contains no other registered claim holder. An explicit
+  `--holder-pid` must be an ancestor and pass the same test. No process name is consulted.
+- **Fail closed on identity.** If no session boundary can be established, the tool refuses to acquire (unknown): a
+  claim it could not verify, renew or release would only block others. A claim recorded elsewhere with `pid` and
+  `process_start` as `null` is treated as *unknown*, never *dead*, so it can never be taken over merely because its
+  holder was recorded wrongly.
+- **Optional fields** written by the tool: `transfer` (a pending offer: the SHA-256 of a one-time transfer token,
+  when it was offered and when it lapses) and `history` (each change of holder: `transferred` or `recovered`, when,
+  and the public identities of both holders, never their session tokens).
 - `scope.type`: `checkout` (anything that touches the index, HEAD or the whole working tree: commit, switch, reset,
   merge, stash, clean), `branch` (operations on a ref without the working tree: push, PR updates), `paths` (a list of
   path globs being edited), `resource` (a build directory, port or device; may name a `path`).
@@ -258,8 +268,26 @@ for **cooperating** agents, without a daemon, database or service.
 |---|---|---|
 | **live** | Same host; the PID exists with the recorded start time | Conflict while unexpired |
 | **expired-held** | Live, but past `expires` | Still a conflict: the holder is active. Report it; the holder renews or releases, or the owner decides |
-| **dead** | Same host; the recorded PID is gone, or its start time differs (reused) | The claim is stale: move it to `claims/stale/`, record the takeover, continue |
+| **dead** | Same host; the recorded PID is gone, its start time differs (reused), or the host has rebooted since | Stale **only once also expired**: then move it to `claims/stale/`, record it, continue. Until expiry it remains a conflict |
 | **unknown** | Another host, no recorded PID, or the process table cannot be read | Conflict while unexpired; after expiry, **expired-unknown**: still a conflict, and the owner may release it (ask once) |
+| **transfer-pending** | The holder is not live, but its transfer offer has not lapsed | Conflict: the claim waits for its intended successor and is never archived meanwhile |
+
+### Ownership lifecycle
+
+Ownership is the verified holder identity (host, boot, PID, process start time) **and** the session token. A token
+alone is never ownership, and an unverifiable holder never becomes verified through its token.
+
+| Operation | Who may | Effect |
+|---|---|---|
+| **Renew** | The current holder: token and identity both match | New expiry |
+| **Release** | The current holder; or the token's bearer once the holder is provably dead and no transfer is pending | Claim deleted |
+| **Transfer** | Offered by the current holder; accepted by the successor presenting the one-time transfer token before the offer lapses | In one atomic replacement under the registry lock: the successor becomes holder with a **new** session token, the offer is removed, and `history` records the change. No third agent can acquire in between, and the former holder can no longer renew or release |
+| **Recovery** (adopt) | The token's bearer, once the holder is provably dead and no transfer is pending | The bearer becomes holder with a new session token; `history` records `recovered`. A live or unknown holder is never displaced |
+
+Shared claims never authorize writes. Copying a session token into a handoff is not a transfer: the receiving session
+cannot renew with it. When a safe transfer is impossible (the holder is gone and the token was never recorded, or the
+holder is on another host), the claim is released or expires and the successor acquires anew; the gap between the two
+is reported in the handoff.
 
 ### Procedure
 
@@ -269,8 +297,9 @@ for **cooperating** agents, without a daemon, database or service.
    not supported, claims are **unavailable**: report unknown, and do not pretend to hold a claim.
 3. Read every claim and determine each holder's state.
 4. Compare the request with every claim that overlaps in an incompatible mode. Any live, expired-held, unknown or
-   expired-unknown holder is a conflict: release the lock and report holder, intent and state. Dead holders' claims
-   are moved to `claims/stale/`.
+   expired-unknown holder is a conflict, and so is a dead holder's claim that has not expired: release the lock and
+   report holder, intent and state. Claims that are both expired and held by a dead holder are moved to
+   `claims/stale/`.
 5. Write the new claim to a temporary file in `claims/`, flush it, rename it into place, and **leave the critical
    section**. The lock is held for milliseconds, never for the operation.
 6. **Run the activity check after acquiring:** every process's working directory **and** open files under the scoped
@@ -278,12 +307,15 @@ for **cooperating** agents, without a daemon, database or service.
    unknown result means the operation does not start; release or keep the claim and report.
 7. **Revalidate immediately before any destructive step**, chained with it, as `workspace-housekeeping` does for
    worktree removal.
-8. **Renew** and **release** inside the same critical section, after checking that `holder.session` matches.
+8. **Renew**, **release**, **transfer** and **recovery** inside the same critical section, after verifying both the
+   session token and the caller's process identity as the ownership lifecycle requires.
 
 **Failure modes of the lock.** A crashed holder releases the lock automatically (the kernel drops it with the file
 descriptor), so the lock itself never goes stale; only claims can. On network filesystems advisory locks may be
-local-only, so claims there are unreliable and reported as such. On platforms without `fcntl` (Windows), claims are
-unavailable until Phase 1b settles a substitute. None of these failures is ever reported as "no conflict".
+local-only, so claims there are unreliable and reported as such. On platforms without `fcntl` (Windows), in a
+checkout whose filesystem cannot be identified, and in an isolated PID namespace such as most containers (where
+holders and processes outside it cannot be verified), claims are unavailable and the read-only activity check reports coordination as unavailable too. None
+of these failures is ever reported as "no conflict" or "idle".
 
 ### Several machines
 
@@ -451,7 +483,8 @@ Earlier runs keep their original criteria and verdicts; any re-evaluation is lab
 
 Owner: `resource-budgeting` (Phase 2; this format is a proposal until then). Thresholds are configurable and
 owner-approved. **The `per_operation` values below are the owner's initial workspace values, not universal
-defaults.** `material_overrun` (1.25) is a proposed default for owner review, not one of the owner's values.
+defaults.** `material_overrun` (1.25) is approved as a material-deviation threshold that requires reassessment; it
+never permits exceeding an authorized hard limit.
 
 ```json
 {
@@ -486,7 +519,8 @@ Design requirements (D9):
   compare the **high** value, accumulated, with the threshold.
 - **Stop conditions** are declared before launch (maximum wall time, maximum spend, early-termination rule). When
   actuals exceed the high estimate by the material-overrun factor, or would cross a threshold, the job stops or the
-  agent seeks authorization.
+  agent seeks authorization. The factor triggers reassessment; it is never permission to exceed an authorized hard
+  limit on spending, compute, storage or execution time.
 
 ## Artifact provenance manifest (proposal, Phase 3)
 

@@ -18,11 +18,7 @@ Runs every skill script's `--self-test` (normally and under `python -O`), checks
 
 ## Design proposals
 
-- [RFC 0001: Operational Skills](rfcs/0001-agent-operations/README.md) (revision 3, approved): a family of operational skills (coordination, handoff, instruction governance, research provenance, resource budgeting, release governance and, provisionally, technical debt) alongside `workspace-housekeeping`. Not yet implemented.
-
-## Design proposals
-
-- [RFC 0001: Operational Skills](rfcs/0001-agent-operations/README.md) (revision 3, approved): a family of operational skills (coordination, handoff, instruction governance, research provenance, resource budgeting, release governance and, provisionally, technical debt) alongside `workspace-housekeeping`. Not yet implemented.
+- [RFC 0001: Operational Skills](rfcs/0001-agent-operations/README.md) (revision 5, approved): a family of operational skills (coordination, handoff, instruction governance, research provenance, resource budgeting, release governance and, provisionally, technical debt) alongside `workspace-housekeeping`. Implemented so far: the shared foundation in [`operational/`](operational/) (Phase 1a) and `development-coordination` (Phase 1b).
 
 ## Skills
 
@@ -497,6 +493,49 @@ skills/faust-dsp/
 - [Faust GitHub](https://github.com/grame-cncm/faust) — compiler source, examples, architecture files
 - [Faust Examples](https://faustdoc.grame.fr/examples/) — categorized examples (ambisonics, reverb, physical modeling, etc.)
 - [Faust Wiki](https://github.com/grame-cncm/faust/wiki) — tutorials, platform-specific guides, workshops
+
+### development-coordination
+
+Coordinate cooperating coding agents that share one git checkout, without a daemon, database or service. The first
+Operational Skills skill ([RFC 0001](rfcs/0001-agent-operations/README.md), Phase 1b).
+- **Claims:** a session-level checkout claim (or a narrower branch, paths or resource claim), acquired through a
+  serialized advisory registry in `.agent-state/` (`fcntl.flock`, bounded retry, atomic publication); renewal,
+  release, transfer to a successor and recovery after holder death under the same lock, with an audited history.
+- **Ownership and lifetime:** holder identity by session, host, PID and process start time (PID reuse and reboots
+  detected), validated as a session boundary without consulting process names; a token alone is never ownership; an
+  expired claim is stale only when its holder is provably dead; an unverifiable holder is unknown.
+- **Activity check:** working directories and open files of every readable process (a generated copy of
+  `workspace-housekeeping`'s in-use check), other agents' claims, git operations in progress, uncommitted work;
+  idle, busy or unknown, with partial visibility reported as unknown; passive interactive shells reported separately,
+  with owner acceptance pinned to one process identity for reversible operations only.
+- **Safe execution** of disruptive and destructive operations, and documented fallbacks for Windows, network
+  filesystems and containers.
+
+Claims bind cooperating agents only; the skill documents what git, the operating system and branch protection enforce
+independently.
+
+**Triggers on:** switching branches, committing, resetting, rebasing, cleaning or rebuilding in a shared checkout;
+starting or stopping a shared dev server; pushing to someone else's branch; another agent's activity; a harness
+offering an isolated worktree.
+
+#### Structure
+
+```
+skills/development-coordination/
+├── SKILL.md                    Principles, session workflow, scopes, enforcement, platforms, example
+├── agents/openai.yaml
+├── scripts/
+│   ├── coordination.py         acquire, renew, release, transfer, accept, adopt, status, check, archive-stale;
+│   │                           real-process self-test
+│   └── path_in_use.py          Generated copy of workspace-housekeeping's in-use check (do not edit)
+└── references/
+    ├── operational-core.md     Generated copy of operational/core.md (do not edit)
+    ├── protocol.md             Registry, claim record, holder identity, lifetime, ownership lifecycle, overlap rules
+    ├── activity-check.md       What is inspected, verdicts, own-session exclusion, passive processes, blind spots
+    └── procedures.md           Session lifecycle, handing over a claim, safe execution, busy checkouts, fallback
+```
+
+Behavioral scenarios and activation triggers: [`evals/development-coordination/`](evals/development-coordination/).
 
 ### workspace-housekeeping
 
