@@ -16,6 +16,10 @@ python3 scripts/validate_skills.py
 
 Runs every skill script's `--self-test` (normally and under `python -O`), checks every relative Markdown link and anchor, validates SKILL.md frontmatter (including that each `description` is a one-line YAML scalar that parses as the complete intended string; `python3 scripts/validate_skills.py --self-test` runs the parser's fixtures) and `agents/openai.yaml`, and scans for leaked absolute user paths and embedded vendor model text. Standard library only; exits non-zero on any problem. The same command runs in GitHub Actions ([`.github/workflows/validate-skills.yml`](.github/workflows/validate-skills.yml)) on every pull request and on pushes to `main`.
 
+## Design proposals
+
+- [RFC 0001: Agent Operations](rfcs/0001-agent-operations/README.md) (draft): a proposed family of operational skills (coordination, handoff, instruction governance, research provenance, resource budgeting, release governance, technical debt) alongside `workspace-housekeeping`. Not yet approved or implemented.
+
 ## Skills
 
 ### plugdata-patch
