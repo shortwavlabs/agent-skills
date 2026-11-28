@@ -1,6 +1,7 @@
 # 3. Skill responsibility matrix
 
-Part of [RFC 0001: Operational Skills](README.md). Status: **approved** (owner decision D3, revision 2).
+Part of [RFC 0001: Operational Skills](README.md). Status: **boundaries approved** (owner decision D3); the
+coordination and audit-tool details are new in revision 2, for owner review.
 
 ## Contents
 - [The family](#the-family)
@@ -58,7 +59,7 @@ Each skill names its siblings by name and states a minimum fallback for when a s
 
 | | |
 |---|---|
-| **Owns** | The canonical operational policy, its revision and digest; the [trust boundary](04-risk-and-authorization.md#trust-boundary-for-standing-authorizations) for the canonical policy and for standing authorizations; the [precedence rule](04-risk-and-authorization.md#instruction-precedence); adapters (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, rule files) and how they import or carry the policy; the consultation-trigger table; documentation of opt-in enforcement adapters |
+| **Owns** | The canonical operational policy, its revision and digest; the trust boundaries for the [canonical policy](04-risk-and-authorization.md#trust-boundary-for-the-canonical-policy) and for [standing authorizations](04-risk-and-authorization.md#trust-boundary-for-standing-authorizations); the [precedence rule](04-risk-and-authorization.md#instruction-precedence); adapters (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, rule files) and how they import or carry the policy; the consultation-trigger table; documentation of opt-in enforcement adapters |
 | **Does not own** | The content of domain policies (`workspace-housekeeping` owns its policy text); runtime coordination |
 | **Triggers** | Creating or editing an agent instruction file; installing, renaming or removing a skill; finding conflicting rules; setting up a new agent, machine or repository; an agent behaving as if it had not seen a rule |
 | **Inputs** | The canonical policy; the adapter files the owner names; the installed skills list |

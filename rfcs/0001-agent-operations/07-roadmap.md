@@ -1,6 +1,6 @@
 # 7. Implementation roadmap
 
-Part of [RFC 0001: Operational Skills](README.md). Status: **approved** (owner decision D13, revision 2).
+Part of [RFC 0001: Operational Skills](README.md). Status: **structure approved** (owner decision D13, revision 2).
 
 Phase 1 is four reviewable PRs on stacked branches, each based on its predecessor. Implementation PRs stay in draft
 until the owner reviews them, and a phase starts only after the previous one has been reviewed. Small, coherent and

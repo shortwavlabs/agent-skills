@@ -1,7 +1,8 @@
 # 5. Shared artifact conventions and the coordination protocol
 
-Part of [RFC 0001: Operational Skills](README.md). Status: **approved with requirements** (owner decision D8, revision
-2).
+Part of [RFC 0001: Operational Skills](README.md). Status: **decision D8 approved with requirements**; the coordination
+protocol's details, the reference format and the standing-authorizations format are new in revision 2, for owner
+review.
 
 **Which formats are normative when.** Phase 1a defines the formats the Phase 1 skills need, in machine-readable form,
 in the top-level `operational/` directory: verification records, authorization references, standing authorizations,
@@ -63,8 +64,8 @@ Every record carries `kind` and `version` (JSON) or a `Version:` header line (Ma
 
 - **Sandbox-compatible exclusion.** The agent creates `.agent-state/.gitignore` containing `*` before writing anything
   else there. This needs no write to `.git/` (read-only in Codex's default sandbox) and no change to any tracked file.
-  It was tested with a read-only `.git`: `git status` and `git add -A` ignore the directory, and
-  `git check-ignore -v` attributes every path to `.agent-state/.gitignore`.
+  Tested: with a read-only `.git`, `git status` shows nothing and `git check-ignore -v` attributes every path to
+  `.agent-state/.gitignore`; with a writable `.git` (staging needs one), `git add -A` stages nothing.
 - **Ignored is not disposable.** `git clean -x` (and `-X`) deletes the directory. Handoffs are not caches: no agent
   runs `git clean -x` in a checkout that may hold them, and housekeeping classifies them as evidence until reviewed.
 - **Claims are ephemeral.** A released claim is deleted by its holder. Stale claims are moved to `claims/stale/`, not
@@ -120,30 +121,34 @@ An authorization reference lets another agent check where an authorization came 
 ```json
 {
   "level": "R2",
-  "scope": "Push the feature branch to origin and update its draft PR",
-  "source": "owner-comment",
+  "scope": "Push feature branches of this repository to origin and open draft PRs",
+  "source": "standing",
   "by": "github:<owner login>",
-  "ref": "https://github.com/<owner>/<repo>/pull/<n>#issuecomment-<id>",
+  "ref": "ops/authorizations.json@<40-hex commit>#push-feature-branches",
   "granted": "2026-11-27T19:00:00Z",
-  "expires": "task-end"
+  "expires": "2027-06-30T00:00:00Z"
 }
 ```
 
+References point only to the approved sources of authorization
+([04](04-risk-and-authorization.md#sources)):
+
 | `source` | `ref` form | Verifiable by another agent? |
 |---|---|---|
-| `owner-commit` | a full commit ID (optionally `<repo>@<commit>`) | Yes: check the commit's author |
-| `owner-comment` | the URL of a comment or review on a PR or issue | Yes: check the comment's author |
-| `standing` | `<path>@<commit>#<id>` | Yes: within the [trust boundary](04-risk-and-authorization.md#trust-boundary-for-standing-authorizations) |
-| `budget` | `<path>@<commit>#<id>` | Yes; covers cost only |
-| `owner-session` | a session locator; may include a `quote` | **No.** The authorization is *unestablished* for any other agent |
+| `standing` | `<path>@<commit>#<id>`, naming an entry in the designated authorizations file (cost-only entries included) | Yes: within the [trust boundary](04-risk-and-authorization.md#trust-boundary-for-standing-authorizations) |
+| `owner-session` | a locator for the session in which the owner gave the instruction; may carry a `quote` | **No.** For any other agent the authorization is *unestablished* |
+
+A host-attested reference type (a PR approval or merge recorded by the host as performed by an owner identity) is a
+proposal awaiting owner confirmation ([unresolved questions](README.md#unresolved-implementation-questions)). Until it
+is confirmed, any other `source` value is invalid. Comments are not references: collaborators with write access can edit
+other users' comments.
 
 Three outcomes, kept distinct:
-- **Established (form):** a verifiable source with a well-formed reference. The receiving agent still checks
-  authenticity (author, scope, expiry) before relying on it.
-- **Unestablished:** a well-formed `owner-session` entry, or one whose reference cannot be checked now. Not an error;
-  the receiving agent asks the owner once.
-- **Invalid:** an unknown source, a missing or malformed `ref`, `scope`, `level` or `by`, a level other than R1 or R2
-  (R3 never transfers), or a malformed expiry. Validators reject it.
+- **Established (form):** a `standing` reference with a well-formed `ref`. The receiving agent still checks
+  authenticity (entry present at that commit within the trust boundary, scope, expiry) before relying on it.
+- **Unestablished:** a well-formed `owner-session` entry. Not an error: the receiving agent asks the owner once.
+- **Invalid:** an unknown or unapproved source, a missing or malformed `ref`, `scope`, `level` or `by`, a level other
+  than R1 or R2 (R3 never transfers), or a malformed `granted` or `expires`. Validators reject it.
 
 Repository validators check form only. Authenticity is established at run time.
 
@@ -164,14 +169,25 @@ Committed in `ops/authorizations.json` (or the file the canonical policy names),
       "operations": "Push feature branches of this repository to origin and open draft PRs",
       "granted_by": "github:<owner login>",
       "approved_in": "https://github.com/<owner>/<repo>/pull/<n>",
-      "expires": "2027-06-30"
+      "expires": "2027-06-30T00:00:00Z"
+    },
+    {
+      "id": "nightly-benchmarks",
+      "level": "R2",
+      "operations": "The nightly benchmark workflow as committed, up to USD 10 per run",
+      "cost_only": true,
+      "granted_by": "github:<owner login>",
+      "approved_in": "https://github.com/<owner>/<repo>/pull/<n>",
+      "expires": "until revoked"
     }
   ]
 }
 ```
 
-`level` is R1 or R2, never R3. Where owner identities are declared for good (here, or in the canonical policy) is
-settled in Phase 1c or 1d.
+- `level` is R1 or R2, never R3. A `cost_only` entry authorizes spending alone, never publication or deletion.
+- Existing authorized workflows that cost money (D9) are entries here; the budget file only holds thresholds.
+- `owners` is governed by the file it sits in: its trust rests on the host's record of who merged the change. Where
+  owner identities are declared for good is settled in Phase 1c or 1d.
 
 ## Claims and the coordination protocol
 
@@ -204,6 +220,10 @@ for **cooperating** agents, without a daemon, database or service.
 - `holder.pid` is the agent's long-lived process, not the short-lived shell that ran the tool. `process_start`
   defends against **PID reuse**: a holder is alive only if a process with that PID exists **and** started at that
   time. `session` distinguishes two sessions of the same agent.
+- **Fail closed on identity.** If the tool cannot determine the agent's long-lived process, it records `pid` and
+  `process_start` as `null`. Other agents then treat the holder as *unknown*, never *dead*, so a claim can never be
+  taken over merely because its holder was recorded wrongly. How the long-lived process is found is settled in
+  Phase 1b.
 - `scope.type`: `checkout` (anything that touches the index, HEAD or the whole working tree: commit, switch, reset,
   merge, stash, clean), `branch` (operations on a ref without the working tree: push, PR updates), `paths` (a list of
   path globs being edited), `resource` (a build directory, port or device; may name a `path`).
@@ -216,8 +236,8 @@ for **cooperating** agents, without a daemon, database or service.
 |---|---|---|---|---|
 | **`checkout`** | overlap | overlap | overlap | overlap |
 | **`branch` Y** | overlap | if X = Y | no | no |
-| **`paths` Q** | overlap | no | if P and Q may share a file (compared conservatively on their literal prefixes) | if R has a path inside P or Q |
-| **`resource` S** | overlap | no | if S has a path inside P or Q | if R = S |
+| **`paths` Q** | overlap | no | if P and Q may share a file (compared conservatively on their literal prefixes) | if R has a path inside Q |
+| **`resource` S** | overlap | no | if S has a path inside P | if R = S |
 
 ### Holder states
 
@@ -225,8 +245,8 @@ for **cooperating** agents, without a daemon, database or service.
 |---|---|---|
 | **live** | Same host; the PID exists with the recorded start time | Conflict while unexpired |
 | **expired-held** | Live, but past `expires` | Still a conflict: the holder is active. Report it; the holder renews or releases, or the owner decides |
-| **dead** | Same host; the PID is gone, or its start time differs (reused) | The claim is stale: move it to `claims/stale/`, record the takeover, continue |
-| **unknown** | Another host, or the process table cannot be read | Conflict while unexpired; after expiry, **expired-unknown**: still a conflict, and the owner may release it (ask once) |
+| **dead** | Same host; the recorded PID is gone, or its start time differs (reused) | The claim is stale: move it to `claims/stale/`, record the takeover, continue |
+| **unknown** | Another host, no recorded PID, or the process table cannot be read | Conflict while unexpired; after expiry, **expired-unknown**: still a conflict, and the owner may release it (ask once) |
 
 ### Procedure
 
@@ -312,8 +332,8 @@ One line of status, then the dirty files, if any, and why they are uncommitted.
 ## Authorizations in force
 ```json
 [
-  { "level": "R2", "scope": "...", "source": "owner-comment", "by": "github:<owner login>",
-    "ref": "https://github.com/<owner>/<repo>/pull/<n>#issuecomment-<id>", "granted": "...", "expires": "task-end" }
+  { "level": "R2", "scope": "...", "source": "standing", "by": "github:<owner login>",
+    "ref": "ops/authorizations.json@<40-hex commit>#push-feature-branches", "granted": "...", "expires": "..." }
 ]
 ```
 
@@ -417,7 +437,8 @@ Earlier runs keep their original criteria and verdicts; any re-evaluation is lab
 ## Resource budget
 
 Owner: `resource-budgeting` (Phase 2; this format is a proposal until then). Thresholds are configurable and
-owner-approved. **The values below are the owner's initial workspace values, not universal defaults.**
+owner-approved. **The `per_operation` values below are the owner's initial workspace values, not universal
+defaults.** `material_overrun` (1.25) is a proposed default for owner review, not one of the owner's values.
 
 ```json
 {
@@ -434,18 +455,16 @@ owner-approved. **The values below are the owner's initial workspace values, not
     "storage_gib": 20,
     "network_gib": 5
   },
-  "material_overrun": 1.25,
-  "standing": [
-    { "id": "existing-ci", "operations": "The CI workflows as committed on the default branch, unchanged" }
-  ]
+  "material_overrun": 1.25
 }
 ```
 
 Design requirements (D9):
 - **Classification, not permission.** Reaching a threshold makes an operation R2; it then needs an established
   authorization.
-- **Existing authorized workflows** (`standing`) are respected: the committed CI is not re-approved on every push.
-  Changing a workflow's triggers or matrix is estimated as an incremental cost.
+- **Existing authorized workflows** are respected. The committed CI is the project's normal cost and is not
+  re-approved on every push; a workflow that reaches a threshold by itself is covered by a cost-only standing
+  authorization. Changing a workflow's triggers or matrix is estimated as an incremental cost.
 - **Money, not minutes, for CI.** Estimates keep elapsed minutes, billed minutes (per runner type) and USD separate,
   using the provider's current price list with its date.
 - **No implicit paid GPU:** any paid GPU cost is R2.

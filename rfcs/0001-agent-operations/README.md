@@ -92,7 +92,7 @@ every process, then gave a command that listed only processes matching five name
 removal. PR #18 (merged independently of this RFC, before revision 2) replaced the command with a tested in-use check
 (`skills/workspace-housekeeping/scripts/path_in_use.py`) and removed `--force` entirely
 ([findings](02-ecosystem-assessment.md#workspace-housekeeping-findings)). The owner's agent-specific instruction files
-are still maintained by hand and still differ (I8).
+are maintained by hand and still differed when re-checked on 2026-11-27 (I8).
 
 ## Scope and non-goals
 
@@ -126,7 +126,7 @@ preservation and storage. Applicable to any software domain, any agent, any oper
 | **Risk level** | R0 routine, R1 shared state, R2 consequential, R3 irreversible or evidence-sensitive ([model](04-risk-and-authorization.md)). A property of the operation's consequences, never of who authorized it |
 | **Authorization** | Permission for an operation, from an established source. It permits an operation; it does not lower its risk level |
 | **Standing authorization** | An owner-approved entry in a designated, committed file that pre-authorizes a scoped class of R1 or R2 operations ([trust boundary](04-risk-and-authorization.md#trust-boundary-for-standing-authorizations)) |
-| **Authorization reference** | A verifiable pointer to the original owner authorization (a commit, a merged standing authorization, an owner-authored comment) |
+| **Authorization reference** | A pointer to the original authorization: a standing authorization at a commit (verifiable by another agent), or the owner session that granted it (not verifiable by another agent) |
 | **Refusal** | A safety mechanism declining an operation (git, a preflight, a permission check, a hook). A finding to investigate, never a reason to escalate |
 | **Run manifest** | The provenance record of one experiment, benchmark or simulation run |
 | **Frozen evidence** | Criteria, held-out data, golden references or results protected from change except by amendment |
@@ -212,6 +212,23 @@ and where it is specified.
 | D11 | Workspace housekeeping | Manifest scope clarified; PR #18 separate; integration in Phase 4 | [03](03-responsibility-matrix.md#overlaps-with-workspace-housekeeping), [07](07-roadmap.md#phase-4-integration) |
 | D12 | Fresh clones | No blanket authorization; investigate alternatives | [03](03-responsibility-matrix.md#overlaps-with-domain-skills), [07](07-roadmap.md#outside-this-roadmap) |
 | D13 | Roadmap | Approved: Phase 1 as four stacked PRs | [07](07-roadmap.md) |
+
+### New in revision 2, for owner review
+
+The decisions above are approved. The following design is new in revision 2, written to carry out those decisions and
+the architectural corrections. It has not been reviewed by the owner yet:
+- the coordination protocol's overlap rules, holder states and lock failure modes
+  ([05](05-artifact-conventions.md#claims-and-the-coordination-protocol));
+- the authorization-reference format, limited to the approved sources, and the standing-authorizations file format
+  ([05](05-artifact-conventions.md#authorization-references));
+- the trust-boundary conditions for the canonical policy and for standing authorizations, anchored in host-attested
+  records rather than self-asserted git authors ([04](04-risk-and-authorization.md#trust-boundary-for-the-canonical-policy));
+- R3 controls by consequence ([04](04-risk-and-authorization.md#r3-controls-by-consequence));
+- the repository-wide baseline of cross-skill links, which also binds the domain skills
+  ([06](06-validation-strategy.md#tier-0-repository-checks-on-every-ci-run));
+- the generated copy of `path_in_use.py` in `development-coordination` ([D4](#d4-shared-operational-core));
+- the proposed material-overrun factor of 1.25 ([05](05-artifact-conventions.md#resource-budget));
+- the added scenarios and the `critical` flag ([06](06-validation-strategy.md#scenario-catalogue)).
 
 ### D1: Family name
 
@@ -342,13 +359,14 @@ weakened.
 
 ## Architectural corrections
 
-The owner's review identified four areas to correct before implementation. Each is specified where it belongs.
+The owner's review identified four areas to correct before implementation (coordination takes two rows below). Each is
+specified where it belongs.
 
 | Area | Correction | Rationale | Specified in |
 |---|---|---|---|
 | **Coordination protocol** | Claims are acquired, renewed and released inside one serialized critical section (an OS advisory lock on a single registry lock file), with overlap rules per scope type, process identity by PID **and** start time, explicit states for expired and unverifiable holders, and the activity check run after acquisition and again before execution | Atomic creation of individual claim files does not stop two agents acquiring overlapping scopes at the same moment | [05](05-artifact-conventions.md#claims-and-the-coordination-protocol) |
 | **Advisory versus enforced** | Claims bind only cooperating agents; uncooperative agents and external processes are detected by the activity check, not prevented; the enforceable mechanisms are listed separately | Documentation must not pretend to be a lock | [05](05-artifact-conventions.md#advisory-coordination-versus-enforcement) |
-| **Instruction governance** | A trust boundary for the canonical policy and for standing authorizations; a policy audit tool that is read-only by default, proposes a diff, verifies revision and digest, applies only with explicit approval of that exact diff, preserves unrelated instructions, and fails without modifying anything when an adapter cannot be updated safely; never installs hooks or edits harness settings or global files on its own | The tool that keeps instructions consistent must not itself become an unreviewed writer of instructions | [04](04-risk-and-authorization.md#trust-boundary-for-standing-authorizations), [03](03-responsibility-matrix.md#instruction-governance) |
+| **Instruction governance** | A trust boundary for the canonical policy and one for standing authorizations; a policy audit tool that is read-only by default, proposes a diff, verifies revision and digest, applies only with explicit approval of that exact diff, preserves unrelated instructions, and fails without modifying anything when an adapter cannot be updated safely; never installs hooks or edits harness settings or global files on its own | The tool that keeps instructions consistent must not itself become an unreviewed writer of instructions | [04](04-risk-and-authorization.md#trust-boundary-for-the-canonical-policy), [04](04-risk-and-authorization.md#trust-boundary-for-standing-authorizations), [03](03-responsibility-matrix.md#instruction-governance) |
 | **Evidence and authorization** | Precise labels; verification records with claim, method, artifact identity and time; a digest verifies identity or integrity only; authorization references verifiable, and a quotation alone is unestablished | Labels used loosely spread unverified claims with the authority of verified ones | [05](05-artifact-conventions.md#evidence-labels-and-verification-records) |
 | **Shared-state and cleanup safety** | The lessons of PR #18 apply family-wide: no forced worktree removal, no process-name filters, no truncated inventories, unknown is not idle, working directories and open files, revalidation immediately before destructive operations. The family references the corrected housekeeping procedure and its `path_in_use.py`; it never re-implements them | One corrected implementation, not two contradictory ones | [04](04-risk-and-authorization.md#refusals-and-missing-evidence), [03](03-responsibility-matrix.md#development-coordination) |
 
@@ -356,9 +374,17 @@ The owner's review identified four areas to correct before implementation. Each 
 
 These are implementation details within the approved design, to be settled in the phase named.
 
-- **Owner identities (1c, 1d).** Where owner identities are declared (canonical policy or a project file), and how a
-  receiving agent checks an owner-authored comment or commit when it has no network access (the answer may be "ask
-  once").
+- **Owner identities (1c, 1d).** Where owner identities are declared for good. A list inside the authorizations file
+  is governed by that same file, so its trust rests on the host's record of who merged the change, not on the list
+  itself.
+- **Host-attested owner references (needs owner confirmation).** Whether to accept, as an additional authorization
+  reference, a PR approval or merge that the host records as performed by a declared owner identity, or a commit whose
+  signature the host verifies as an owner's. Git author fields are self-asserted and never count. Comments are
+  excluded: collaborators with write access can edit other users' comments.
+- **Identifying the claim holder's process (1b).** The tool must record the agent's long-lived process, not the
+  short-lived shell that ran it; otherwise every claim would look dead at once and be taken over. Safe default: if the
+  long-lived process cannot be determined, record no PID, and other agents treat the holder as *unknown*, never
+  *dead*.
 - **Process start time (1b).** `ps -o lstart=` output is locale-dependent; Linux has `/proc/<pid>/stat`. The portable
   choice, and the behaviour when neither is readable (the holder's status is then unknown).
 - **Windows (1b).** `fcntl` is unavailable; whether `msvcrt.locking` is an adequate substitute, or claims are
