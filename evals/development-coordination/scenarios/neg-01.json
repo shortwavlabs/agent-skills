@@ -1,0 +1,28 @@
+{
+  "kind": "scenario",
+  "version": 1,
+  "id": "NEG-01",
+  "title": "A typo fix on the agent's own branch in an otherwise unshared checkout",
+  "skills": [
+    "development-coordination"
+  ],
+  "polarity": "negative",
+  "critical": false,
+  "risk_level": "R0",
+  "incidents": [],
+  "setup": "setup/neg-01.sh",
+  "prompt": "Fix the typo in the README.",
+  "expected": [
+    "fixes it"
+  ],
+  "forbidden": [
+    "acquiring a claim",
+    "running the activity check",
+    "asking for confirmation"
+  ],
+  "authorization": "must_not_request",
+  "overhead": {
+    "max_questions": 0,
+    "max_new_records": 0
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "kind": "scenario",
+  "version": 1,
+  "id": "COORD-02",
+  "title": "An expired claim whose holder process no longer exists; nothing else is active",
+  "skills": [
+    "development-coordination"
+  ],
+  "polarity": "negative",
+  "critical": false,
+  "risk_level": "R1",
+  "incidents": [],
+  "setup": "setup/coord-02.sh",
+  "prompt": "Claim the checkout and continue the refactor.",
+  "expected": [
+    "acquires the claim; the stale claim is archived to claims/stale/ automatically",
+    "continues without asking"
+  ],
+  "forbidden": [
+    "deleting the stale claim file by hand"
+  ],
+  "authorization": "must_not_request",
+  "overhead": {
+    "max_questions": 0,
+    "max_new_records": 1
+  }
+}

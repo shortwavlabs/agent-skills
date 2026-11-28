@@ -17,9 +17,9 @@ Checks:
   7. the design documents in rfcs/ and the shared operational sources in operational/ get checks 2 and 5 too;
   8. no new relative link from one skill into another: scripts/cross-skill-links.json lists the existing ones, a link
      not listed fails, and a listed link that no longer exists fails too (the list only shrinks);
-  9. the generated copies of operational/ sources are in sync (scripts/operational_sync.py, read-only) and every
-     example record in operational/examples/ is valid (scripts/operational_records.py); both scripts' --self-test
-     runs with the skills' scripts.
+  9. the generated copies of approved sources are in sync (scripts/operational_sync.py, read-only), and every example
+     record in operational/examples/ and every scenario in evals/ is valid (scripts/operational_records.py); both
+     scripts' --self-test runs with the skills' scripts. evals/ Markdown gets checks 2 and 5.
 Standard library only. Exit status 1 on any failure.
 """
 
@@ -36,6 +36,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
 RFCS = ROOT / "rfcs"
 OPERATIONAL = ROOT / "operational"
+EVALS = ROOT / "evals"
 LINK_BASELINE = ROOT / "scripts" / "cross-skill-links.json"
 REPO_SCRIPTS = [ROOT / "scripts" / "operational_sync.py", ROOT / "scripts" / "operational_records.py"]
 PATH_LEAK = re.compile(r"/Users/[A-Za-z]|[A-Za-z]:\\Users\\|yellow-punch/")   # container paths such as /home/build are fine
@@ -57,7 +58,7 @@ def anchors(path: Path) -> set[str]:
 def documents() -> list[Path]:
     """Markdown covered by the link and anchor check."""
     return [ROOT / "README.md", *sorted(SKILLS.rglob("*.md")), *sorted(RFCS.rglob("*.md")),
-            *sorted(OPERATIONAL.rglob("*.md"))]
+            *sorted(OPERATIONAL.rglob("*.md")), *sorted(EVALS.rglob("*.md"))]
 
 
 def check_links(problems: list[str]) -> int:
@@ -243,7 +244,7 @@ def code_regions(path: Path) -> list[str]:
 
 
 def check_leaks(problems: list[str]) -> None:
-    for path in [ROOT / "README.md", *sorted(p for d in (SKILLS, RFCS, OPERATIONAL) for p in d.rglob("*") if p.is_file())]:
+    for path in [ROOT / "README.md", *sorted(p for d in (SKILLS, RFCS, OPERATIONAL, EVALS) for p in d.rglob("*") if p.is_file())]:
         if path.suffix in {".png", ".jpg", ".jpeg", ".glb", ".blend", ".ico"}:
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
@@ -323,7 +324,7 @@ def check_operational(problems: list[str], skills: list[Path]) -> int:
         problems.append(f"operational formats: {e}")
         return 0
     checker = records.Checker(formats, known_skills={s.name for s in skills})
-    examples = sorted(p for p in (OPERATIONAL / "examples").glob("*") if p.is_file())
+    examples = sorted(p for p in (OPERATIONAL / "examples").glob("*") if p.is_file()) + sorted(EVALS.rglob("*.json"))
     for path in examples:
         problems.extend(checker.check_text(path.read_text(encoding="utf-8"), str(path.relative_to(ROOT))))
     return len(examples)

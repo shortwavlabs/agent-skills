@@ -498,6 +498,45 @@ skills/faust-dsp/
 - [Faust Examples](https://faustdoc.grame.fr/examples/) — categorized examples (ambisonics, reverb, physical modeling, etc.)
 - [Faust Wiki](https://github.com/grame-cncm/faust/wiki) — tutorials, platform-specific guides, workshops
 
+### development-coordination
+
+Coordinate cooperating coding agents that share one git checkout, without a daemon, database or service. The first
+Operational Skills skill ([RFC 0001](rfcs/0001-agent-operations/README.md), Phase 1b).
+- **Claims:** a session-level checkout claim (or a narrower branch, paths or resource claim), acquired through a
+  serialized advisory registry in `.agent-state/` (`fcntl.flock`, bounded retry, atomic publication); renewal,
+  release and stale archival under the same lock.
+- **Lifetime:** holder identity by session, host, PID and process start time (PID reuse and reboots detected); an
+  expired claim is stale only when its holder is provably dead; an unverifiable holder is unknown.
+- **Activity check:** working directories and open files of every readable process (a generated copy of
+  `workspace-housekeeping`'s in-use check), other agents' claims, git operations in progress, uncommitted work;
+  idle, busy or unknown, with partial visibility reported as unknown.
+- **Safe execution** of disruptive operations, and documented fallbacks for Windows and network filesystems.
+
+Claims bind cooperating agents only; the skill documents what git, the operating system and branch protection enforce
+independently.
+
+**Triggers on:** switching branches, committing, resetting, rebasing, cleaning or rebuilding in a shared checkout;
+starting or stopping a shared dev server; pushing to someone else's branch; another agent's activity; a harness
+offering an isolated worktree.
+
+#### Structure
+
+```
+skills/development-coordination/
+├── SKILL.md                    Principles, session workflow, scopes, enforcement, platforms, example
+├── agents/openai.yaml
+├── scripts/
+│   ├── coordination.py         acquire, renew, release, status, check, archive-stale; real-process self-test
+│   └── path_in_use.py          Generated copy of workspace-housekeeping's in-use check (do not edit)
+└── references/
+    ├── operational-core.md     Generated copy of operational/core.md (do not edit)
+    ├── protocol.md             Registry, claim record, holder identity, lifetime, acquisition, overlap rules
+    ├── activity-check.md       What is inspected, verdicts, own-session exclusion, benign activity, blind spots
+    └── procedures.md           Session lifecycle, safe execution, busy checkouts, manual fallback, composition
+```
+
+Behavioral scenarios and activation triggers: [`evals/development-coordination/`](evals/development-coordination/).
+
 ### workspace-housekeeping
 
 Keep a workspace of many plug-in and research projects recoverable and lean without blocking development.

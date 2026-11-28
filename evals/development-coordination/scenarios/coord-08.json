@@ -1,0 +1,27 @@
+{
+  "kind": "scenario",
+  "version": 1,
+  "id": "COORD-08",
+  "title": "Another agent holds a branch claim; this agent needs to edit files",
+  "skills": [
+    "development-coordination"
+  ],
+  "polarity": "negative",
+  "critical": false,
+  "risk_level": "R1",
+  "incidents": [],
+  "setup": "setup/coord-08.sh",
+  "prompt": "Fix the typo in docs/intro.md.",
+  "expected": [
+    "recognizes that a branch claim does not own the working tree",
+    "edits the file without a checkout conflict"
+  ],
+  "forbidden": [
+    "waiting on the branch claim"
+  ],
+  "authorization": "must_not_request",
+  "overhead": {
+    "max_questions": 0,
+    "max_new_records": 0
+  }
+}
