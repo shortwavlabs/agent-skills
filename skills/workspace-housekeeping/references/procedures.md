@@ -133,20 +133,42 @@ symlink targets**. An archive checksum proves only that the archive file is inta
    (`git rev-list --count <branch> --not --remotes` is 0), or backed up under `refs/backup/*` in a private store.
 2. **Ignored evidence is moved:** test outputs, logs and renders go into an ignored folder of the primary checkout
    (`mv` on the same volume costs nothing). Record a README of the origins.
-3. **No process uses it.** Check every process, without truncating the list:
+3. **No process uses it.** Run [`path_in_use.py`](../scripts/path_in_use.py) from this skill's `scripts/` folder:
    ```bash
-   for p in $(pgrep -f 'node|vite|cargo|python|cmake'); do lsof -p $p -a -d cwd -Fn 2>/dev/null | sed -n "s|^n||p"; done | grep -F "$WORKTREE"
+   python3 scripts/path_in_use.py "$WORKTREE"     # exit 0 CLEAR, 1 IN USE, 2 UNKNOWN
    ```
-   Stop leftover dev servers only with the owner's agreement.
-4. `git worktree remove [--force] <path>` (force only for ignored files you have just checked), then
-   `git worktree prune`. Confirm the path is gone and stays gone: a still-running watcher can recreate it.
+   It checks the working directory **and** the open files (including executables and mapped libraries) of every
+   process in one `lsof` pass. It never filters by process name, because a name filter misses `make`, `ninja`, `bun`,
+   `java`, agents and anything else not on the list. It resolves the path first, because `lsof` reports resolved
+   paths (on macOS, `/tmp` is `/private/tmp`). It matches by path prefix, so a sibling `<path>-old` is not matched.
+   - **CLEAR:** the path resolved, no process uses it, and visibility was *complete* (every process inspected) or
+     *owner-complete* (every process of the path's owner inspected; other users' processes not). Run it as root when
+     another user's processes could use the path.
+   - **IN USE:** each process and the entry that matched are listed. Stop leftover dev servers only with the owner's
+     agreement.
+   - **UNKNOWN:** the path did not resolve, or visibility was *partial* (a live process of the owner could not be
+     inspected) or *failed* (no `lsof` or `ps`). Unknown is not idle: do not proceed.
+4. **Revalidate and remove in one step**, so that nothing can change between the checks and the removal. Repeat the
+   checks of steps 1 and 3, and remove only if every one passes:
+   ```bash
+   test -z "$(git -C "$WORKTREE" status --porcelain)" \
+     && [ "$(git -C "$WORKTREE" rev-list --count HEAD --not --remotes --glob='refs/backup/*')" = 0 ] \
+     && python3 scripts/path_in_use.py "$WORKTREE" \
+     && git worktree remove "$WORKTREE"
+   ```
+   **Never use `--force`.** Plain `git worktree remove` already removes a worktree that holds only ignored files. It
+   refuses one with modified or untracked files, or a lock, and those refusals protect work. If git refuses, stop and
+   find out why; never escalate to a forced removal. `path_in_use.py --self-test` checks these git behaviours.
+
+   Then run `git worktree prune`. Confirm the path is gone and stays gone: a still-running watcher can recreate it.
 
 ## Pre-deletion revalidation
 
 Run immediately before deleting:
 1. The current set of directories equals the manifest's set.
 2. No file is newer than the manifest's preparation time.
-3. No open files (`lsof -Fn | grep <root>`), and no process whose working directory is inside a target (see above).
+3. `python3 scripts/path_in_use.py <target>` reports CLEAR for every target: no process has its working directory or
+   an open file inside it ([above](#removing-a-worktree-or-checkout)). UNKNOWN drops the entry, exactly like IN USE.
 4. Every bundle with a binary has a whole-bundle twin in the preserved set. If one has none, copy it and verify it
    first, or drop the entry.
 5. Logs, test reports and captures inside the directories are preserved.
