@@ -1,4 +1,4 @@
-{"$generated": "Generated from operational/formats.json (sha256 620971ae4a546e77f12e07374f71ffa101bb4c228d2583859cfedc6b7bf8a6a4). Do not edit this copy: change the source and regenerate.",
+{"$generated": "Generated from operational/formats.json (sha256 9fe85b02ed863733e77508efbfd72fa7cf92c529d7c5691b777caf0b4db37c6f). Do not edit this copy: change the source and regenerate.",
 "content":
 {
   "kind": "formats",
@@ -45,7 +45,8 @@
         "id": "str"
       },
       "optional": {
-        "sha256": "sha256"
+        "sha256": "sha256",
+        "supports": "str"
       },
       "cases": {
         "type": {
@@ -93,7 +94,8 @@
         "expires": "expiry"
       },
       "optional": {
-        "quote": "str"
+        "quote": "str",
+        "limits": "obj:grant-scope"
       },
       "cases": {
         "source": {
@@ -127,7 +129,8 @@
       },
       "optional": {
         "cost_only": "bool",
-        "actions": "list+:slug"
+        "actions": "list+:slug",
+        "scope": "obj:grant-scope"
       }
     },
     "holder": {
@@ -242,7 +245,8 @@
         "inputs_sha256": "sha256",
         "expected_end": "timestamp",
         "stop": "str",
-        "cost": "str"
+        "cost": "str",
+        "boot": "str"
       },
       "null_together": [
         [
@@ -250,6 +254,17 @@
           "process_start"
         ]
       ]
+    },
+    "grant-scope": {
+      "optional": {
+        "repositories": "list+:str",
+        "branches": "list+:str",
+        "paths": "list+:str",
+        "destinations": "list+:str",
+        "targets": "list+:str",
+        "purposes": "list+:str",
+        "max_usd": "usd"
+      }
     }
   },
   "json": {
@@ -375,7 +390,8 @@
         "Authorizations in force": "list:obj:authorization-reference"
       },
       "optional_headers": {
-        "Transfer": "str"
+        "Transfer": "str",
+        "Checkout": "str"
       },
       "optional_headings": [
         "Artifacts",

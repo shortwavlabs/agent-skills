@@ -215,45 +215,21 @@ def resolve_holder(explicit: int | None, table: dict, claims=(), start: int | No
     return None
 
 
-def process_start(pid: int) -> str | None:
-    proc = Path(f"/proc/{pid}/stat")
-    if proc.exists():
-        try:
-            data = proc.read_text()
-            return "proc:" + data[data.rindex(")") + 2:].split()[19]
-        except (OSError, ValueError, IndexError):
-            return None
-    try:
-        r = subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True, timeout=10,
-                           env={**os.environ, "LC_ALL": "C", "TZ": "UTC"})
-    except (OSError, subprocess.SubprocessError):
-        return None
-    out = " ".join(r.stdout.split())
-    return f"lstart:{out}" if r.returncode == 0 and out else None
+def _sibling(name: str):
+    """A generated copy installed next to this script, loaded by path (no bytecode is written)."""
+    spec = importlib.util.spec_from_file_location(f"{name}_copy", HERE / f"{name}.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_identity = _sibling("process_identity")              # shared with agent-handoff: one implementation
+process_start, boot_id, here = _identity.process_start, _identity.boot_id, _identity.here
 
 
 def identity_token(pid: int, start: str) -> str:
     """A short, revalidatable name for one process: its PID and a digest of its start time."""
     return f"{pid}:{hashlib.sha256(start.encode()).hexdigest()[:16]}"
-
-
-def boot_id() -> str | None:
-    proc = Path("/proc/sys/kernel/random/boot_id")
-    if proc.exists():
-        try:
-            return "linux:" + proc.read_text().strip()
-        except OSError:
-            return None
-    try:
-        r = subprocess.run(["sysctl", "-n", "kern.boottime"], capture_output=True, text=True, timeout=10)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    m = re.search(r"sec = (\d+)", r.stdout)
-    return f"bsd:{m.group(1)}" if m else None
-
-
-def here() -> dict:
-    return {"host": socket.gethostname(), "boot": boot_id()}
 
 
 def caller_identity(holder_pid: int | None, claims=(), table: dict | None = None) -> dict:
@@ -273,26 +249,7 @@ def same_holder(holder: dict, who: dict) -> bool:
 
 
 def holder_state(holder: dict, local: dict) -> tuple[str, str]:
-    if holder["host"] != local["host"]:
-        return "unknown", "held on another host"
-    if holder.get("boot") and local["boot"] and holder["boot"] != local["boot"]:
-        return "dead", "the host has rebooted since the claim was made"
-    if holder["pid"] is None or holder["process_start"] is None:
-        return "unknown", "the holder's process identity was not recorded"
-    try:
-        os.kill(holder["pid"], 0)
-    except ProcessLookupError:
-        return "dead", f"process {holder['pid']} no longer exists"
-    except PermissionError:
-        pass
-    except OSError as e:
-        return "unknown", f"process {holder['pid']} cannot be inspected: {e}"
-    start = process_start(holder["pid"])
-    if start is None:
-        return "unknown", f"the start time of process {holder['pid']} cannot be read"
-    if start != holder["process_start"]:
-        return "dead", f"PID {holder['pid']} now belongs to another process (reused)"
-    return "live", f"process {holder['pid']} is running"
+    return _identity.liveness(holder["pid"], holder["process_start"], holder["host"], holder.get("boot"), local)
 
 
 def filesystem_type(path: Path) -> str | None:

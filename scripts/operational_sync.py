@@ -44,6 +44,7 @@ APPROVED = {                                                   # source -> its d
     "scripts/operational_records.py": "scripts/operational_records.py",
     "operational/formats.json": "references/formats.json",
     "operational/fixtures/authorization-runtime.json": "references/authorization-runtime.json",
+    "operational/process_identity.py": "scripts/process_identity.py",
 }
 HEADER = ("<!-- Generated from {source} (revision {revision}, sha256 {digest}). Do not edit this copy: change the source "
           "and regenerate. -->")

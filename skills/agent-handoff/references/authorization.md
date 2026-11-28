@@ -1,13 +1,14 @@
 # Runtime authorization verification
 
-`handoff.py verify-auth --action <action>` evaluates each authorization reference in a record for one operation, at
-the moment of use. A record never grants authority; a reference that verifies is evidence that a standing
-authorization covers this operation now.
+`handoff.py verify-auth` evaluates each authorization reference in a record for one structured operation, at the
+moment of use. A record never grants authority; a reference that verifies is evidence that a standing authorization
+covers this exact operation now.
 
 ## Contents
 - [The model](#the-model)
+- [Describing the operation](#describing-the-operation)
+- [Structured scope](#structured-scope)
 - [Conditions, in order](#conditions-in-order)
-- [Actions](#actions)
 - [The GitHub integration](#the-github-integration)
 - [The trusted policy](#the-trusted-policy)
 - [Limitations](#limitations)
@@ -21,87 +22,128 @@ fixtures); `scripts/github_facts.py` gathers them from GitHub. Another host need
 
 | Status | Grants authority |
 |---|---|
-| verified | Yes, for the evaluated action only |
+| verified | Yes, for the evaluated operation only |
 | inapplicable | No |
 | invalid | No |
 | unknown | No: ask the owner once |
 
-## Conditions, in order
+## Describing the operation
 
-The first condition that fails decides.
+The operation is structured data, never prose: free-text descriptions are not consulted, so an agent's wording cannot
+widen a grant.
 
-1. The reference is well formed (shared `authorization-reference` format; R3 is never valid). Otherwise **invalid**.
-2. An `owner-session` reference (a quotation) cannot be verified by another agent: **unknown**.
-3. The operation names an action, and is not R3. Otherwise unknown, or inapplicable for R3.
-4. A trusted policy exists. Otherwise **unknown** (see [the trusted policy](#the-trusted-policy)).
-5. The reference names the designated authorizations file (`ops/authorizations.json`, or the file the canonical
-   policy names). An authorizations-shaped file elsewhere (an example, a fixture) is not one: **invalid**.
-6. The host was reached. Otherwise **unknown**.
-7. The repository is trusted by the policy. Otherwise **inapplicable**: a repository cannot establish its own trust.
-8. The referenced commit exists, and holds the referenced entry. Otherwise **invalid** (fabricated or missing).
-9. The entry is well formed, matches the reference (who granted it, its level), was granted by an owner identity, and
-   names an `approved_in` PR in the same repository.
-10. The host records an approval or merge of that PR by an owner identity, still active (not dismissed, not superseded
-    by a later change request). **That PR introduced or changed the entry**: its content just before the PR's own
-    changes (the merge commit's first parent, or the reviewed commit's merge base with the base branch) is absent or
-    different. Merging an unrelated PR approves nothing already on the branch, even an entry pushed after the PR was
-    opened. The entry's content at the approved
-    revision equals the referenced content. Git author fields never count.
-11. The entry is unchanged on the current default branch (absent: revoked; changed: not covered), and was not removed
-    and reintroduced after the approval (a reinstatement needs fresh approval).
-12. Neither the entry nor the reference has expired.
-13. The entry lists the operation's action, and the operation's level does not exceed the entry's.
+| Field | Meaning | Required |
+|---|---|---|
+| `action` | A lowercase slug (`push-branch`, `run-ci`, `delete-files`) | Always |
+| `level` | R0, R1 or R2. A missing level is never permission; R3 is never covered | Always |
+| `repository` | `host/owner/name` the operation acts on (`verify-auth` defaults it to this checkout's identity) | Always |
+| `branch`, `destination`, `target`, `purpose` | Strings | When stated, or when the grant limits them |
+| `paths` | Canonical relative paths (no `..`, no absolute paths) | Likewise |
+| `cost_usd` | The operation's spending, a number | Likewise |
+| `aspect` | `execute` (the default) or `spend` | For cost-only grants |
 
-Only then: **verified**. Content is compared, not commit IDs, so squash merges are handled.
+```bash
+python3 $H verify-auth --action run-ci --level R2 --purpose qualification --cost-usd 1.50
+python3 $H verify-auth --action push-branch --level R2 --branch feature/parser --destination origin --pin <sha>
+```
 
-## Actions
+## Structured scope
 
-Whether a sentence such as "push feature branches and open draft PRs" covers an operation is a judgment no script
-should make. Entries therefore list the actions they cover, and the operation names one:
+A standing entry lists the `actions` it covers and a `scope` saying where and how much:
 
 ```json
 {
-  "id": "push-feature-branches",
+  "id": "ci-qualification",
   "level": "R2",
-  "operations": "Push feature branches of this repository to origin and open draft PRs",
-  "actions": ["push-branch", "open-draft-pr"],
+  "operations": "Qualification runs of the app's CI, up to USD 2 each",
+  "actions": ["run-ci"],
+  "scope": { "purposes": ["qualification"], "max_usd": 2 },
   "granted_by": "github:<owner login>",
   "approved_in": "https://github.com/<owner>/<repo>/pull/<n>",
   "expires": "2027-06-30T00:00:00Z"
 }
 ```
 
-Actions are lowercase slugs compared exactly; there is no global vocabulary, and a near-miss (`push-branches`)
-simply does not match. An entry without `actions` evaluates to unknown. Approving a tool is never the action of using
-it: an entry for `merge-pr` does not cover `delete-files`.
+| Scope key | Limits | Matching |
+|---|---|---|
+| `repositories` | `repository` | Exact, case-insensitive; no wildcard. Absent: the repository that holds the entry |
+| `branches`, `paths` | `branch`, `paths` | Glob patterns (`*` crosses `/`); `"*"` alone allows any |
+| `destinations`, `targets`, `purposes` | `destination`, `target`, `purpose` | Exact; `"*"` allows any |
+| `max_usd` | `cost_usd` | The operation's cost must not exceed it |
+
+- **Both directions.** Every dimension the operation states must be limited by the entry (an unlimited dimension is
+  unknown, not permission), and every dimension the entry limits must be stated by the operation.
+- **References only narrow.** A reference may carry `limits` (the same keys); the operation must satisfy those too.
+  A reference claiming a higher limit than its entry changes nothing.
+- **Cost-only grants** (`"cost_only": true`) cover spending alone: they verify only an operation whose `aspect` is
+  `spend`. Running the workflow itself needs its own authorization.
+- **No scope, no authority.** An entry without `actions` or without `scope` stays structurally valid (records from
+  before Phase 1c still pass the checker) but evaluates to unknown.
+- Approving a tool is never the action of using it: an entry for `merge-pr` does not cover `delete-files`.
+
+## Conditions, in order
+
+The first condition that fails decides.
+
+1. The reference is well formed (shared format; R3 is never valid). Otherwise **invalid**.
+2. An `owner-session` reference (a quotation) cannot be verified by another agent: **unknown**.
+3. The operation names an action and a valid risk level; R3 is **inapplicable** (reconfirm with the owner).
+4. A trusted policy exists, and the reference names the designated authorizations file (`ops/authorizations.json`,
+   or the file the policy names). Otherwise unknown, or **invalid** for another file.
+5. The host was reached, and the default branch has not moved since a pinned revision (`--pin`). Otherwise unknown.
+6. The repository is trusted. The referenced commit exists and holds the entry, which is well formed, matches the
+   reference, was granted by an owner identity and names an `approved_in` PR of this repository.
+7. The host records an approval or merge of that PR by an owner identity, still active (not dismissed, not superseded
+   by a later change request), of content identical to the referenced entry.
+8. The PR's merge lies on the default branch's first-parent chain, and **the PR itself introduced or changed the
+   entry**: the entry is absent or different just before the PR's own changes. Merging an unrelated PR approves
+   nothing already on the branch.
+9. Since the merge, the entry was never removed and never changed on the default branch, even if restored later; it
+   is identical at the pinned revision. Removal or change needs fresh owner approval.
+10. Neither the entry nor the reference has expired.
+11. The action is listed; the level does not exceed the entry's; a cost-only entry is used only to spend; the
+    operation is inside the entry's scope and the reference's limits.
+
+Only then: **verified**. Content is compared, not commit IDs, so squash merges are handled.
 
 ## The GitHub integration
 
-`github_facts.gather()` reads, through `gh api` and nothing else: the repository and its default branch; the
-referenced commit (GitHub answers a missing one with HTTP 422, read as "does not exist"); the authorizations file at
-the referenced commit, at each approved revision, at the commit just before the PR's changes (the merge commit's
-first parent, or the compare API's merge base for a review) and on the default branch; the PR named in `approved_in`
-(its merge, merged-by and base branch) and its reviews; and the commits that touched the file
-on the default branch since the approval (up to 100; more is unknown). It writes nothing. Each reviewer's latest
-decisive review counts: an approval later dismissed is `dismissed`, one followed by a change request is
-`superseded`. Any failure to reach or parse the host gives `host_reachable: false`, hence unknown.
+`github_facts.gather()` reads, through `gh api` and nothing else, and writes nothing:
+- **The pinned revision.** The default branch's head is resolved once and used for every later read. `--pin <sha>`
+  passes the revision an earlier verification used: if the branch has moved, the result is unknown. Run it again,
+  chained with a consequential operation, to revalidate (`still_current()`).
+- **History by ancestry.** The adapter walks the first-parent chain from the pinned revision back to the PR's merge,
+  reading the file at each merge commit and at each commit whose changed-file list includes it (or is truncated).
+  Commit dates are never used, so a misleadingly dated revocation is still seen. States that existed only on a side
+  branch are not counted. More than 100 first-parent commits is unknown, never assumed unchanged.
+- **The point before the PR's changes.** For a merge commit, its first parent. For a squash or rebase merge, the
+  first commit, walking back along first parents, that the host does not associate with the PR (at most as many
+  steps as the PR has commits). A merge the host does not associate with the PR, or an inconsistent commit count, is
+  unknown.
+- **Approval candidates.** The PR's merge and each reviewer's latest decisive review: an approval later dismissed is
+  `dismissed`, one followed by a change request is `superseded`. Only a candidate that satisfies the whole contract is
+  chosen; otherwise the closest one is reported so the reason is precise.
+- **Missing commits.** GitHub answers a missing commit with HTTP 422, read as "does not exist" (invalid).
+- **Failures.** Missing, malformed or unexpected answers are never positive evidence: an unreachable host or an
+  unreadable answer gives unknown.
 
-It is deliberately narrow: no general reading of PR approvals as permission, no caching, no other API.
+It is deliberately narrow: no general reading of PR approvals as permission, no caching across runs, no other API.
 
 ## The trusted policy
 
 Owner identities and trusted repositories come only from the canonical policy (RFC 0001, D14), whose format Phase 1d
 defines. Until then `authorization.canonical_policy()` returns none, and `verify-auth` reports every standing
-reference as unknown, still gathering and printing the facts the host records (a `facts:` line per reference), so the
-owner can decide quickly. No flag, environment variable,
-repository file or handoff record can supply the policy instead: a trust root the agent could write is not one.
+reference as unknown. It still gathers and prints the facts the host records (a `facts:` line per reference), so the
+owner can decide quickly. No flag, environment variable, repository file or handoff record can supply the policy
+instead: a trust root the agent could write is not one.
 
 ## Limitations
 
 - Evaluation is as good as the host's records. The host records **an account**, not a person: an agent running with
   the owner's credentials (a `gh` login, a token) approves or merges as the owner, and nothing here can tell the
   difference. Approvals of authorization PRs therefore mean something only if agents do not approve or merge them
-  with the owner's credentials; that is a rule for the owner's setup, not something this tool can enforce.
+  with the owner's credentials. That is a rule for the owner's setup, not something this tool can enforce.
+- Bounded inspection: 100 first-parent commits and 100 reviews; beyond that, unknown.
+- Spending limits are per operation. Cumulative budgets belong to `resource-budgeting` (Phase 2).
 - `gh` must be installed and authenticated for live facts; otherwise every standing reference is unknown.
-- A dismissed approval is recognised only when the host records the dismissal.
 - Time comes from the local clock.

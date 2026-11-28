@@ -195,9 +195,12 @@ Committed in `ops/authorizations.json` (or the file the canonical policy names),
 ```
 
 - `level` is R1 or R2, never R3. A `cost_only` entry authorizes spending alone, never publication or deletion.
-- `actions` (Phase 1c) lists the operations the entry covers as exact slugs; runtime verification matches the
-  operation's action against it, because whether a sentence covers an operation is not decided mechanically. An entry
-  without `actions` verifies as unknown.
+- `actions` (Phase 1c) lists the operations the entry covers as exact slugs, and `scope` limits where and how much:
+  `repositories`, `branches`, `paths`, `destinations`, `targets`, `purposes` and `max_usd`. Runtime verification
+  matches a structured operation (action, risk level, and each stated dimension) against both, because whether a
+  sentence covers an operation is not decided mechanically. Every dimension the operation states must be limited, and
+  every limited dimension must be stated. A reference may carry narrower `limits`, never wider. An entry without
+  `actions` or `scope` stays structurally valid and verifies as unknown.
 - **Bound to its PR.** The `approved_in` PR must have introduced or changed the entry, compared with the merge
   commit's first parent (a merge) or with the merge base of the reviewed commit (a review), never with the PR's
   recorded base, which can predate an entry pushed to the branch later: an owner merging an unrelated PR approves
@@ -358,7 +361,7 @@ token), `## Artifacts` (a JSON list of artifacts), a JSON list of jobs under `##
 Version: 1
 Created: 2026-11-27T18:40:00Z
 Author: <agent product> / <model> / <session id, if the agent has one>
-Repository: <remote name or URL>
+Repository: <host/owner/name of the remote> | none (no remote: local repository)
 Branch: <branch>
 HEAD: <full commit id>
 Upstream: in sync | ahead <n> | behind <n> | not pushed

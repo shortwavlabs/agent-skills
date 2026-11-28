@@ -64,6 +64,8 @@ Two optional fields record ownership changes. `transfer` is a pending offer: the
   climb further, because anything higher is broader still.
 - **`--holder-pid`** overrides the choice, but only with this process or one of its ancestors, and only if it passes
   the same boundary test. A claim can never be made on behalf of an unrelated or shared process.
+- **Process identity** is read by `scripts/process_identity.py`, a generated copy of `operational/process_identity.py`
+  that `agent-handoff` shares, so both skills judge a process the same way.
 - **Process start time** defends against PID reuse: `/proc/<pid>/stat` on Linux, `ps -o lstart=` (C locale, UTC)
   elsewhere. A holder is alive only if its PID exists **and** its start time matches.
 - **Boot identity** (`/proc/sys/kernel/random/boot_id`, or `kern.boottime`) shows that a same-host holder predates a

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Generated from scripts/operational_records.py (sha256 4de77bfd86af3333e762bf1dc1f63c127f05d983a59d276fbea6f5be9be5994c). Do not edit this copy: change the source and regenerate.
+# Generated from scripts/operational_records.py (sha256 e36d5226c3476b3d898bdfe8ae854aa8fcbd0a589cead7de25320b3d83a6fe54). Do not edit this copy: change the source and regenerate.
 """Check operational records against operational/formats.json (RFC 0001, document 05).
 
     python3 scripts/operational_records.py FILE...    exit 0 when every file is valid
@@ -109,6 +109,10 @@ class Checker:
         if t.startswith("enum:"):
             if not isinstance(value, str) or value not in t[5:].split(","):
                 problems.append(f"{where}: {value!r} is not one of {t[5:]}")
+            return
+        if t == "usd":
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value < float("inf"):
+                problems.append(f"{where}: expected a non-negative amount in USD, got {value!r}")
             return
         if t in ("int", "count", "pid"):
             if type(value) is not int:
@@ -540,6 +544,22 @@ def self_test() -> list[str]:
         extended([], [mutate(artifact, "sha256", ...)]), "h.md"), "sha256: missing")
     expect_bad("empty transfer header", Checker(formats).check_text(extended([], [], transfer=""), "h.md"),
                "header 'Transfer'")
+    # Backward compatibility: records written before the optional parts existed stay valid at version 1.
+    legacy_claim = {k: v for k, v in VALID["claim"].items()}
+    legacy_standing = {"kind": "authorizations", "version": 1, "authorizations": [
+        {"id": "push-feature-branches", "level": "R2", "operations": "Push feature branches",
+         "granted_by": "github:example-owner", "approved_in": "https://github.com/example/repo/pull/1",
+         "expires": "2027-06-30T00:00:00Z"}]}
+    expect_ok("phase 1a claim (no transfer, history or boot)", problems_of(legacy_claim))
+    expect_ok("standing entry without actions or scope", problems_of(legacy_standing))
+    expect_ok("phase 1a handoff (no Transfer, Checkout, Artifacts or job JSON)",
+              Checker(formats).check_text(handoff([STANDING]), "h.md"))
+    scoped = mutate(legacy_standing, "authorizations.0.scope", {"branches": ["feature/*"], "max_usd": 2})
+    expect_ok("standing entry with a structured scope", problems_of(scoped))
+    expect_bad("negative spending limit", problems_of(mutate(scoped, "authorizations.0.scope.max_usd", -1)),
+               "non-negative amount")
+    expect_bad("boolean spending limit", problems_of(mutate(scoped, "authorizations.0.scope.max_usd", True)),
+               "non-negative amount")
     with tempfile.TemporaryDirectory() as tmp:
         wrapped = Path(tmp) / "copy.json"
         wrapped.write_text('{"$generated": "Generated from x", "content": {"kind": "formats"}, "extra": 1}')
@@ -579,8 +599,8 @@ def self_test() -> list[str]:
             failures.append(f"runtime fixture {cid}: a structural check granted authority")
         if case["structural"] == "invalid" and case["runtime"] != "invalid":
             failures.append(f"runtime fixture {cid}: a structurally invalid reference must stay invalid at run time")
-    if [c.get("runtime") for c in fixtures["cases"]].count("verified") != 1:
-        failures.append("runtime fixtures: exactly one positive control (runtime 'verified') is expected")
+    if not any(c.get("id") == "verified-control" and c.get("runtime") == "verified" for c in fixtures["cases"]):
+        failures.append("runtime fixtures: the positive control 'verified-control' must expect 'verified'")
     for cid, want in [("fabricated-reference", "invalid"), ("missing-entry", "invalid"), ("expired", "inapplicable"),
                       ("revoked", "inapplicable"), ("changed-after-approval", "inapplicable"),
                       ("quoted-session", "unknown")]:

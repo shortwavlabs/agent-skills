@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Revision 5 approved by the owner, with all 14 decisions and the Phase 1a and Phase 1b review decisions recorded (2026-11-27). Phases 1a (#19) and 1b (#20) merged. Revision 6, proposed with Phase 1c, records its implementation details for owner review |
+| **Status** | Revision 5 approved by the owner, with all 14 decisions and the Phase 1a and Phase 1b review decisions recorded (2026-11-27). Phases 1a (#19) and 1b (#20) merged. Revision 6 (Phase 1c design, accepted with the corrections of the Phase 1c review, 2026-11-28) |
 | **Created** | 2026-11-27 |
 | **Scope** | The Operational Skills family for coding agents, alongside the existing `workspace-housekeeping` skill |
 | **Terms** | "Operational Skills" is the family name. "Agent Operations" is a descriptive architectural term only ([D1](#d1-family-name)) |
@@ -402,6 +402,28 @@ Approved by the owner on 2026-11-27, after the Phase 1a review:
 Runtime authorization verification and its regression fixtures belong to Phase 1c; budget enforcement belongs to
 Phase 2.
 
+### Decisions from the Phase 1c review (revision 6)
+
+Approved by the owner on 2026-11-28, after the Phase 1c review:
+- Revisions 5 and 6 are both kept.
+- Additive optional fields may stay within format version 1, provided backward compatibility is tested explicitly
+  (records written before the optional parts still validate).
+- The additional generated-copy sources (including one outside `operational/`) and the JSON generated-copy
+  representation are accepted, under strict validation of canonical sources and designated destinations.
+- A standing authorization without `actions` evaluates to unknown, and so does one without a structured `scope`.
+- Milestone-based handoff refresh is acceptable where pre-compaction hooks are unavailable.
+- **Operation scope.** An action name alone never establishes scope. Every operation submitted for verification
+  states a valid risk level; repository, target, resource, destination, purpose and spending limits are verified
+  wherever the grant limits them; `cost_only` and the reference's narrower limits are respected; descriptions never
+  widen a grant; there is no fuzzy or language-model matching; undeterminable scope is unknown.
+- **Provenance.** The default-branch revision is pinned; history is established by first-parent ancestry, never by
+  timestamps; removal and reinstatement, and change followed by restoration, need fresh approval; squash, merge and
+  rebase merges are handled, ambiguity is unknown; bounded inspection beyond its limit is unknown.
+- **Handoffs** record canonical repository identity, checkout, exact branch and commit, and cached versus freshly
+  verified upstream state; inspection fails closed; records are private, atomically published, collision-resistant
+  and never lost on supersession. The PR summary is a redacted draft from an allowlist, to be reviewed.
+- The merged Phase 1b branch is kept for now.
+
 ### Decisions from the Phase 1b final review (revision 5)
 
 Approved by the owner on 2026-11-27, after the Phase 1b review:
@@ -500,4 +522,4 @@ These are implementation details within the approved design, to be settled in th
 | 3 | 2026-11-27 | Final review: D14 (host-recorded approvals as evidence for explicitly scoped standing authorizations); authorization statuses (invalid, unverified, verified, inapplicable, unknown); owner identities and trusted repositories only in the canonical policy; revocation and approval binding; level-1 constraints never overridden; force-exception and R0-deletion limits; identity is not state. Approved |
 | 4 | 2026-11-27 | Phase 1a review decisions recorded: approved interpretations, fresh approval for reintroduced authorizations, inapplicable approvals grant nothing, GitHub PR URLs as the initial `approved_in` capability, the 1.25 factor as a reassessment threshold, stale claims require expiry and holder death |
 | 5 | 2026-11-27 | Phase 1b review decisions recorded: passive processes and owner-accepted identities for reversible operations only, `.DS_Store` tolerated in the registry, holders validated as session boundaries, the ownership lifecycle (renew, release, transfer, recovery) with token rotation and history, fail-closed parity between check and acquire, full-set reporting |
-| 6 (proposed) | 2026-11-28 | Phase 1c implementation details for owner review: the runtime verification conditions and GitHub reads, approvals bound to the PR that introduced the entry, `actions` on standing entries, the designated authorizations file, optional handoff parts (transfer token, artifacts, jobs, budget, lessons) within version 1 |
+| 6 | 2026-11-28 | Phase 1c, accepted after review with corrections (structured operation scope, ancestry-based provenance with a pinned default-branch revision, handoff identity and safe persistence, an allowlisted summary draft): the runtime verification conditions and GitHub reads, approvals bound to the PR that introduced the entry, `actions` on standing entries, the designated authorizations file, optional handoff parts (transfer token, artifacts, jobs, budget, lessons) within version 1 |

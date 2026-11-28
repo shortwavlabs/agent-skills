@@ -527,7 +527,8 @@ skills/development-coordination/
 ├── scripts/
 │   ├── coordination.py         acquire, renew, release, transfer, accept, adopt, status, check, archive-stale;
 │   │                           real-process self-test
-│   └── path_in_use.py          Generated copy of workspace-housekeeping's in-use check (do not edit)
+│   ├── path_in_use.py          Generated copy of workspace-housekeeping's in-use check (do not edit)
+│   └── process_identity.py     Generated copy of operational/process_identity.py (do not edit)
 └── references/
     ├── operational-core.md     Generated copy of operational/core.md (do not edit)
     ├── protocol.md             Registry, claim record, holder identity, lifetime, ownership lifecycle, overlap rules
@@ -548,9 +549,10 @@ skill ([RFC 0001](rfcs/0001-agent-operations/README.md), Phase 1c).
 - **Verified resumption:** the record is evidence, not authority. `handoff.py check` compares it with the repository
   (branch, HEAD, upstream, working tree, artifact digests, jobs, claim) and reports every difference; jobs are never
   restarted, duplicated or stopped, and expensive work with unchanged inputs is not repeated.
-- **Runtime authorization verification:** a pure evaluator of standing authorizations (trusted repository, owner
-  identity, host-recorded approval or merge of the exact content, default branch, revocation and reinstatement,
-  expiry, listed actions), with a narrow GitHub facts adapter. Only `verified` grants authority; until Phase 1d
+- **Runtime authorization verification:** a pure evaluator of standing authorizations for one structured operation
+  (trusted repository, owner identity, host-recorded approval or merge of the exact content by the PR that introduced
+  it, a pinned default-branch revision, revocation, change and reinstatement established by ancestry, expiry, listed
+  actions, risk level and structured scope including spending limits), with a narrow GitHub facts adapter. Only `verified` grants authority; until Phase 1d
   declares owner identities in the canonical policy, standing references report unknown.
 - **Continuity** across compaction, interruption, outages, quota exhaustion, model and agent switches, restarts and
   long-running jobs; an extension point for lessons, skill defects and proposals.
@@ -567,8 +569,9 @@ skills/agent-handoff/
 ├── scripts/
 │   ├── handoff.py                new, check, verify-auth, summary; self-test with real repositories and processes
 │   ├── authorization.py          The portable runtime evaluator; self-test against the runtime fixtures
-│   ├── github_facts.py           The narrow GitHub facts adapter (gh api, read-only); self-test with a fake host
-│   └── operational_records.py    Generated copy of scripts/operational_records.py (do not edit)
+│   ├── github_facts.py           The narrow GitHub facts adapter (gh api, read-only, ancestry-based provenance)
+│   ├── operational_records.py    Generated copy of scripts/operational_records.py (do not edit)
+│   └── process_identity.py       Generated copy of operational/process_identity.py (do not edit)
 └── references/
     ├── operational-core.md       Generated copy of operational/core.md (do not edit)
     ├── formats.json              Generated copy of operational/formats.json (do not edit)
