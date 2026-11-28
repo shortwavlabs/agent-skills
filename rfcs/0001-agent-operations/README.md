@@ -1,11 +1,11 @@
-# RFC 0001: Agent Operations
+# RFC 0001: Operational Skills
 
 | | |
 |---|---|
-| **Status** | Draft for owner review (Phase 0: research and design). Nothing here is approved or implemented |
+| **Status** | Revision 2: the owner accepted the direction and settled all 13 decisions (2026-11-27). Ready for final owner review. Nothing is implemented yet |
 | **Created** | 2026-11-27 |
-| **Scope** | A family of operational skills for coding agents, alongside the existing `workspace-housekeeping` skill |
-| **Working name** | "Agent Operations". The name collides with existing projects; see [D1](#d1-the-family-name) |
+| **Scope** | The Operational Skills family for coding agents, alongside the existing `workspace-housekeeping` skill |
+| **Terms** | "Operational Skills" is the family name. "Agent Operations" is a descriptive architectural term only ([D1](#d1-family-name)) |
 
 > Technical skills teach agents how to build software. Operational skills teach agents how to sustain software
 > engineering.
@@ -14,16 +14,13 @@
 
 | # | Deliverable | Location |
 |---|---|---|
-| 1 | RFC: motivation, scope, architecture, terminology, principles, decisions | This file |
+| 1 | RFC: motivation, scope, architecture, terminology, principles, owner decisions, corrections | This file |
 | 2 | Existing skills and ecosystem assessment | [02-ecosystem-assessment.md](02-ecosystem-assessment.md) |
 | 3 | Skill responsibility matrix | [03-responsibility-matrix.md](03-responsibility-matrix.md) |
 | 4 | Operational risk and authorization model | [04-risk-and-authorization.md](04-risk-and-authorization.md) |
-| 5 | Shared artifact conventions (templates and schemas) | [05-artifact-conventions.md](05-artifact-conventions.md) |
+| 5 | Shared artifact conventions and the coordination protocol | [05-artifact-conventions.md](05-artifact-conventions.md) |
 | 6 | Scenario-based validation strategy | [06-validation-strategy.md](06-validation-strategy.md) |
 | 7 | Implementation roadmap | [07-roadmap.md](07-roadmap.md) |
-
-Every decision that needs the owner is collected in one place:
-[decisions requiring owner approval](#decisions-requiring-owner-approval).
 
 ## Contents
 - [Summary](#summary)
@@ -33,32 +30,32 @@ Every decision that needs the owner is collected in one place:
 - [Terminology](#terminology)
 - [Design principles](#design-principles)
 - [Architecture](#architecture)
-- [Design decisions](#design-decisions)
-- [Decisions requiring owner approval](#decisions-requiring-owner-approval)
-- [Unresolved questions](#unresolved-questions)
+- [Owner decisions](#owner-decisions)
+- [Architectural corrections](#architectural-corrections)
+- [Unresolved implementation questions](#unresolved-implementation-questions)
 - [Revision history](#revision-history)
 
 ## Summary
 
 Most agent skills teach an agent to perform a technical task. Few teach it to work safely next to other agents, leave
 work resumable, keep results trustworthy, spend resources deliberately, ship traceable builds, or keep its
-compromises visible. A recent workspace cleanup produced `workspace-housekeeping`, which covers preservation and
-storage. This RFC proposes seven more skills around it:
+compromises visible. A workspace cleanup produced `workspace-housekeeping`, which covers preservation and storage.
+This RFC adds seven skills around it:
 
 | Skill | Priority | Responsibility |
 |---|---|---|
-| `development-coordination` | P0 | Whether a shared-state operation is safe now: activity checks, advisory claims, ownership |
+| `development-coordination` | P0 | Whether a shared-state operation is safe now: activity checks, a serialized claim registry, ownership |
 | `agent-handoff` | P0 | A verifiable record that lets another agent or session resume without the conversation |
-| `instruction-governance` | P0 | One canonical policy, synchronized agent adapters, mandatory consultation triggers |
+| `instruction-governance` | P0 | One canonical policy, synchronized agent adapters, a trust boundary for exceptions, consultation triggers |
 | `research-provenance` | P1 | Provenance, frozen criteria and amendments for experiments and benchmarks |
-| `resource-budgeting` | P1 | Estimates, thresholds, authorization and stop rules before expensive operations |
+| `resource-budgeting` | P1 | Estimates, thresholds, cumulative accounting, authorization and stop rules before expensive operations |
 | `release-governance` | P2 | Build classes, immutable candidates, gates, release decisions, rollback |
-| `technical-debt-management` | P2 | Debt records with reassessment triggers; may be cut at Phase 3 |
+| `technical-debt-management` | P2, provisional | Debt records with reassessment triggers; the decision to implement it is taken at Phase 3 |
 
-They share one four-level risk model (R0 routine, R1 shared state, R2 consequential, R3 irreversible or
-evidence-sensitive), one set of evidence labels and a small set of record formats. Each skill is installable on its
-own. Rules that matter are backed by deterministic scripts or harness hooks wherever practical, because
-documentation alone enforces nothing.
+They share one canonical operational core: four risk levels (R0 routine, R1 shared state, R2 consequential,
+R3 irreversible or evidence-sensitive), precise evidence labels and the authorization rules. The core is copied
+into every skill by a deterministic generator, so each skill installs on its own. Rules that matter are backed by
+deterministic scripts or harness controls where practical, because documentation alone enforces nothing.
 
 ## Motivation
 
@@ -69,7 +66,7 @@ one agent saw and another did not.
 
 `workspace-housekeeping` showed that this knowledge can be packaged as a skill. It also showed the limits of doing
 so: a skill that is installed is not necessarily consulted, and a rule written in prose is not necessarily followed
-(see incidents I6 to I8 below, and the [ecosystem assessment](02-ecosystem-assessment.md#agent-skills-format-and-activation)).
+(incidents I6 to I8 below, and the [ecosystem assessment](02-ecosystem-assessment.md#agent-skills-format-and-activation)).
 
 ## Motivating incidents
 
@@ -79,58 +76,65 @@ confirmation**.
 
 | ID | Incident | What failed (inferred) | Generalized lesson | Owner | Strongest practical enforcement |
 |---|---|---|---|---|---|
-| I1 | Hundreds of gigabytes of research output accumulated with no retention strategy | Output was classified only at cleanup time, long after anyone remembered what it was | Decide each output's class (evidence, expensive reproducible, disposable cache) when the run is created; count disk in budgets | `research-provenance`, `resource-budgeting`, `workspace-housekeeping` | Run manifests declare output class; disk threshold in the budget |
-| I2 | Critical source code stayed uncommitted while expensive simulation outputs accumulated | Results had no recorded provenance; committing the code afterwards could not restore it | Qualification runs start from committed source; retrospective commits are preservation, not provenance | `research-provenance` | The run-manifest script refuses a dirty tree for qualification runs |
+| I1 | Hundreds of gigabytes of research output accumulated with no retention strategy | Output was classified only at cleanup time, long after anyone remembered what it was | Decide each output's class (evidence, expensive reproducible, disposable cache) when the run is created; count storage in budgets | `research-provenance`, `resource-budgeting`, `workspace-housekeeping` | Run manifests declare output class; storage threshold in the budget |
+| I2 | Critical source code stayed uncommitted while expensive simulation outputs accumulated | Results had no recorded provenance; committing the code afterwards could not restore it | Qualification runs start from committed source; retrospective commits are preservation, not provenance | `research-provenance` | The run-manifest tool refuses a dirty tree for qualification runs |
 | I3 | Approved binaries were hard to distinguish from later rebuilds | Approval named a build, not bytes | Approve digests; promote the approved bytes; a rebuild is a new candidate | `release-governance`, `workspace-housekeeping` | Artifact manifest with whole-bundle digest; release check compares digests |
 | I4 | Historical builds depended on unversioned external assets | Inputs were named, not pinned | Store external inputs by content digest before any build that uses them is cited | `release-governance`, `workspace-housekeeping` | Manifest dependencies require a digest |
-| I5 | Unpublished work needed preservation without publishing it to public repositories | A "preservation" push to a public remote publishes | Classify a public push as R2 whatever its intent; back up to private storage | `workspace-housekeeping` (exists) | Check repository visibility before any push |
-| I6 | A truncated process check allowed a cache to be removed while processes still held it | The check listed only some processes, and a missing signal was read as "idle" | Check the complete process list; a missing signal means *unknown*, never *idle* | `development-coordination` | A tested activity-check script with no name filter |
-| I7 | An agent created an unauthorized worktree minutes after a workspace cleanup | The rule existed in prose, but the harness offered worktree isolation as a normal feature | Prose loses to tool affordances; hard rules need harness-level enforcement and a decision procedure | `instruction-governance`, `development-coordination` | A deny rule or pre-tool hook for worktree creation |
-| I8 | Different coding agents operated under inconsistent global Git instructions | Adapter files for each agent were maintained by hand and drifted | One canonical policy; adapters import it or carry checked copies | `instruction-governance` | A policy-sync script reporting drift |
-| I9 | Qualification criteria and frozen experimental evidence required explicit protection | Nothing technical stopped criteria from changing after results were seen | Freeze criteria before results; change them only by amendment; protect frozen files from cleanup | `research-provenance`, `workspace-housekeeping` | Criteria hash recorded in the run manifest and checked at evaluation |
-| I10 | GitHub Actions spend rose because of repeated build and validation workloads | Workflow changes were made without a cost estimate; macOS minutes cost about ten times Linux | Estimate before changing CI or launching paid work; deduplicate; cancel superseded runs | `resource-budgeting` | A check that workflows set concurrency groups and timeouts |
+| I5 | Unpublished work needed preservation without publishing it to public repositories | A "preservation" push to a public remote publishes | Any push to a public remote is publication (R2); back up to private storage | `workspace-housekeeping` (exists) | Check repository visibility before any push |
+| I6 | A truncated process check allowed a cache to be removed while processes still held it | The check saw only some processes, and a missing signal was read as "idle" | Check every process's working directory and open files; unknown is never idle | `development-coordination`, `workspace-housekeeping` | `path_in_use.py` (merged in PR #18) |
+| I7 | An agent created an unauthorized worktree minutes after a workspace cleanup | The rule existed in prose, but the harness offered worktree isolation as a normal feature | Prose loses to tool affordances; hard rules need harness-level controls and a decision procedure | `instruction-governance`, `development-coordination` | An owner-installed deny rule or pre-tool hook (never installed by an agent) |
+| I8 | Different coding agents operated under inconsistent global Git instructions | Adapter files for each agent were maintained by hand and drifted | One canonical policy; adapters import it or carry digest-checked copies | `instruction-governance` | A policy audit that reports drift and proposes a diff |
+| I9 | Qualification criteria and frozen experimental evidence required explicit protection | Nothing technical stopped criteria from changing after results were seen | Freeze criteria before results; change them only by amendment; protect frozen files from cleanup | `research-provenance`, `workspace-housekeeping` | Criteria digest recorded in the run manifest and checked at evaluation |
+| I10 | GitHub Actions spend rose because of repeated build and validation workloads | Workflow changes were made without a cost estimate; macOS minutes cost about ten times Linux | Estimate money, not minutes, before changing CI or launching paid work; count related runs together | `resource-budgeting` | A check that workflows set concurrency groups and timeouts |
 
-**Observed during this phase** (details in the
-[assessment](02-ecosystem-assessment.md#workspace-housekeeping-findings)):
-- The owner's agent-specific instruction files are maintained by hand and currently differ. I8 is ongoing.
-- `workspace-housekeeping`'s worktree-removal procedure tells the reader to check every process, then gives a
-  command that lists only processes matching five names. That is the same class of gap as I6 (a partial process
-  list), whatever the original check's exact cause.
+**Observed during Phase 0, and since resolved:** `workspace-housekeeping`'s worktree-removal procedure said to check
+every process, then gave a command that listed only processes matching five names, and it permitted a forced
+removal. PR #18 (merged independently of this RFC, before revision 2) replaced the command with a tested in-use check
+(`skills/workspace-housekeeping/scripts/path_in_use.py`) and removed `--force` entirely
+([findings](02-ecosystem-assessment.md#workspace-housekeeping-findings)). The owner's agent-specific instruction files
+are still maintained by hand and still differ (I8).
 
 ## Scope and non-goals
 
 **In scope:** operational practice for coding agents working on real repositories: coordination, continuity,
 instruction governance, provenance of results, resource use, release decisions, technical debt, and (existing)
-preservation and storage. Applicable to any software domain, any agent, any operating system.
+preservation and storage. Applicable to any software domain, any agent, any operating system the tools support.
 
 **Non-goals:**
-- A project-management framework: no tickets, sprints, estimates of effort or status meetings.
-- A service: no daemon, database, orchestrator or hosted dependency. Files and git only.
+- A project-management framework: no tickets, sprints, effort estimates or status meetings.
+- A service: no daemon, database, orchestrator or hosted dependency. Files, git and the standard library only.
+- Enforceable locking against uncooperative processes. Coordination between cooperating agents is advisory; what
+  can actually be enforced is listed in [05](05-artifact-conventions.md#advisory-coordination-versus-enforcement).
 - Replacing domain procedures: signing, notarization, circuit validation and the like stay in their domain skills.
-- Signed supply-chain attestations: projects that need SLSA levels above L1 use their CI provider's tooling.
-- Changing any existing skill in Phase 0.
+- Signed supply-chain attestations: projects that need them use their CI provider's tooling.
+- Installing hooks, changing harness settings or editing global instruction files on an agent's own initiative.
 
 ## Terminology
 
 | Term | Meaning |
 |---|---|
-| **Owner** | The person with authority over the project (or someone they name). The only source of authorization |
+| **Owner** | The person with authority over the project, identified by declared identities (for example a GitHub account). The only source of authorization |
 | **Agent** | Any coding agent or model acting in the repository, in any harness |
 | **Session** | One continuous run of an agent; it ends, or loses detail at context compaction |
 | **Shared state** | Anything another agent or person depends on: a checkout, a pushed branch, a PR, CI configuration, a build directory, a running server |
-| **Activity check** | An automated inspection of processes, git state, recent writes and claims, answering `busy`, `idle` or `unknown` |
-| **Claim** | An advisory, expiring record that an agent is using a checkout, branch, path set or resource |
-| **Handoff record** | A structured, verifiable file describing unfinished work so that another agent can resume it |
-| **Evidence label** | VERIFIED, OBSERVED, REPORTED, INFERRED or UNKNOWN, attached to each factual statement in a record |
-| **Risk level** | R0 routine, R1 shared state, R2 consequential, R3 irreversible or evidence-sensitive ([model](04-risk-and-authorization.md)) |
-| **Standing authorization** | A committed, owner-authored rule pre-authorizing a class of operations, with a scope |
+| **Activity check** | An inspection of every process's working directory and open files, git state and recent writes, answering `busy`, `idle` or `unknown` with an explicit visibility level |
+| **Visibility** | How much of the process table a check could read: complete, owner-complete, partial or failed. Only the first two can support "idle" |
+| **Claim** | An advisory, expiring record that an agent is using a checkout, branch, path set or resource, acquired through the serialized [coordination protocol](05-artifact-conventions.md#claims-and-the-coordination-protocol) |
+| **Handoff record** | A structured, verifiable file describing unfinished work so that another agent can resume it. Not a source of authority |
+| **Evidence label** | VERIFIED, OBSERVED, REPORTED, INFERRED or UNKNOWN, defined precisely in [05](05-artifact-conventions.md#evidence-labels-and-verification-records) |
+| **Verification record** | The claim, method, artifact identity and time behind a VERIFIED label |
+| **Risk level** | R0 routine, R1 shared state, R2 consequential, R3 irreversible or evidence-sensitive ([model](04-risk-and-authorization.md)). A property of the operation's consequences, never of who authorized it |
+| **Authorization** | Permission for an operation, from an established source. It permits an operation; it does not lower its risk level |
+| **Standing authorization** | An owner-approved entry in a designated, committed file that pre-authorizes a scoped class of R1 or R2 operations ([trust boundary](04-risk-and-authorization.md#trust-boundary-for-standing-authorizations)) |
+| **Authorization reference** | A verifiable pointer to the original owner authorization (a commit, a merged standing authorization, an owner-authored comment) |
+| **Refusal** | A safety mechanism declining an operation (git, a preflight, a permission check, a hook). A finding to investigate, never a reason to escalate |
 | **Run manifest** | The provenance record of one experiment, benchmark or simulation run |
 | **Frozen evidence** | Criteria, held-out data, golden references or results protected from change except by amendment |
 | **Amendment** | A committed, owner-approved record of a change to frozen criteria or evidence, never applied retroactively |
 | **Build classes** | Development build, audition build (preserved for review), release candidate (immutable), released product |
 | **Canonical policy** | The single source text of operational rules that agent-specific instruction files import or copy |
 | **Adapter** | An agent-specific instruction file (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, rule files) that carries canonical policy to one agent |
-| **Operational core** | The short shared text (risk levels, evidence labels, authorization rule) copied into every family skill |
+| **Operational core** | The canonical shared text (risk levels, evidence labels, authorization rules), with exactly one authoritative source and identical generated copies in every family skill |
 
 ## Design principles
 
@@ -139,17 +143,18 @@ The brief's principles, with how the family meets each, and the strongest
 
 | Principle | How the family meets it | Enforcement |
 |---|---|---|
-| **Agent-agnostic** | Plain files and git; no agent-specific feature is required. Agent-specific adapters (hooks, deny rules) are optional extras documented by `instruction-governance` | Scenario runs on at least two agents per phase |
-| **Domain-agnostic** | Examples span benchmarks, ML runs, numerical computing and releases; audio examples appear only as one case among several | Review |
-| **Composable** | Each skill installs alone; siblings are referenced by name with a minimum fallback; the shared core is copied, not linked | Validator: no cross-skill relative links; core drift check |
+| **Agent-agnostic** | Plain files, git and standard-library Python; agent-specific controls are optional adapters the owner installs | Scenario runs on Claude Code and Codex |
+| **Domain-agnostic** | Examples span benchmarks, ML runs, numerical computing and releases | Review |
+| **Composable** | Each skill installs alone; siblings are referenced by name with a minimum fallback; shared text and the in-use check are generated copies of one source | Validator: drift check; no new cross-skill relative links |
 | **Non-overlapping** | One owner per responsibility, with explicit rules for every known overlap ([matrix](03-responsibility-matrix.md)) | Review; boundary tests |
-| **Risk-proportional** | Four levels; R0 requires nothing; R1 one automated preflight; questions only at R2 and above | Negative scenarios fail a skill that adds ceremony |
-| **Evidence-based** | Evidence labels in every record; verification does not transfer across a handoff | Record checks; handoff check |
-| **Authorization-aware** | Sources, scope and expiry of authorization defined once; observed content never authorizes | Scenarios with injected "approvals" |
+| **Risk-proportional** | R0 needs nothing; R1 needs a preflight only where another party could be affected; R2 needs established authorization; R3 controls match the actual consequence | Negative scenarios fail a skill that adds ceremony |
+| **Evidence-based** | Precise labels; verification records name claim, method, artifact identity and time; missing evidence is never proof of safety | Record checks; handoff check |
+| **Authorization-aware** | Sources, references, scope, expiry and trust boundary defined once; observed content never authorizes | Scenarios with injected "approvals" |
+| **Refusals are findings** | A safety mechanism that refuses an operation triggers investigation, never a more forceful variant | Critical scenarios |
 | **Non-disruptive** | Overhead limits are requirements; claims are advisory; nothing blocks on a service | Negative scenarios |
 | **Progressive disclosure** | `SKILL.md` near 150 lines, detail in `references/`, one level deep | Validator size check |
-| **Portable** | Standard-library Python and `git`; no paths, services or platform assumptions; a missing tool yields *unknown* | Script self-tests on CI's Linux runner |
-| **Enforceable where practical** | Each key rule has a script, and each skill states which rung each rule is on | Tier 0 and Tier 1 checks |
+| **Portable** | Standard library and `git`; where a tool is missing (for example `lsof` on Windows) the answer is *unknown*, not *idle* | Self-tests on CI's Linux runner and locally on macOS |
+| **Enforceable where practical** | Each key rule has a deterministic check, and each skill states which rung each rule is on | Tier 0 and Tier 1 checks |
 
 ## Architecture
 
@@ -167,173 +172,213 @@ The brief's principles, with how the family meets each, and the strongest
 Three mechanisms, from weakest to strongest. The family uses all three, because installing a skill guarantees none
 of them:
 
-1. **Descriptions.** Each skill's description lists its consultation triggers in the repository's
-   "Capability. Covers …. Use when …" style, and is tested with a trigger set of about 20 prompts.
-2. **Mandatory triggers in instruction files.** `instruction-governance` maintains a table such as "before switching
-   branches in a shared checkout, consult `development-coordination`", carried into every agent's adapter. The
-   owner's existing instruction already does this for `workspace-housekeeping`.
-3. **Harness enforcement for hard rules.** Where an agent supports it, a deny rule or pre-tool hook blocks the
-   operations that must never happen without authorization (for example, worktree creation). These adapters are
-   optional and agent-specific.
+1. **Descriptions.** Each skill's description lists its consultation triggers and is tested with a trigger set of
+   about 20 prompts. Activation failures are reported as failures.
+2. **Mandatory triggers in instruction files.** `instruction-governance` maintains a trigger table carried into
+   every agent's adapter, through an audited, owner-approved change.
+3. **Harness controls for hard rules.** Where an agent supports them, deny rules or pre-tool hooks block operations
+   that must never happen without authorization. The skills document them; only the owner installs them.
 
-### Shared foundation
+### Shared foundation (Phase 1a)
 
-- **Operational core** (about 40 lines): the four risk levels with their requirements, the evidence labels, and the
-  authorization rule. Copied into each skill (see [D3](#d3-sharing-the-risk-model-without-coupling-the-skills)).
-- **Record formats** ([conventions](05-artifact-conventions.md)): JSON where scripts read the record, Markdown with
-  fixed headings where people do; every record versioned.
-- **Locations:** `.agent-state/` (local, excluded from git) for claims and handoffs; a committed records directory
-  for budgets, debt, release decisions and amendments; run manifests next to their results.
+- **One authoritative source** in a top-level `operational/` directory: the operational core text and the record and
+  scenario format definitions. It is not a skill and is never installed.
+- **Generated copies:** each family skill carries `references/operational-core.md`, byte-identical to what the
+  generator produces from the source (a generated header naming the source, its revision and digest, then the source
+  text). The generator's default mode is a read-only check, which CI runs; writing copies is an explicit mode.
+- **Records:** JSON where tools read them, Markdown with fixed headings where people do (with a JSON block where
+  precision matters, such as authorizations); every record versioned
+  ([conventions](05-artifact-conventions.md)).
+- **Locations:** `.agent-state/` (local, self-ignoring) for claims and handoffs; `ops/` (or a project override) for
+  committed operational records; run manifests next to their results.
 
-## Design decisions
+## Owner decisions
 
-### D1: The family name
+All thirteen decisions were settled by the owner on 2026-11-27. Each entry records the decision, the resulting design,
+and where it is specified.
 
-"AgentOps" already names a skills collection for coding agents in this same category, a Microsoft accelerator and an
-agent observability product ([assessment](02-ecosystem-assessment.md#comparable-collections-and-the-name)).
-- **Option A (recommended):** a plain descriptive label, **"Operational skills"**, in the README and documentation;
-  never "AgentOps" as an identifier.
-- **Option B:** keep "Agent Operations" spelled out and accept the confusion.
-- **Option C:** a distinctive name ("Sustained Engineering").
+| # | Decision | Outcome | Specified in |
+|---|---|---|---|
+| D1 | Family name | Approved: "Operational Skills" | This file |
+| D2 | Skill names | Approved: unprefixed | This file |
+| D3 | Skill boundaries | Approved: seven skills; governance P0; debt provisional | [03](03-responsibility-matrix.md) |
+| D4 | Shared operational core | Approved: one source, generated copies, drift check | [D4](#d4-shared-operational-core), [06](06-validation-strategy.md#tier-0-repository-checks-on-every-ci-run) |
+| D5 | Risk model | Approved with corrections | [04](04-risk-and-authorization.md) |
+| D6 | Authorization across handoffs | Approved with corrections | [04](04-risk-and-authorization.md#authorization-across-a-handoff), [05](05-artifact-conventions.md#authorization-references) |
+| D7 | Instruction precedence | Approved: five levels; trust boundary to define | [04](04-risk-and-authorization.md#instruction-precedence) |
+| D8 | Artifact locations and formats | Approved with requirements | [05](05-artifact-conventions.md#location-rule) |
+| D9 | Resource budgets | Approved: configurable; initial workspace values | [05](05-artifact-conventions.md#resource-budget) |
+| D10 | Scenario evaluations | Approved: Tier 0–1 always; Tier 2 smoke tests | [06](06-validation-strategy.md#tier-2-scenario-evaluations-with-an-agent) |
+| D11 | Workspace housekeeping | Manifest scope clarified; PR #18 separate; integration in Phase 4 | [03](03-responsibility-matrix.md#overlaps-with-workspace-housekeeping), [07](07-roadmap.md#phase-4-integration) |
+| D12 | Fresh clones | No blanket authorization; investigate alternatives | [03](03-responsibility-matrix.md#overlaps-with-domain-skills), [07](07-roadmap.md#outside-this-roadmap) |
+| D13 | Roadmap | Approved: Phase 1 as four stacked PRs | [07](07-roadmap.md) |
 
-Skill names stay unprefixed, matching every existing skill in the repository. A prefix (`ops-handoff`) would reduce
-collision risk with other collections at the cost of the repository's naming convention. Collision risk is low for
-the proposed names.
+### D1: Family name
 
-### D2: Seven proposed skills, with clear triggers
+**Decision:** "Operational Skills" is the descriptive family name. "AgentOps" is never used as a product name or
+identifier, because it already names a skills collection in this category, a Microsoft accelerator and an agent
+observability product ([assessment](02-ecosystem-assessment.md#comparable-collections-and-the-name)). "Agent
+Operations" may remain a descriptive architectural term; this directory keeps its name.
 
-Each responsibility became a skill only if its consultation trigger is distinct from its neighbours'
-([boundary tests](03-responsibility-matrix.md#boundary-tests)). Rejected: one combined skill (its description could
-not cover seven trigger families, and every activation would load irrelevant guidance); merging handoff and
-coordination (their triggers differ, and coordination is consulted far more often). `technical-debt-management` is
-the weakest candidate and carries an explicit cut point at Phase 3.
+### D2: Skill names
 
-### D3: Sharing the risk model without coupling the skills
+**Decision:** keep the proposed names unprefixed, consistent with every existing skill in the repository.
 
-The risk model, evidence labels and authorization rule must mean the same thing in every skill, yet each skill must
-install alone.
+### D3: Skill boundaries
 
-| Option | For | Against |
-|---|---|---|
-| A base skill that the others require | One copy | Breaks independent installation; agents rarely load two skills for one task |
-| Reference by name only ("see `development-coordination`") | No duplication | The text is missing whenever that skill is not installed |
-| **A short copied block, checked for drift (recommended)** | Every skill is complete alone; drift is caught in CI | About 40 lines copied into each of the seven new skills |
+**Decision:** approve the seven skills listed in the [summary](#summary). `instruction-governance` is a separate P0
+skill: its triggers (editing instruction files, installing skills, conflicting rules) are rare and
+configuration-time, while coordination's are frequent and runtime, and the Phase 1 skills depend on instruction-file
+triggers to be consulted at all. `technical-debt-management` stays provisional; whether to implement it is decided at
+Phase 3 ([boundary tests](03-responsibility-matrix.md#boundary-tests)).
 
-The copy lives in each skill's `references/operational-core.md`, and the validator checks that every copy is
-byte-identical. The same marker-and-hash mechanism serves `instruction-governance`, so one primitive covers both.
+### D4: Shared operational core
 
-### D4: Instruction governance as its own P0 skill
+**Decision:** independently installable skills; one authoritative source; identical generated copies; a
+deterministic synchronization and drift check; no additional base skill to install.
 
-The brief asked whether instruction governance deserves its own skill or belongs in `development-coordination`.
-**Recommendation: its own skill, at P0.**
-- Its triggers (editing instruction files, installing skills, finding conflicting rules) are rare and
-  configuration-time. Coordination's are frequent and runtime. Folding them together would dilute coordination's
-  description and load policy maintenance on every branch switch.
-- Operational skills under-trigger on descriptions alone, because agents believe they can do these tasks unaided.
-  Mandatory triggers in instruction files are what make the Phase 1 skills effective, so governance cannot wait.
-- Incident I8 is live today, and the fix is small: a canonical file, adapters and a sync script.
+- The source lives in `operational/` (Phase 1a). Copies live at `skills/<skill>/references/operational-core.md`.
+- A copy is *identical* when its bytes equal the generator's output for the current source: a fixed generated header
+  (source path, revision, SHA-256 of the source) followed by the source text unchanged.
+- The generator's default is a read-only check that reports missing, extra, edited and outdated copies; CI runs it.
+  Writing copies is an explicit mode, reviewed in the PR like any other change.
+- The same mechanism carries any other file that must have one source and several installed copies. Its second use is
+  planned for Phase 1b: `development-coordination` carries a generated copy of `workspace-housekeeping`'s
+  `path_in_use.py`, so coordination installs alone without a second, divergent implementation of the in-use check.
 
-Alternative: a section of `development-coordination`. Cheaper by one skill, but weaker discovery for both.
+### D5: Risk model
 
-### D5: Design documents live in `rfcs/`
+**Decision:** approve R0–R3 and the risk-proportional approach, with these corrections, all applied in
+[04](04-risk-and-authorization.md):
+1. A push to a public remote is publication, whatever the branch: R2. Pushing a feature branch is permitted when the
+   owner's instruction or a standing authorization covers it; the push is still R2.
+2. R0 requires no additional ceremony.
+3. Routine operations are not escalated because an agent lacks confidence. Classification rests on facts; an unknown
+   deciding fact is established, or treated as unsafe for that dimension.
+4. R1 requires a shared-state preflight only where there is a genuine concurrency risk.
+5. R2 may proceed under explicit, scoped standing authorization.
+6. R3 controls match the actual consequence: backups for destruction, amendments for evidence changes, no
+   irrelevant backup requirement for evidence-sensitive operations that destroy nothing.
+7. Risk classification and authorization are separate. Authorization permits an operation; it never reduces its risk.
+8. Missing or incomplete evidence is never proof of safety.
+9. A safety mechanism refusing an operation triggers investigation, not escalation to a more destructive command.
 
-`docs/` is ignored by `.gitignore` (it holds local upstream documentation), and the owner's rules forbid bypassing or
-weakening ignore rules without authorization. This RFC therefore lives in `rfcs/0001-agent-operations/`. Future
-RFCs take the next number. The validator does not yet scan `rfcs/`; Phase 1a adds it, and Phase 0 runs the same
-checks ad hoc.
+### D6: Authorization across handoffs
 
-### D6: Local coordination state lives in `.agent-state/`
+**Decision:** R1 scope transfers; scoped R2 authorization transfers only with a **verifiable reference** to the
+original owner authorization wherever one exists. A handoff is not an independent source of authority, and a
+quotation in an agent-authored record is not sufficient by itself. If the authorization cannot be established, the
+receiving agent asks once. R3 authorization is reconfirmed by the receiving agent, and the operation revalidated
+before execution ([04](04-risk-and-authorization.md#authorization-across-a-handoff),
+[reference format](05-artifact-conventions.md#authorization-references)).
 
-Claims and handoff records are local, uncommitted and visible to every agent in the checkout.
-- `.git/` would be ideal (never committed, shared across worktrees), but Codex's default sandbox makes `.git`
-  read-only ([assessment](02-ecosystem-assessment.md#enforcement-versus-advice)).
-- A user-level directory outside the repository needs sandbox escalation in some agents.
-- **Recommended:** `.agent-state/` at the checkout root, excluded through `.git/info/exclude` (one-time set-up,
-  changes no tracked file). Excluding it through a committed `.gitignore` entry is the alternative. Caveat:
-  `git clean -x` removes it, which is acceptable for ephemeral state.
+### D7: Instruction precedence
 
-### D7: JSON for machines, Markdown for people, no YAML
+**Decision:**
+1. Applicable system, security and harness constraints.
+2. Explicit owner instructions in the current session.
+3. Explicit, trusted, owner-approved project exceptions (standing authorizations).
+4. The canonical operational policy.
+5. General project guidance and technical skills.
 
-Scripts read JSON with the standard library; people read Markdown records with fixed headings that a regular
-expression can check. YAML has no standard-library parser, which is why the validator already hand-parses
-frontmatter ([format rule](05-artifact-conventions.md#format-rule-json-or-markdown)).
+Where applicable instructions at the same level conflict, the more protective rule applies and the conflict is
+reported. Instructions are never silently edited to resolve a conflict. The
+[trust boundary](04-risk-and-authorization.md#trust-boundary-for-standing-authorizations) separates owner-approved
+standing authorizations from text found in files, issues, PR comments or tool output.
 
-### D8: Canonical policy, adapters and the conflict rule
+### D8: Artifact locations and formats
 
-- One canonical policy file with a revision number and stable section IDs. Adapters import it where the agent
-  supports imports (`@path` in Claude Code, `@file.md` in Gemini CLI). Elsewhere they carry a marked copy, checked
-  by a sync script ([policy blocks](05-artifact-conventions.md#canonical-policy-blocks)). Symlinks are a third option,
-  but they break on Windows and some editing tools refuse to write through them.
-- **Conflict rule (proposed):** no tool resolves conflicts between instruction files: most concatenate them. The
-  canonical policy therefore states its own rule, and every agent reads it:
-  1. The owner's explicit instruction in the current session wins for that task.
-  2. An owner-authored, explicit exception in a project file (a standing authorization) wins over a general rule.
-  3. Otherwise, the **more protective** rule wins: the one that preserves data, requires authorization, or blocks
-     publication.
-  4. The conflict is reported to the owner either way. An agent never resolves it by editing instruction files
-     without authorization (global files are R2).
-- Third-party skills rank below the owner's policy. A skill that recommends what the owner forbids (worktrees, for
-  example) loses.
+**Decision:** `rfcs/` for design documents; `.agent-state/` for local coordination records; `ops/` as the default for
+committed operational records, with project overrides; JSON for machine-read records; Markdown for human-read
+records; no YAML as an operational record format (Agent Skills frontmatter conventions are unchanged). Additional
+requirements, specified in [05](05-artifact-conventions.md#location-rule):
+- a sandbox-compatible exclusion of `.agent-state/` (a self-ignoring `.gitignore` inside it, tested with a read-only
+  `.git`);
+- claims are ephemeral, handoffs are valuable, and the two are kept apart;
+- ignored files are never assumed safe to delete;
+- a preservation path for important handoffs that never force-adds ignored files;
+- no private coordination records, credentials, transcripts or personal paths in public repositories.
 
-### D9: Deterministic checks in CI; paid evaluations on demand
+### D9: Resource budgets
 
-Tier 0 (repository checks) and Tier 1 (script self-tests on fixture repositories) run on every CI run, using the
-standard library only. Tier 2 (agent scenario runs) is budgeted, run before a skill's first merge and after material
-changes, never on every push ([validation strategy](06-validation-strategy.md)).
+**Decision:** thresholds are configurable and owner-approved. The owner's initial **workspace** values, which are not
+universal defaults: 8 CPU-hours, 2 hours of wall-clock execution, no implicit paid GPU compute, USD 2 of incremental
+paid CI, USD 5 of API spend, 20 GiB of additional persistent storage and 5 GiB of network transfer, per operation.
+The design respects existing authorized workflows, separates billed minutes from elapsed minutes and money, evaluates
+related operations cumulatively so that splitting a task cannot circumvent a threshold, records estimate
+uncertainty, and stops or seeks authorization when an estimate is materially exceeded
+([05](05-artifact-conventions.md#resource-budget), [03](03-responsibility-matrix.md#resource-budgeting)).
 
-### D10: `workspace-housekeeping` changes wait for Phase 4
+### D10: Scenario evaluations
 
-The overlaps are resolved on paper now and migrated later with explicit approval
-([overlap table](03-responsibility-matrix.md#overlaps-with-workspace-housekeeping)). Until then the stricter rule
-applies wherever housekeeping and a new skill both speak. The procedural defect found in this audit (the
-name-filtered process check) is an exception the owner may choose to fix earlier.
+**Decision:** deterministic Tier 0 and Tier 1 checks on every CI run. Tier 2 starts as engineering smoke tests on
+Claude Code and Codex, two runs per scenario per agent (a third for a meaningful non-safety disagreement, within
+budget), with every run passing Preservation and Authorization, at least 90% aggregate Action and Overhead success
+without hiding a critical failure, results reported by agent, model and scenario, activation failures included, and a
+proposed USD 25 cap for the first Phase 1 suite, estimated before execution. No paid evaluation runs in Phase 1a
+([06](06-validation-strategy.md#tier-2-scenario-evaluations-with-an-agent)).
 
-## Decisions requiring owner approval
+### D11: Workspace housekeeping
 
-1. **Family name** ([D1](#d1-the-family-name)): adopt "Operational skills" (recommended), keep "Agent Operations",
-   or choose another. Drop "AgentOps" as an identifier.
-2. **Skill names:** keep the proposed names unprefixed (recommended), or add a family prefix.
-3. **Boundaries** ([D2](#d2-seven-proposed-skills-with-clear-triggers), [D4](#d4-instruction-governance-as-its-own-p0-skill)):
-   seven proposed skills; `instruction-governance` separate and P0; `technical-debt-management` subject to a cut at
-   Phase 3.
-4. **Shared core** ([D3](#d3-sharing-the-risk-model-without-coupling-the-skills)): a copied block with a drift check.
-5. **Risk model** ([model](04-risk-and-authorization.md)): the four levels, their requirements and the overhead
-   limits.
-6. **Authorization across handoffs:** R1 scope transfers; R2 only when quoted with a covering scope; R3 never.
-7. **Conflict rule** ([D8](#d8-canonical-policy-adapters-and-the-conflict-rule)): owner in session, then explicit
-   project exception, then the more protective rule.
-8. **Locations** ([D5](#d5-design-documents-live-in-rfcs), [D6](#d6-local-coordination-state-lives-in-agent-state)):
-   `rfcs/` for design documents; `.agent-state/` excluded via `.git/info/exclude` or via `.gitignore`; `ops/` as the
-   default committed records directory; handoff records local by default with a public-safe PR summary.
-9. **Budget thresholds:** real per-operation values for CPU-hours, GPU-hours, billed CI minutes, API spend, disk and
-   network, per project.
-10. **Tier 2 evaluations:** how many runs per scenario, the pass rule, the agents to cover, and a budget per run.
-11. **`workspace-housekeeping`:** whether policy §6.1 (a manifest for every deletion) is meant for cleanups only or for
-    every deletion; whether to fix its name-filtered process check before Phase 1; the Phase 4 migration; whether to
-    generalize its domain- and macOS-specific wording.
-12. **Clean-machine reproducibility:** whether to write a standing authorization for the fresh clones that
-    `spice-circuit-modeling` and `bbd-modeling` call for, which the worktree and clone policy currently forbids
-    without authorization.
-13. **Roadmap** ([roadmap](07-roadmap.md)): Phase 1 as four stacked PRs (foundation, coordination, handoff,
-    governance).
+**Decision:** the manifest requirement applies to deliberate workspace cleanup, destructive operations and
+evidence-sensitive deletion. It does not apply to routine source edits, test-fixture teardown or ordinary deletion of
+demonstrably disposable, task-owned temporary files. Stricter project rules are preserved. PR #18 stays independent
+of this RFC; it was merged on 2026-11-27, before this revision. Broader housekeeping integration is deferred to
+Phase 4, which also generalizes the skill for non-audio projects and platforms beyond macOS, keeping the specialized
+procedures in its references.
 
-## Unresolved questions
+### D12: Fresh clones
 
-- **Coordination across machines.** Claims are local. Across machines the only signals are branches, PRs and CI.
-  Is a convention (for example a draft PR as the claim on a branch) enough?
-- **Identifying the agent's own processes.** The activity check must exclude its caller. Harnesses expose process
-  ancestry differently; the fallback is to report own-looking processes as *unknown* rather than *busy*.
-- **Platforms without `lsof`.** On Windows the process check reports *unknown* until a portable method is chosen.
-- **When to refresh a handoff before compaction.** Some harnesses offer a pre-compaction hook; others give no
-  warning. The default is "at milestones", which may be too coarse for long sessions.
-- **Per-period budgets.** Providers' own spending limits may suffice; a local ledger is deferred.
-- **Enforcement adapters in the skills or beside them.** Shipping hook examples inside `instruction-governance`
-  makes them easy to find but agent-specific; keeping them out keeps the skills agent-agnostic.
-- **Interoperability.** Whether run manifests should optionally export to RO-Crate, and artifact manifests to in-toto
-  statements, for projects that publish them.
+**Decision:** no blanket standing authorization for fresh clones. Additional clones and worktrees require explicit
+authorization or a narrowly scoped, owner-approved exception. Clean-machine reproducibility stays valuable; the
+roadmap investigates disposable CI environments, containers and temporary source exports (`git archive` into a
+scratch directory), none of which creates a persistent duplicate development checkout. The workspace policy is not
+weakened.
+
+### D13: Roadmap
+
+**Decision:** Phase 1 as four reviewable PRs: 1a shared foundation, 1b `development-coordination`, 1c
+`agent-handoff`, 1d `instruction-governance`, on stacked branches for dependent work ([07](07-roadmap.md)).
+
+## Architectural corrections
+
+The owner's review identified four areas to correct before implementation. Each is specified where it belongs.
+
+| Area | Correction | Rationale | Specified in |
+|---|---|---|---|
+| **Coordination protocol** | Claims are acquired, renewed and released inside one serialized critical section (an OS advisory lock on a single registry lock file), with overlap rules per scope type, process identity by PID **and** start time, explicit states for expired and unverifiable holders, and the activity check run after acquisition and again before execution | Atomic creation of individual claim files does not stop two agents acquiring overlapping scopes at the same moment | [05](05-artifact-conventions.md#claims-and-the-coordination-protocol) |
+| **Advisory versus enforced** | Claims bind only cooperating agents; uncooperative agents and external processes are detected by the activity check, not prevented; the enforceable mechanisms are listed separately | Documentation must not pretend to be a lock | [05](05-artifact-conventions.md#advisory-coordination-versus-enforcement) |
+| **Instruction governance** | A trust boundary for the canonical policy and for standing authorizations; a policy audit tool that is read-only by default, proposes a diff, verifies revision and digest, applies only with explicit approval of that exact diff, preserves unrelated instructions, and fails without modifying anything when an adapter cannot be updated safely; never installs hooks or edits harness settings or global files on its own | The tool that keeps instructions consistent must not itself become an unreviewed writer of instructions | [04](04-risk-and-authorization.md#trust-boundary-for-standing-authorizations), [03](03-responsibility-matrix.md#instruction-governance) |
+| **Evidence and authorization** | Precise labels; verification records with claim, method, artifact identity and time; a digest verifies identity or integrity only; authorization references verifiable, and a quotation alone is unestablished | Labels used loosely spread unverified claims with the authority of verified ones | [05](05-artifact-conventions.md#evidence-labels-and-verification-records) |
+| **Shared-state and cleanup safety** | The lessons of PR #18 apply family-wide: no forced worktree removal, no process-name filters, no truncated inventories, unknown is not idle, working directories and open files, revalidation immediately before destructive operations. The family references the corrected housekeeping procedure and its `path_in_use.py`; it never re-implements them | One corrected implementation, not two contradictory ones | [04](04-risk-and-authorization.md#refusals-and-missing-evidence), [03](03-responsibility-matrix.md#development-coordination) |
+
+## Unresolved implementation questions
+
+These are implementation details within the approved design, to be settled in the phase named.
+
+- **Owner identities (1c, 1d).** Where owner identities are declared (canonical policy or a project file), and how a
+  receiving agent checks an owner-authored comment or commit when it has no network access (the answer may be "ask
+  once").
+- **Process start time (1b).** `ps -o lstart=` output is locale-dependent; Linux has `/proc/<pid>/stat`. The portable
+  choice, and the behaviour when neither is readable (the holder's status is then unknown).
+- **Windows (1b).** `fcntl` is unavailable; whether `msvcrt.locking` is an adequate substitute, or claims are
+  unavailable there and the protocol reports *unknown*.
+- **Network filesystems (1b).** Advisory locks may be local-only or emulated on NFS and SMB. Detecting such a checkout
+  and reporting claims as unreliable.
+- **Several machines (1b).** Beyond the PR-and-branch convention and git's own refusal of non-fast-forward pushes,
+  whether any cross-machine signal is worth adding without publishing private state.
+- **Handoff refresh before compaction (1c).** Some harnesses offer a pre-compaction hook; others give no warning.
+- **Related operations (Phase 2).** How a task is identified for cumulative budget accounting (a PR, a run series, a
+  declared task ID), and whether a per-period ledger is needed beyond providers' own spending limits.
+- **Hook adapters (1d).** Whether opt-in hook examples live in `instruction-governance`'s references or outside the
+  skills.
+- **Housekeeping and the core (Phase 4).** Whether `workspace-housekeeping` adopts the generated operational core.
+- **Interoperability (Phases 2–3).** Optional export of run manifests to RO-Crate and artifact manifests to in-toto
+  statements.
 
 ## Revision history
 
 | Revision | Date | Change |
 |---|---|---|
 | 1 | 2026-11-27 | First draft for owner review (Phase 0) |
+| 2 | 2026-11-27 | Owner decisions D1–D13 recorded; architectural corrections (coordination protocol, instruction-governance trust boundary and audit tool, evidence and verification records, shared-state safety); reconciled with PR #18 (merged); family renamed Operational Skills |

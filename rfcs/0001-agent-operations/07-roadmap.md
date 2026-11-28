@@ -1,16 +1,13 @@
 # 7. Implementation roadmap
 
-Part of [RFC 0001: Agent Operations](README.md). Status: **draft for owner review**.
+Part of [RFC 0001: Operational Skills](README.md). Status: **approved** (owner decision D13, revision 2).
 
-The brief's tentative roadmap holds, with three changes:
-- `instruction-governance` joins Phase 1 as a P0 skill, because the Phase 1 skills depend on instruction-file
-  triggers to be consulted at all (see [D4](README.md#d4-instruction-governance-as-its-own-p0-skill)).
-- A small foundation PR comes first: shared core, validator support and the scenario format.
-- Each skill is its own PR. Within a phase, the PRs are stacked, each based on its predecessor (the repository's
-  existing practice for dependent work).
+Phase 1 is four reviewable PRs on stacked branches, each based on its predecessor. Implementation PRs stay in draft
+until the owner reviews them, and a phase starts only after the previous one has been reviewed. Small, coherent and
+trustworthy beats numerous.
 
 ## Contents
-- [Phase 0: research and RFC (this PR)](#phase-0-research-and-rfc-this-pr)
+- [Phase 0: research and RFC](#phase-0-research-and-rfc)
 - [Phase 1: foundation and continuity](#phase-1-foundation-and-continuity)
 - [Phase 2: evidence and cost](#phase-2-evidence-and-cost)
 - [Phase 3: releases and debt](#phase-3-releases-and-debt)
@@ -18,84 +15,85 @@ The brief's tentative roadmap holds, with three changes:
 - [Definition of done for every skill PR](#definition-of-done-for-every-skill-pr)
 - [Outside this roadmap](#outside-this-roadmap)
 
-## Phase 0: research and RFC (this PR)
+## Phase 0: research and RFC
 
-- The seven design documents in `rfcs/0001-agent-operations/`.
-- No skill, script, validator or CI change.
-- Checks: the repository validator (unchanged), plus an ad-hoc run of the validator's link, anchor and path-leak
-  logic over `rfcs/`, which the validator does not yet scan. A manual scan for private names.
-- Exit: the owner approves the RFC, or approves it with the decisions in the
-  [decision list](README.md#decisions-requiring-owner-approval) settled.
+- Revision 1: the seven design documents.
+- Revision 2: owner decisions D1–D13 recorded, architectural corrections, reconciliation with PR #18.
+- Checks: the repository validator, plus the validator's link, anchor and path-leak logic run over `rfcs/`, and a
+  scan for private names.
+- Exit: final owner review of revision 2.
 
 ## Phase 1: foundation and continuity
 
-| PR | Content | Depends on |
+| PR | Content | Base |
 |---|---|---|
-| 1a | Foundation: the operational core text (risk levels, evidence labels, authorization rule, about 40 lines); validator support (scan `rfcs/`, core drift check, scenario-file and record-example checks, no new cross-skill relative links); the scenario format; scenarios for the brief's nine situations as fixtures, with no runner yet | Phase 0 approval |
-| 1b | `development-coordination`: `SKILL.md`, references (activity check, claims and leases, worktree decision procedure, interruption), `activity_check.py` with self-tests, scenarios | 1a |
-| 1c | `agent-handoff`: `SKILL.md`, references (record, resume procedure, compaction), `handoff_check.py`, scenarios | 1b (uses `.agent-state/` and claims) |
-| 1d | `instruction-governance`: `SKILL.md`, references (canonical policy, adapters per agent, precedence, triggers, enforcement adapters), `policy_sync.py`, scenarios | 1a |
+| **1a** | **Shared foundation only:** the canonical operational core; deterministic synchronization of generated copies with drift detection (read-only check by default, explicit write mode); validator support for `rfcs/`; record and scenario format definitions for the Phase 1 formats; example records and synthetic fixtures; validator checks for record structure; prevention of new cross-skill relative links; deterministic self-tests, including regression tests for malformed records, drifted copies, incompatible versions and invalid authorization references. Standard library only. No skill directories, no paid evaluations | RFC branch |
+| 1b | `development-coordination`: the [coordination protocol](05-artifact-conventions.md#claims-and-the-coordination-protocol), the activity check through a generated copy of `path_in_use.py`, the worktree decision procedure, safe interruption, scenarios. Settles process start time, Windows, network filesystems and the several-machines convention | 1a |
+| 1c | `agent-handoff`: the record, the resume procedure, authorization-reference verification, refreshing before compaction, `handoff_check.py`, scenarios. Settles where owner identities are declared | 1b |
+| 1d | `instruction-governance`: canonical policy, adapters per agent, the trust boundary, the precedence rule, the trigger table, the policy audit tool (read-only by default, proposed diff, revision and digest checks, explicit approval, unrelated text preserved, no partial writes), opt-in enforcement adapters documented but never installed by an agent | 1a |
 
-**Exit:** the three skills pass Tier 0 and Tier 1; one budgeted Tier 2 run of their scenarios on at least two
-agents; the owner adds the consultation triggers to their own instruction files (the agent proposes the patch and
-does not apply it).
+**Phase 1 exit:**
+- Tier 0 and Tier 1 pass.
+- A first Tier 2 suite on Claude Code and Codex is estimated, the owner approves the estimate (proposed cap USD 25),
+  and it runs with the [approved settings](06-validation-strategy.md#tier-2-scenario-evaluations-with-an-agent).
+- The owner applies the consultation-trigger changes to their own instruction files. The agent proposes the diff and
+  does not apply it.
 
 ## Phase 2: evidence and cost
 
-| PR | Content | Depends on |
+| PR | Content | Base |
 |---|---|---|
-| 2a | `research-provenance`: run manifest, purposes, criteria freeze, amendments, numerical metadata, negative results; `run_manifest.py` | 1a |
-| 2b | `resource-budgeting`: estimates, budget file, stop criteria, deduplication, CI hygiene; `budget_check.py` | 2a (reads manifests) |
+| 2a | `research-provenance`: run manifests, purposes, criteria freeze, amendments, numerical metadata, negative results, output classes at creation | 1a (or the last Phase 1 branch) |
+| 2b | `resource-budgeting`: thresholds as classification, estimates with uncertainty, money for CI, cumulative related operations, stop conditions, standing workflows, CI hygiene; `budget_check.py`. Settles how related operations are identified | 2a |
 
-**Exit:** as Phase 1, plus one real experiment in a project run under the two skills, with its manifest and
-estimate-versus-actual reviewed by the owner.
+**Exit:** as Phase 1, plus one real experiment run under both skills, with its manifest and estimate-versus-actual
+reviewed by the owner.
 
 ## Phase 3: releases and debt
 
-| PR | Content | Depends on |
+| PR | Content | Base |
 |---|---|---|
-| 3a | `release-governance`: build classes, candidates, gates and waivers, artifact manifest, decision record, rollback; `release_check.py` | 2a (qualification evidence) |
-| 3b | `technical-debt-management`: register, triggers, markers; `debt_check.py` | 3a (releases list known issues) |
+| 3a | `release-governance`: build classes, candidates, gates and waivers, artifact manifest, decision record, rollback | 2a |
+| 3b | `technical-debt-management`, **only if** the decision point below says so | 3a |
 
-**Decision point before 3b:** if Phases 1–3a already cover limitations well enough (handoff limitations, release
-known issues, domain omission registers), cut 3b. Fewer, better skills.
+**Decision point (D3):** if handoff limitations, release known-issues and the domain skills' existing registers already
+cover enough, `technical-debt-management` is not implemented.
 
 ## Phase 4: integration
 
-These changes touch existing content, so each needs explicit owner approval:
-- `workspace-housekeeping` migration, per the [overlap table](03-responsibility-matrix.md#overlaps-with-workspace-housekeeping):
-  pointers to `development-coordination` (activity check), `research-provenance` (run records, amendments) and
-  `release-governance` (artifact manifest); stop restating global instructions.
-- Whether to generalize `workspace-housekeeping`'s audio-plugin- and macOS-specific wording to match the family's
-  domain-agnostic, portable principles, or to keep it as the audio-workspace member of the family.
-- A README section for the family, in the repository's existing "one owner per area" table style.
-- Optional alignment of domain skills: replacing their own status vocabularies and change terms with the family's
-  evidence labels and amendment record where that loses nothing. Optional, and per skill.
-- A second budgeted Tier 2 run across all eight skills (the seven new ones and `workspace-housekeeping`); prune or
-  merge anything that the scenarios show is unused or
+Each item touches existing content and needs explicit owner approval:
+- **`workspace-housekeeping` integration** per the [overlap table](03-responsibility-matrix.md#overlaps-with-workspace-housekeeping),
+  including the manifest scope from D11 (deliberate cleanup, destructive operations and evidence-sensitive deletion;
+  not routine edits, fixture teardown or task-owned temporary files), with stricter project rules preserved.
+- **Generalizing `workspace-housekeeping`** for non-audio projects and platforms beyond macOS, keeping the specialized
+  procedures (APFS clone accounting, Restic on the owner's disk, audition bundles) in its references.
+- Whether `workspace-housekeeping` adopts the generated operational core.
+- A README section for the Operational Skills family, in the repository's "one owner per area" table style.
+- Optional alignment of domain skills' status vocabularies and change terms with the family's evidence labels and
+  amendment record, per skill, where nothing is lost.
+- A Tier 2 run across all the skills that exist by then; prune or merge whatever the scenarios show is unused or
   overlapping.
 
 ## Definition of done for every skill PR
 
-1. `SKILL.md` under 500 lines (specification) and near the family's target of about 150; detail in `references/`,
-   one level deep.
-2. `description` at most 1024 characters, in the repository's style ("Capability. Covers …. Use when …"), with the
-   consultation triggers in it; `agents/openai.yaml` with the required keys.
-3. References to siblings by name, each with its minimum fallback; no cross-skill relative links.
-4. The operational core copy, byte-identical to the canonical one.
-5. Scripts: standard library only, `--self-test` passing normally and under `python -O`.
-6. Scenarios: at least four positive and two negative, with incident mapping.
-7. A trigger set of about 20 prompts for the description, checked at least once.
+1. `SKILL.md` under 500 lines and near the family target of about 150; detail in `references/`, one level deep.
+2. `description` at most 1024 characters, with the consultation triggers; `agents/openai.yaml` with the required keys.
+3. Siblings referenced by name with a minimum fallback; no new cross-skill relative links.
+4. `references/operational-core.md` present and generated; the drift check passes.
+5. Scripts standard library only, `--self-test` passing normally and under `python -O`.
+6. Scenarios: at least four positive and two negative, critical ones marked, incidents mapped.
+7. A trigger set of about 20 prompts for the description.
 8. No private paths, project names, host names or unpublished results.
-9. The repository validator passes; the PR is opened as a draft for owner review.
+9. The repository validator passes; the PR is a draft for owner review; nothing merges without the owner.
 
 ## Outside this roadmap
 
-Found during the audit, but independent of the family:
-- **A defect in `workspace-housekeeping`'s procedures** (see the
-  [assessment](02-ecosystem-assessment.md#workspace-housekeeping-findings)): a name-filtered process check that
-  contradicts the skill's own "complete process list" rule. A small fix that could land before Phase 1, with owner
-  approval.
-- **107 cross-skill relative links** in the existing skills break whenever the linked sibling is not installed next to
-  the linking skill. Fixing them is a
-  separate repository-wide change.
+- **PR #18 (merged 2026-11-27, independently of this RFC)** corrected `workspace-housekeeping`: a tested in-use check
+  (`path_in_use.py`: working directories and open files of every process, explicit visibility, UNKNOWN never treated
+  as idle), revalidation chained with removal, and no forced worktree removal. The family builds on it.
+- **Existing cross-skill links.** Phase 1a freezes the 107 existing `../../<other-skill>/` links in a baseline so no
+  new ones appear. Removing the existing ones is a separate repository-wide change.
+- **Clean-machine reproducibility without persistent checkouts (D12).** To investigate: a disposable CI job that
+  checks out a commit; a container with the repository mounted read-only; a `git archive` export into a scratch
+  directory, removed after use. None creates a persistent duplicate development checkout, and none weakens the
+  workspace policy. Any clone or worktree still needs explicit authorization or a narrowly scoped exception.

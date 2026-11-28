@@ -1,6 +1,7 @@
 # 2. Existing skills and ecosystem assessment
 
-Part of [RFC 0001: Agent Operations](README.md). Status: **draft for owner review**. Sources checked 2026-11-27.
+Part of [RFC 0001: Operational Skills](README.md). Status: **reviewed** (revision 2: findings reconciled with the
+owner's decisions and with PR #18). Sources checked 2026-11-27.
 
 **How to read the labels.**
 - **[V]** I fetched or read the source myself during this phase.
@@ -48,23 +49,25 @@ the family's [R3 requirements](04-risk-and-authorization.md#requirements-per-lev
 release skills will own. The [responsibility matrix](03-responsibility-matrix.md#overlaps-with-workspace-housekeeping)
 gives each overlap an owner now, an owner later, and the migration that needs approval.
 
-**Defects and tensions found** (not fixed in Phase 0):
+**Defects and tensions found in Phase 0, and their current state:**
 
-1. **A name-filtered process check.** The procedure for removing a worktree says to check every process "without
-   truncating the list", then gives a command that lists only processes matching
-   `node|vite|cargo|python|cmake` (`references/procedures.md`, "Removing a worktree or checkout", step 3). A `ninja`,
-   `make`, `bun`, `java` or agent process inside the worktree would be missed. It is the same class of gap as incident
-   I6 (a partial process list), whatever that incident's exact cause was. **It is our main argument for turning such
-   checks into tested scripts:** prose said "complete", and the example did not match it.
-2. **Every deletion needs a manifest** (policy §6.1), including disposable caches that need no backup (principle 2).
-   Read literally, deleting your own scratch build directory during development needs a written, owner-approved
-   manifest. The family's risk model would put that at R0 or R1. The owner should decide whether §6.1 is meant for
-   cleanups or for every deletion.
-3. **Domain- and machine-specific wording.** "Audio-plugin and research workspace", APFS clone accounting, a macOS
-   keychain command and the owner's approved external disk are specific to one workspace. They are correct there, but
-   they clash with the family's domain-agnostic and portable principles.
+1. **A name-filtered process check. Resolved by PR #18.** The worktree-removal procedure said to check every process
+   "without truncating the list", then gave a command that listed only processes matching
+   `node|vite|cargo|python|cmake`, missing `ninja`, `make`, `bun`, `java` or agent processes: the same class of gap as
+   incident I6. The same procedure also permitted a forced removal. PR #18, merged independently of this RFC, replaced
+   the command with `scripts/path_in_use.py` (working directories and open files of every process, explicit
+   visibility, UNKNOWN never treated as idle), chained revalidation with removal, and removed `--force`. Its self-test
+   covers git's own protections, and deliberate mutations of its logic each fail it. **This is the family's model for
+   turning rules into tested scripts:** the prose said "complete", and the example did not match it.
+2. **"Every deletion needs a manifest"** (policy §6.1). **Scope settled by D11:** deliberate workspace cleanup,
+   destructive operations and evidence-sensitive deletion; not routine source edits, test-fixture teardown or
+   demonstrably disposable, task-owned temporary files. The wording change waits for Phase 4.
+3. **Domain- and machine-specific wording** ("audio-plugin and research workspace", APFS clone accounting, a macOS
+   keychain command, the owner's approved external disk). Correct for one workspace, at odds with the family's
+   domain-agnostic and portable principles. **Planned (D11):** generalize the skill in Phase 4 and keep the specialized
+   procedures in its references.
 4. **It restates the owner's global instructions** (policy preamble). Every restatement is another copy that can drift
-   from the source (incident I8).
+   (incident I8). Phase 4 points it at the canonical policy instead.
 
 ## Overlap with existing skills
 
@@ -86,6 +89,8 @@ re-checked.
 - **Clones and worktrees ✓:** `spice-circuit-modeling` (clean-machine regeneration from a new clone) and
   `bbd-modeling` (reproduce a reference binary's hash from a clean worktree of the cited commit) versus
   `workspace-housekeeping` (no unauthorized clones or worktrees). Neither side mentions the other.
+  **Direction (D12):** no blanket exception; explicit authorization or a narrowly scoped exception, and preferably
+  a disposable CI job, a container or a `git archive` export instead of a persistent clone.
 - **Build directories ✓:** `guitar-dsp` proposes four build presets; `workspace-housekeeping`'s default limit is
   three. Housekeeping's exceptions may cover the difference; nothing says so.
 - **Status vocabularies (audit-reported):** NOT EVALUATED, NOT MET, NOT RUN, NOT CHECKED, PENDING, UNRESOLVED and
@@ -164,8 +169,9 @@ may adopt them in Phase 4 where nothing is lost. The family does not rewrite dom
   gate.
 - **[V] Codex sandbox.** In the default workspace-write sandbox, `.git` (and `.agents`, `.codex`, `.aws`) inside a
   writable root is read-only, recursively. ([approvals and security](https://learn.chatgpt.com/docs/agent-approvals-security))
-  **Consequence:** shared coordination state cannot live under `.git/`. This RFC puts it in an excluded
-  `.agent-state/` directory ([location rule](05-artifact-conventions.md#location-rule)).
+  **Consequence:** shared coordination state cannot live under `.git/`, and its exclusion cannot rely on writing
+  `.git/info/exclude`. This RFC puts it in a self-ignoring `.agent-state/` directory, tested with a read-only `.git`
+  ([location rule](05-artifact-conventions.md#location-rule)).
 - **Our enforcement ladder**, from weakest to strongest: prose in a skill → a mandatory trigger in an instruction file
   → a deterministic script the skill tells the agent to run → a harness hook or deny rule → a server-side gate. The
   family uses the strongest rung that is practical for each rule and says plainly which rung a rule is on.
@@ -208,9 +214,12 @@ may adopt them in Phase 4 where nothing is lost. The family does not rewrite dom
 - **[R] Leases and advisory locks.** A lease grants rights for a limited term, so a failed holder blocks others only
   until it expires (Gray and Cheriton, SOSP 1989; [ACM](https://dl.acm.org/doi/10.1145/74851.74870)). `flock` locks
   are advisory ([man page](https://man7.org/linux/man-pages/man2/flock.2.html)).
-- **Consequence (ours).** No vendor documents a cross-agent claim protocol. A file-based, advisory lease in the
-  checkout, combined with an activity check that does not depend on cooperation, is the lightest design that works
-  across agents without a service.
+- **Consequence (ours).** No vendor documents a cross-agent claim protocol. Atomic creation of individual claim files
+  is not enough: two agents can create overlapping claims at the same moment. The family serializes conflict checking
+  and acquisition through one advisory lock on a registry lock file, identifies holders by PID **and** process start
+  time, and backs the advisory claims with an activity check that does not depend on cooperation
+  ([protocol](05-artifact-conventions.md#claims-and-the-coordination-protocol)). Within the owner's policy, worktrees
+  are used only with explicit authorization or a narrowly scoped exception (D12).
 
 ## Comparable collections and the name
 
@@ -228,7 +237,7 @@ governance. One round of searching found none. That is weak evidence, not proof 
 **[R] The name "AgentOps" is taken three times:** a skills collection for coding agents in this exact category
 ([boshu2/agentops](https://github.com/boshu2/agentops)), Microsoft's AgentOps accelerator
 ([Azure/agentops](https://github.com/Azure/agentops)), and an agent observability product
-([AgentOps-AI/agentops](https://github.com/AgentOps-AI/agentops)). See [decision D1](README.md#d1-the-family-name).
+([AgentOps-AI/agentops](https://github.com/AgentOps-AI/agentops)). The owner chose "Operational Skills" ([D1](README.md#d1-family-name)).
 
 ## Engineering practice prior art
 

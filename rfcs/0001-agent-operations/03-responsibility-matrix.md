@@ -1,6 +1,6 @@
 # 3. Skill responsibility matrix
 
-Part of [RFC 0001: Agent Operations](README.md). Status: **draft for owner review**.
+Part of [RFC 0001: Operational Skills](README.md). Status: **approved** (owner decision D3, revision 2).
 
 ## Contents
 - [The family](#the-family)
@@ -12,179 +12,183 @@ Part of [RFC 0001: Agent Operations](README.md). Status: **draft for owner revie
 
 ## The family
 
-Eight skills: the existing `workspace-housekeeping` and seven proposed ones. The candidates from the brief survive
-with one change: `instruction-governance`
-becomes its own skill instead of a section of `development-coordination` (see [boundary tests](#boundary-tests)).
+Eight skills: the existing `workspace-housekeeping` and seven approved ones ([D3](README.md#d3-skill-boundaries)).
 
 | Skill | Status | Priority | One-line responsibility |
 |---|---|---|---|
-| `workspace-housekeeping` | Exists (policy revision 3) | — | Retention: what must be preserved, backed up and how storage is reclaimed |
-| `development-coordination` | Proposed | P0 | Concurrency: who is using what, and whether a shared-state operation is safe now |
-| `agent-handoff` | Proposed | P0 | Continuity: a record that lets another agent or session resume without the conversation |
-| `instruction-governance` | Proposed | P0 (raised from cross-cutting; see [D4](README.md#d4-instruction-governance-as-its-own-p0-skill)) | Policy: one canonical source for operational rules, synchronized agent adapters, consultation triggers |
-| `research-provenance` | Proposed | P1 | Integrity of results: provenance, frozen criteria and amendments for experiments and benchmarks |
-| `resource-budgeting` | Proposed | P1 | Cost: estimates, thresholds, authorization and stop rules before expensive operations |
-| `release-governance` | Proposed | P2 | Trust in shipped bytes: build classes, immutable candidates, gates, release decisions, rollback |
-| `technical-debt-management` | Proposed | P2 | Compromises that outlive a PR: debt records, reassessment triggers, links to releases and decisions |
+| `workspace-housekeeping` | Exists (policy revision 3, procedures corrected by PR #18) | — | Retention: what must be preserved and backed up, how storage is reclaimed, the authoritative in-use check |
+| `development-coordination` | Approved | P0 | Concurrency: who is using what, and whether a shared-state operation is safe now |
+| `agent-handoff` | Approved | P0 | Continuity: a verifiable record that lets another agent or session resume |
+| `instruction-governance` | Approved | P0 | Policy: one canonical source, audited adapters, the trust boundary, consultation triggers |
+| `research-provenance` | Approved | P1 | Integrity of results: provenance, frozen criteria and amendments |
+| `resource-budgeting` | Approved | P1 | Cost: thresholds, estimates, cumulative accounting, authorization and stop rules |
+| `release-governance` | Approved | P2 | Trust in shipped bytes: build classes, immutable candidates, gates, decisions, rollback |
+| `technical-debt-management` | Provisional | P2 | Compromises that outlive a PR; implemented only if the Phase 3 decision point says so |
 
 ## Matrix
 
-Each skill names its siblings by name and states a minimum fallback for when a sibling is not installed (see
-[rules for references](#rules-for-references-between-skills)).
+Each skill names its siblings by name and states a minimum fallback for when a sibling is not installed
+([rules](#rules-for-references-between-skills)). Every family skill carries a generated copy of the operational core
+([D4](README.md#d4-shared-operational-core)).
 
 ### development-coordination
 
 | | |
 |---|---|
-| **Owns** | The activity check (is anyone using this checkout, branch, build directory or port?); claims and leases in `.agent-state/claims/`; stale-claim detection; branch and PR ownership signals; safe interruption and cancellation; the worktree **decision procedure** (ask, use only with authorization) |
-| **Does not own** | Worktree policy itself and worktree removal (`workspace-housekeeping`); what to write when leaving (`agent-handoff`) |
-| **Triggers** | Before any R1-or-higher operation on shared state: switching branches, resetting, rebasing, rebuilding a shared build directory, starting or stopping a dev server, pushing to a branch the agent did not create, cancelling a job; when another agent's activity is observed; when a harness offers to create an isolated worktree |
-| **Inputs** | Process list with working directories; git state (dirty files, in-progress operations, recent ref changes); existing claims; optionally PR and CI state |
-| **Produces** | Activity-check result (`busy`, `idle` or `unknown`, with evidence); claims |
-| **References** | `workspace-housekeeping` (worktree policy and removal), `agent-handoff` (claims point to handoff records), `instruction-governance` (where standing authorizations for worktrees are written) |
+| **Owns** | The [coordination protocol](05-artifact-conventions.md#claims-and-the-coordination-protocol): the claim registry and its serialized acquire, renew and release; overlap rules; holder states (live, expired-held, dead, unknown) with process identity by PID and start time; the activity check (process working directories **and** open files, git in-progress state, explicit visibility), through a generated copy of `workspace-housekeeping`'s `path_in_use.py`; branch and PR ownership signals across machines; safe interruption and cancellation; the worktree decision procedure (ask, or use a scoped exception) |
+| **Does not own** | Worktree policy, worktree removal and the in-use check's implementation (`workspace-housekeeping`); what to write when leaving (`agent-handoff`); where exceptions are written (`instruction-governance`) |
+| **Triggers** | Before an R1-or-higher operation on shared state where another party could be affected: switching branches, committing or resetting in a shared checkout, rebuilding a shared build directory, starting or stopping a dev server, pushing to a branch the agent did not create, cancelling a job; when another agent's activity is observed; when a harness offers an isolated worktree |
+| **Inputs** | The process table (working directories and open files); git state; existing claims; optionally PR and CI state |
+| **Produces** | Claims; activity-check results (`busy`, `idle` or `unknown`, with visibility and evidence) |
+| **References** | `workspace-housekeeping` (worktree policy and removal, the in-use check's source), `agent-handoff`, `instruction-governance` |
+| **Limits, stated in the skill** | Advisory for cooperating agents only; uncooperative agents and external processes are detected, not prevented ([advisory versus enforced](05-artifact-conventions.md#advisory-coordination-versus-enforcement)); local claims are invisible to other machines |
 
 ### agent-handoff
 
 | | |
 |---|---|
-| **Owns** | Handoff records; the resume procedure (verify the record before acting on it); evidence labels in records; refreshing the record before context compaction is expected |
-| **Does not own** | Claims (`development-coordination`); run manifests (`research-provenance`); release decisions (`release-governance`) |
-| **Triggers** | Ending a session with unfinished work; passing work to another agent or model; long-running jobs left running; blocking on an owner decision; resuming work someone else started; approaching the context limit |
-| **Inputs** | Git and PR state; test and CI results; running processes started by the agent; decisions and authorizations given during the session |
+| **Owns** | Handoff records; the resume procedure (verify the record against the repository before acting); verification of authorization references on resume (established, unestablished, invalid); evidence labels in records; refreshing the record before compaction where the harness allows |
+| **Does not own** | Authority: a handoff is never an independent source of it ([D6](README.md#d6-authorization-across-handoffs)); claims (`development-coordination`); run manifests and release decisions (their skills) |
+| **Triggers** | Ending a session with unfinished work; passing work to another agent or model; leaving long-running jobs; blocking on an owner decision; resuming someone else's work; approaching the context limit |
+| **Inputs** | Git and PR state; test and CI results; processes the agent started; decisions and authorization references from the session |
 | **Produces** | `.agent-state/handoffs/<branch>.md`; optionally a public-safe status section in the PR description |
-| **References** | `development-coordination` (claims, activity check on resume), `research-provenance` and `release-governance` (link their records rather than restating them) |
+| **References** | `development-coordination`, `research-provenance`, `release-governance` (link their records, never restate them), `workspace-housekeeping` (preserving important handoffs) |
 
 ### instruction-governance
 
 | | |
 |---|---|
-| **Owns** | The canonical operational policy and its revision number; agent-specific adapters (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, rule files) and how they import or copy the canonical text; the precedence and conflict rule; the table of mandatory skill-consultation triggers; optional enforcement adapters (hooks, deny rules, git hooks) |
+| **Owns** | The canonical operational policy, its revision and digest; the [trust boundary](04-risk-and-authorization.md#trust-boundary-for-standing-authorizations) for the canonical policy and for standing authorizations; the [precedence rule](04-risk-and-authorization.md#instruction-precedence); adapters (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, rule files) and how they import or carry the policy; the consultation-trigger table; documentation of opt-in enforcement adapters |
 | **Does not own** | The content of domain policies (`workspace-housekeeping` owns its policy text); runtime coordination |
-| **Triggers** | Creating or editing any agent instruction file; installing, renaming or removing a skill; finding two rules that conflict; setting up a new agent, machine or repository; an agent behaving as if it had not seen a rule |
-| **Inputs** | The canonical policy file; every adapter file the owner names; the installed skills list |
-| **Produces** | A drift report (missing, extra, outdated or conflicting blocks); a proposed patch for the owner to apply; trigger table |
-| **References** | Every skill in the family (it maintains their consultation triggers) |
+| **Triggers** | Creating or editing an agent instruction file; installing, renaming or removing a skill; finding conflicting rules; setting up a new agent, machine or repository; an agent behaving as if it had not seen a rule |
+| **Inputs** | The canonical policy; the adapter files the owner names; the installed skills list |
+| **Produces** | An audit report (missing, extra, outdated, edited or conflicting blocks); a proposed diff; the trigger table |
+| **References** | Every family skill (it maintains their consultation triggers) |
+
+**Policy audit tool requirements:**
+1. Read-only audit is the default mode.
+2. It proposes a diff and shows it.
+3. It verifies the canonical revision and digest, and the digest recorded in each adapter block.
+4. It applies changes only with explicit approval of that exact diff (the approval names the diff's digest).
+5. It changes nothing outside the policy markers; unrelated user instructions stay byte-identical.
+6. It fails without modifying anything when an adapter cannot be updated safely: markers missing, duplicated or
+   unbalanced, the file changed since the audit, the adapter a symlink, or the file not writable.
+7. It never installs hooks, changes harness settings or edits global instruction files on its own. Global adapters
+   change only when the owner applies the approved diff or explicitly instructs the agent to.
 
 ### research-provenance
 
 | | |
 |---|---|
-| **Owns** | Run manifests; the exploratory, confirmatory and qualification distinction; freezing acceptance criteria before results exist; sealed held-out data; amendment records for criteria; numerical-reproducibility metadata (precision, seeds, threads, tolerances); recording negative results; recording consumption (cost fields) |
-| **Does not own** | Whether a frozen file may be deleted, moved or compressed (`workspace-housekeeping`); spending thresholds and authorization (`resource-budgeting`); domain gates and oracles (`circuit-to-dsp`, `spice-circuit-modeling`, `bbd-modeling`) |
-| **Triggers** | Before running an experiment, benchmark, simulation or evaluation whose result may be cited; before changing acceptance criteria or a frozen evidence set; before citing a result in a decision or document; when an experiment fails |
-| **Inputs** | Committed source, configuration, inputs, toolchain identity, criteria file |
+| **Owns** | Run manifests; exploratory, confirmatory and qualification purposes; output classes declared at creation; freezing criteria before results; sealed held-out data; amendment records; numerical metadata; negative results; recording consumption |
+| **Does not own** | Whether frozen files may be deleted, moved or compressed (`workspace-housekeeping`); thresholds and authorization of spending (`resource-budgeting`); domain gates (`circuit-to-dsp`, `spice-circuit-modeling`, `bbd-modeling`) |
+| **Triggers** | Before a run whose result may be cited; before changing acceptance criteria or frozen evidence; before citing a result; when an experiment fails |
+| **Inputs** | Committed source, configuration, inputs, toolchain identity, criteria |
 | **Produces** | Run manifests; amendment records |
-| **References** | `resource-budgeting` (before launching), `workspace-housekeeping` (retention of evidence), domain skills for domain gates |
+| **References** | `resource-budgeting`, `workspace-housekeeping`, domain skills |
 
 ### resource-budgeting
 
 | | |
 |---|---|
-| **Owns** | Cost estimates before expensive operations (pilot runs, extrapolation, CI minutes with runner prices); the project budget file; stop and early-termination criteria; deduplication of identical runs; CI hygiene (concurrency groups, path filters, caching, matrix size); local versus remote execution choices |
-| **Does not own** | Disk retention and cleanup (`workspace-housekeeping`); recording actual consumption in run manifests (`research-provenance` records it, this skill compares it with the estimate) |
-| **Triggers** | Before launching compute, a paid CI workload, an API batch job, a large download or upload; before changing a CI workflow's triggers or matrix; when a running job exceeds its estimate |
-| **Inputs** | Budget file; pilot measurements; provider pricing pages; existing run manifests (to find a run that already answers the question) |
-| **Produces** | An estimate with assumptions, the decision (proceed within budget, or an R2 request to the owner), stop criteria, estimate versus actual |
-| **References** | `research-provenance` (manifests), `workspace-housekeeping` (disk), `development-coordination` (shared runners and build directories) |
+| **Owns** | The budget file and its thresholds, which classify operations (at or above a threshold is R2); estimates with low and high values and their basis; money for CI, kept apart from billed and elapsed minutes; cumulative accounting of related operations so that splitting a task cannot circumvent a threshold; stop conditions and the material-overrun rule; respect for standing authorized workflows; CI hygiene (concurrency groups, path filters, caching, matrix size); local versus remote execution choices |
+| **Does not own** | Storage retention and cleanup (`workspace-housekeeping`); recording actual consumption (`research-provenance` records it; this skill compares it with the estimate) |
+| **Triggers** | Before launching compute, paid CI, an API batch, paid GPU, a large download or upload, or anything adding persistent storage; before changing CI triggers or matrix; when a job passes its estimate |
+| **Inputs** | The budget file; pilot measurements; providers' current price lists; existing run manifests (to find a run that already answers the question) |
+| **Produces** | An estimate; the classification; an R2 request where needed; stop conditions; estimate versus actual |
+| **References** | `research-provenance`, `workspace-housekeeping`, `development-coordination` |
+
+The owner's initial workspace thresholds (D9, not universal defaults): 8 CPU-hours, 2 hours wall clock, no implicit
+paid GPU, USD 2 incremental paid CI, USD 5 API, 20 GiB persistent storage and 5 GiB network transfer, per operation
+([format](05-artifact-conventions.md#resource-budget)).
 
 ### release-governance
 
 | | |
 |---|---|
-| **Owns** | Build classes (development, audition, release candidate, released); version labels and immutable release candidates; acceptance gates for a release, results per gate, waivers; artifact provenance manifests; release decision records; rollback readiness |
-| **Does not own** | Preserving the bytes and their backups (`workspace-housekeeping`); platform procedures such as signing, notarization and installers (`juce-plugin` and other domain skills); debt records (`technical-debt-management`) |
-| **Triggers** | Creating a release candidate; promoting, publishing or tagging a release; a candidate that fails or skips a gate; rolling back; being asked whether a build is "the approved one" |
-| **Inputs** | Source commit and tag, build provenance, gate results, debt register, previous release |
-| **Produces** | Artifact provenance manifests; release decision records; amendment records for release gates |
-| **References** | `workspace-housekeeping`, `research-provenance` (qualification evidence), `technical-debt-management`, domain skills for platform procedures |
+| **Owns** | Build classes; version labels and immutable release candidates; release gates, results per gate and waivers; artifact provenance manifests; release decision records; rollback readiness |
+| **Does not own** | Preserving the bytes (`workspace-housekeeping`); platform procedures such as signing and installers (`juce-plugin` and other domain skills); debt records |
+| **Triggers** | Creating a candidate; promoting, publishing or tagging a release; a candidate failing or skipping a gate; rolling back; "is this the approved build?" |
+| **Inputs** | Source commit and tag, build provenance, gate results, known issues, previous release |
+| **Produces** | Artifact provenance manifests; release decision records; amendments to release gates |
+| **References** | `workspace-housekeeping`, `research-provenance`, `technical-debt-management` (if implemented), domain skills |
 
-### technical-debt-management
+### technical-debt-management (provisional)
 
 | | |
 |---|---|
-| **Owns** | The debt register; when a compromise becomes a record; risk classification; reassessment triggers; code markers and their consistency with the register |
-| **Does not own** | Architecture decision records in general (projects use their existing ADR practice; a debt entry links to an ADR); release gates (`release-governance`) |
-| **Triggers** | Leaving a workaround, known defect, limitation or deferred decision in place beyond the current PR; upgrading a dependency that a workaround is pinned to; preparing a release; reviewing open debt |
-| **Inputs** | The register; code markers; dependency versions |
-| **Produces** | Register entries; a reassessment report (entries whose trigger has fired) |
-| **References** | `release-governance` (known issues), `agent-handoff` (limitations that outlive a session) |
+| **Owns, if implemented** | The debt register; when a compromise becomes a record; risk classification; reassessment triggers; code markers and their consistency with the register |
+| **Does not own** | Architecture decision records in general; release gates |
+| **Triggers** | Leaving a workaround, defect, limitation or deferred decision beyond the current PR; upgrading a dependency a workaround is pinned to; preparing a release |
 
 ### workspace-housekeeping (existing)
 
 | | |
 |---|---|
-| **Owns** | Preservation and backups (git bundles, Restic, restore verification); preserved binaries and their manifest entries; classification of data for retention; deletion manifests and pre-deletion revalidation; the build-directory limit; worktree and duplicate-checkout policy and removal; storage accounting |
-| **Does not own (after this RFC)** | The activity check (`development-coordination`); creating provenance and amending criteria (`research-provenance`); promotion of builds (`release-governance`) |
-| **Triggers** | Unchanged: before creating clones or worktrees, switching branches in a shared checkout, deleting or archiving, backing up work in progress, citing a binary or result, reporting disk usage |
+| **Owns** | Preservation and backups; preserved binaries; retention classes; deletion manifests and pre-deletion revalidation; the build-directory limit; worktree and duplicate-checkout policy and removal (plain removal, never forced); the authoritative in-use check `scripts/path_in_use.py`; storage accounting |
+| **Does not own (after this RFC)** | Claims and coordination (`development-coordination`); creating provenance and amending criteria (`research-provenance`); promotion of builds (`release-governance`) |
+| **Triggers** | Unchanged |
 
 ## Boundary tests
 
-A responsibility earns its own skill only if its **consultation trigger** is distinct, because a skill is useful
-only when it is activated, and activation is driven by the description (see the
-[ecosystem assessment](02-ecosystem-assessment.md#agent-skills-format-and-activation)).
+A responsibility earns its own skill only if its consultation trigger is distinct, because activation is driven by the
+description ([assessment](02-ecosystem-assessment.md#agent-skills-format-and-activation)).
 
 | Pair | Distinct triggers? | Verdict |
 |---|---|---|
-| `instruction-governance` vs `development-coordination` | Yes. One triggers on editing instruction files, installing skills or finding conflicting rules, which is rare and configuration-time. The other triggers before mutating shared state, which happens many times a day | **Separate.** Folding governance into coordination would load policy-maintenance guidance on every branch switch, and dilute coordination's description |
-| `agent-handoff` vs `development-coordination` | Yes. Leaving or resuming work, versus acting on shared state now | **Separate**, sharing `.agent-state/` |
-| `resource-budgeting` vs `research-provenance` | Mostly. "About to spend" versus "about to produce a citable result". An expensive qualification run triggers both | **Separate.** The overlap is one set of fields: provenance records actual cost, budgeting owns thresholds and compares |
-| `release-governance` vs `workspace-housekeeping` | Yes. Promoting bytes versus keeping bytes | **Separate.** The overlap is the artifact manifest, resolved below |
-| `technical-debt-management` vs `release-governance` | Yes. Debt exists outside releases | **Separate.** Releases read the register |
-| `technical-debt-management` vs `agent-handoff` | Partly. Both record limitations | **Separate.** A handoff limitation that outlives the PR becomes a debt entry |
+| `instruction-governance` vs `development-coordination` | Yes: configuration-time versus runtime | **Separate** (D3) |
+| `agent-handoff` vs `development-coordination` | Yes: leaving or resuming versus acting now | **Separate**, sharing `.agent-state/` |
+| `resource-budgeting` vs `research-provenance` | Mostly: "about to spend" versus "about to produce a citable result" | **Separate**; provenance records cost, budgeting classifies and compares |
+| `release-governance` vs `workspace-housekeeping` | Yes: promoting bytes versus keeping bytes | **Separate** |
+| `technical-debt-management` vs `release-governance` | Yes | **Separate if implemented** |
+| `technical-debt-management` vs `agent-handoff` | Partly | **Separate if implemented**; a limitation outliving the PR becomes a debt entry |
 
-Alternatives considered and rejected:
-- **One `agent-operations` skill with everything in references.** Its description would have to cover seven trigger
-  families within 1024 characters, and every activation would load guidance irrelevant to the task.
-- **Merging handoff and coordination into `agent-continuity`.** Saves one skill. Rejected because the triggers differ
-  and coordination is consulted far more often.
-- **Dropping `technical-debt-management`.** Defensible: it is the least novel. Kept at P2 because version-pinned
-  workarounds already recur in the existing skills and nothing reassesses them (see
-  [domain overlaps](#overlaps-with-domain-skills)). It can be cut at Phase 3 if the earlier skills cover enough.
+Rejected alternatives: one combined skill (seven trigger families in one description); merging handoff and
+coordination (different triggers, very different frequency).
 
 ## Overlaps with workspace-housekeeping
 
-`workspace-housekeeping` already contains parts of three proposed skills. It cannot be edited in Phase 0. Each overlap
-gets a rule for now, a rule for later, and the migration that needs the owner's approval.
+`workspace-housekeeping` contains parts of three family skills. Broader integration is deferred to Phase 4 (D11). Until
+then, where housekeeping and a family skill both speak, the stricter rule applies, and the family skill says so in one
+line rather than restating housekeeping's text.
 
-| Topic | Housekeeping text | Owner now | Owner later | Migration (needs approval) |
+| Topic | Housekeeping text | Owner now | Owner later | Migration (Phase 4, needs approval) |
 |---|---|---|---|---|
-| No unauthorized worktrees or clones | Principle 6, policy §1.2 | `workspace-housekeeping` | Unchanged | None |
-| Don't switch branches in a checkout someone is using | Principle 7, policy §1.4 | Housekeeping states the rule | `development-coordination` owns how to tell whether someone is using it | Housekeeping's workflow calls the activity check instead of describing its own |
-| Process check before removing a worktree or deleting | Procedures: "Removing a worktree", "Pre-deletion revalidation" | Housekeeping | `development-coordination` provides the check; housekeeping keeps the removal and deletion steps | Replace the inline `pgrep` filter with the activity check (see the defect noted in the [assessment](02-ecosystem-assessment.md#workspace-housekeeping-findings)) |
-| Committed source before a qualification run; run records | Policy §4.1 | Housekeeping | `research-provenance` | §4.1 becomes a pointer; housekeeping keeps "results with unknown provenance stay unknown" as a retention fact |
-| Frozen evidence changed only by versioned amendment | Policy §4.3 | Housekeeping (retention) | Retention stays in housekeeping; the amendment procedure moves to `research-provenance` | §4.3 links to the amendment record format |
-| Failed experiments are evidence | Policy §4.5 | Housekeeping | Shared: housekeeping (don't delete), provenance (record them) | None; both keep a one-line statement |
-| Preserved-binary manifest entry | Policy §3.2 | Housekeeping | Housekeeping keeps preservation; `release-governance`'s artifact manifest is a superset that satisfies §3.2 | §3.2 accepts an artifact provenance manifest as its entry |
-| Policy restates the owner's global instructions | Policy preamble | Housekeeping | `instruction-governance` owns the canonical text; housekeeping references it | Housekeeping stops restating global rules |
-
-**Conflict rule until the migration lands:** where housekeeping and a new skill both speak, the stricter rule
-applies, and the new skill says so in one line rather than restating housekeeping's text.
+| No unauthorized worktrees or clones | Principle 6, policy §1.2 | Housekeeping | Unchanged (D12: no blanket exception) | None |
+| Don't switch branches in a checkout someone is using | Principle 7, policy §1.4 | Housekeeping states the rule | Coordination owns how to tell (claims, activity check) | Housekeeping points to coordination |
+| In-use check before removal or deletion | Procedures; `scripts/path_in_use.py` | **Resolved by PR #18**: housekeeping holds the authoritative implementation | Unchanged; coordination carries a generated copy | None |
+| Forced worktree removal | Procedures, step 4 | **Resolved by PR #18**: never forced; refusals investigated | Unchanged | None |
+| Manifest scope | Principle 5, policy §6.1 ("every deletion") | Housekeeping, read with D11: deliberate cleanup, destructive operations, evidence-sensitive deletion; not routine edits, fixture teardown or task-owned temporary files | Unchanged | Reword §6.1 to state the D11 scope |
+| Committed source before a qualification run | Policy §4.1 | Housekeeping | `research-provenance` | §4.1 becomes a pointer; "unknown provenance stays unknown" stays as a retention fact |
+| Frozen evidence changed only by versioned amendment | Policy §4.3 | Housekeeping (retention) | Retention stays; the amendment procedure moves to `research-provenance` | §4.3 links to the amendment format |
+| Failed experiments are evidence | Policy §4.5 | Housekeeping | Shared: don't delete (housekeeping), record (provenance) | None |
+| Preserved-binary manifest entry | Policy §3.2 | Housekeeping | Housekeeping keeps preservation; the artifact manifest is a superset | §3.2 accepts an artifact manifest |
+| Policy restates the owner's global instructions | Policy preamble | Housekeeping | `instruction-governance` owns the canonical text | Housekeeping stops restating global rules |
+| Audio- and macOS-specific wording | Description, procedures | Housekeeping | Housekeeping, generalized | Generalize; keep specialized procedures in references |
 
 ## Overlaps with domain skills
 
-The repository audit (see the [assessment](02-ecosystem-assessment.md#overlap-with-existing-skills)) found
-operational guidance spread through the domain skills. The rule: **domain skills keep domain procedures; the
-operational skills own the domain-agnostic decision and record.** Nothing in a domain skill changes in Phase 0.
+The rule: domain skills keep domain procedures; the operational skills own the domain-agnostic decision and record.
+Nothing in a domain skill changes before Phase 4.
 
 | Operational concern | Already in domain skills | Resolution |
 |---|---|---|
-| Criteria changes | `circuit-to-dsp` (documented revision of a gate), `bbd-modeling` (owner-approved error budget, re-freeze), `spice-circuit-modeling` (change record for oracle edits) | `research-provenance` defines one amendment record. Domain skills keep their domain conditions (what evidence justifies a revision) |
-| Release gates, signing, installers | `juce-plugin` (release gates, signing and notarization, install qualification, CI evidence), `circuit-to-dsp` (release classes and artifact inventory), `vcv-rack-plugin` (tag and version checks) | `release-governance` owns build classes and the release decision record. Platform procedures stay in the domain skills |
-| Cost of CI and re-runs | `juce-plugin` (runner prices per OS), `circuit-to-dsp` (don't re-run SPICE when hashes match), `bbd-modeling` (re-run frozen verification every phase) | `resource-budgeting` owns the estimate and authorization. The re-run guidance does not conflict: re-verifying a frozen set is cheap and required; regenerating an oracle is expensive and avoided |
-| Reports for the next agent | `juce-plugin` (report keeps rejected candidates), `guitar-gear-modeling` (accepted-constraints ledger), `circuit-to-dsp` (report fields) | `agent-handoff` links to these reports and adds a "rejected approaches" section to every handoff |
-| Version-pinned workarounds and omissions | `juce-plugin` (workarounds scoped to framework versions, re-checked on upgrade), `circuit-to-dsp` (omission register), `bbd-modeling` (research agenda, known limitations) | `technical-debt-management` gives these a common register and a reassessment trigger; domain registers can stay where they are and be linked |
-| Fresh clones for reproducibility | `spice-circuit-modeling` (clean-machine regeneration in a new clone), `bbd-modeling` (reproduce a binary hash from a clean worktree) | Conflicts with housekeeping's worktree and clone rule. `development-coordination` routes these to the owner as R2 requests; `instruction-governance` lets the owner write a standing authorization for them |
+| Criteria changes | `circuit-to-dsp` (documented revision), `bbd-modeling` (owner-approved error budget, re-freeze), `spice-circuit-modeling` (change records) | `research-provenance` defines one amendment record; domain skills keep their domain conditions |
+| Release gates, signing, installers | `juce-plugin`, `circuit-to-dsp`, `vcv-rack-plugin` | `release-governance` owns build classes and the decision record; platform procedures stay |
+| Cost of CI and re-runs | `juce-plugin` (runner prices per OS), `circuit-to-dsp` (no SPICE re-runs when hashes match), `bbd-modeling` (re-verify frozen sets every phase) | `resource-budgeting` owns classification and authorization; re-verifying a frozen set is cheap and required, regenerating an oracle is expensive and avoided |
+| Reports for the next agent | `juce-plugin` (rejected candidates kept), `guitar-gear-modeling` (accepted-constraints ledger), `circuit-to-dsp` (report fields) | `agent-handoff` links to them and keeps a "rejected approaches" section |
+| Version-pinned workarounds and omissions | `juce-plugin`, `circuit-to-dsp`, `bbd-modeling` | `technical-debt-management`, if implemented, links the domain registers |
+| Fresh clones for reproducibility | `spice-circuit-modeling` (clean-machine regeneration in a new clone), `bbd-modeling` (reproduce a hash from a clean worktree) | **D12:** no blanket authorization. A clone or worktree needs explicit authorization or a narrowly scoped exception. Preferred alternatives: a disposable CI job, a container, or a `git archive` export into scratch ([roadmap](07-roadmap.md#outside-this-roadmap)) |
 
 ## Rules for references between skills
 
-1. **Reference siblings by name, never by relative path.** The Agent Skills specification says file references are
+1. **Reference siblings by name, never by relative path.** The Agent Skills specification keeps file references
    relative to the skill root and one level deep. The existing skills contain 107 links of the form
-   `../../<other-skill>/...`, which resolve in this repository but break whenever the sibling is not installed
-   next to the linking skill.
-   Operational skills must not add more.
+   `../../<other-skill>/...`, which break whenever the sibling is not installed next to the linking skill. Phase 1a
+   freezes them in a baseline and rejects new ones repository-wide.
 2. **State a minimum fallback.** For example: "If `workspace-housekeeping` is installed, follow it before deleting.
-   Otherwise, delete nothing that is not a disposable cache without the owner's written approval."
-3. **One owner per responsibility.** When a skill needs another's rule, it names the owner and gives the one-line
-   minimum. It never copies the procedure. The exception is the shared operational core (see
-   [decision D3](README.md#d3-sharing-the-risk-model-without-coupling-the-skills)), which is copied deliberately and
-   checked for drift.
+   Otherwise, delete nothing that is not a disposable, task-owned file without the owner's approval."
+3. **One owner per responsibility; one source per shared file.** A skill that needs another's rule names the owner and
+   gives a one-line minimum. Text or code that several installed skills must carry identically (the operational core,
+   the in-use check) has exactly one authoritative source and generated, drift-checked copies
+   ([D4](README.md#d4-shared-operational-core)). Nothing is re-implemented.
