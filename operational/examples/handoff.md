@@ -68,5 +68,6 @@ The validator and the RFC link check ran on the committed head. CI has not been 
 
 ## Resume
 1. Check this record against the repository (branch, HEAD, upstream, working tree, PR state).
-2. Verify the standing authorization at its commit; ask the owner once about the unestablished session authorization.
+2. Verify the standing authorization at run time (it is only unverified until then); ask the owner once about the session
+   authorization, which another agent cannot verify.
 3. Continue with Pending item 1.

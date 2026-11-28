@@ -10,6 +10,7 @@ skill installs on its own.
 | [formats.json](formats.json) | The normative definitions of the Phase 1 record and scenario formats |
 | [copies.json](copies.json) | Each source and the paths of its generated copies (none yet: the first family skill arrives in Phase 1b) |
 | [examples/](examples/) | One valid example per format, checked by the repository validator |
+| [fixtures/](fixtures/) | Expected runtime outcomes for authorization references, for Phase 1c to satisfy |
 
 ## Changing the core
 
@@ -30,8 +31,14 @@ digest) or unlisted ([operational_sync.py](../scripts/operational_sync.py)).
 
 ## What the checks prove, and what they do not
 
-`operational_records.py` checks **form**: required fields, types, enumerations, versions, and whether each
-authorization reference is established, unestablished or invalid. It does not check **authenticity**: a well-formed
-reference to a standing authorization can still point to an entry that does not exist, or was not approved by the
-owner. That is checked at run time by the skill that relies on it. Likewise, a matching digest shows identity or
-integrity, not correctness, provenance or authorization.
+`operational_records.py` checks **form**: required fields, types, enumerations, integer versions, duplicate keys,
+contradictory dates. It gives every authorization reference a structural status, `invalid` or `unverified`, and
+**neither grants authority**. A well-formed reference can still point to a commit or entry that does not exist, or to
+one that expired, was revoked, changed after approval, or was never approved by the owner. Only the runtime
+verification of Phase 1c can report `verified`, the one status that grants authority.
+[fixtures/authorization-runtime.json](fixtures/authorization-runtime.json) defines what that runtime verification must
+report for each of those cases; Phase 1a checks only the structural column.
+
+`operational_sync.py` accepts only the sources listed in its reviewed `APPROVED` table (today, `core.md`), each with
+one designated destination name, and never overwrites a file that is not already a generated copy of that source. A
+matching digest shows identity or integrity, not correctness, provenance or authorization.

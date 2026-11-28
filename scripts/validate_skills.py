@@ -315,8 +315,8 @@ def load_script(path: Path):
 
 def check_operational(problems: list[str], skills: list[Path]) -> int:
     sync, records = (load_script(p) for p in REPO_SCRIPTS)
-    copy_problems, _ = sync.plan(ROOT)
-    problems.extend(f"operational copies: {p}" for p in copy_problems)
+    structural, drift, _ = sync.plan(ROOT)
+    problems.extend(f"operational copies: {p}" for p in structural + drift)
     try:
         formats = records.load_formats()
     except (OSError, ValueError) as e:

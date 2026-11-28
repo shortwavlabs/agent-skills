@@ -1,7 +1,6 @@
 {
   "kind": "authorizations",
   "version": 1,
-  "owners": ["github:example-owner"],
   "authorizations": [
     {
       "id": "push-feature-branches",
