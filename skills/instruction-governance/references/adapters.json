@@ -1,0 +1,14 @@
+{
+  "kind": "instruction-adapters",
+  "version": 1,
+  "about": "Which file each agent runtime reads as global instructions, and which canonical blocks (from references/instructions.md) it carries between policy markers. Paths start at the home directory. Codex reads $CODEX_HOME/AGENTS.md when CODEX_HOME is set.",
+  "adapters": [
+    {"harness": "claude-code", "path": "~/.claude/CLAUDE.md",
+     "blocks": ["git-workflow", "workspace-housekeeping", "ignore-rules", "operational-skills"]},
+    {"harness": "codex", "path": "~/.codex/AGENTS.md",
+     "blocks": ["git-workflow", "workspace-housekeeping", "ignore-rules", "operational-skills"]},
+    {"harness": "opencode", "path": "~/.config/opencode/AGENTS.md",
+     "blocks": ["git-workflow", "workspace-housekeeping", "ignore-rules", "operational-skills"]}
+  ],
+  "skill_roots": ["~/.claude/skills", "~/.agents/skills", "~/.codex/skills", "~/.config/opencode/skills"]
+}

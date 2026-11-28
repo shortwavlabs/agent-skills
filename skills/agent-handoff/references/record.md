@@ -86,8 +86,10 @@ Supersedes: <Created time of the previous record> | none
 name: two checkouts with an `origin` remote may be different repositories. `Checkout:` names this host and path, so
 a resume elsewhere knows local files and processes may differ. `Upstream:` says the comparison came from cached
 remote-tracking refs and when they were last fetched; `check --fresh` asks the remote itself (read-only). Under
-State, `new` lists each uncommitted path as `- <path> sha256:<digest>` (or `deleted`, or `not-hashed`), so `check`
-tells a matching inventory from matching content without archiving anything. A failed `git status` is recorded and
+State, `new` lists each uncommitted path as `- <path> sha256:<digest>[+x] index=<mode>:<blob>` (or `deleted`, or
+`not-hashed`; the index part is `none` when nothing is staged and `conflict` for an unmerged entry), so `check` tells a
+matching inventory from matching content and staged state, and notices a changed file mode, without archiving
+anything. A failed `git status` is recorded and
 reported as unknown, never as clean.
 
 Unfinished qualification work: record the frozen criteria by digest and commit under Artifacts, and say in Pending that

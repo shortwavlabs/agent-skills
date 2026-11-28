@@ -52,7 +52,8 @@ STATE = ".agent-state"
 CLAIM_ID = re.compile(r"^\d{8}T\d{6}Z-[0-9a-f]{8}$")
 TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 PLACEHOLDER = re.compile(r"<[a-z][^<>\n]{2,}>")
-DIRTY_LINE = re.compile(r"^- (.+) (sha256:[0-9a-f]{64}|deleted|not-hashed)$")
+DIRTY_LINE = re.compile(r"^- (.+?) (sha256:[0-9a-f]{64}(?:\+x)?|deleted|not-hashed)"
+                        r"(?: index=([0-7]{6}:[0-9a-f]{40,64}|none|conflict))?$")
 MAX_DIRTY = 200                                       # uncommitted paths recorded with digests; more is unknown
 REDACT = [
     (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?(-----END [A-Z ]*PRIVATE KEY-----|$)", re.S), "<private key>"),
@@ -127,8 +128,25 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def index_entries(root: Path) -> dict[str, str] | None:
+    """{path: "<mode>:<blob>" for a staged entry, or "conflict" for unmerged stages}, from `git ls-files -s`."""
+    r = git_bytes(root, "ls-files", "-s", "-z")
+    if r.returncode != 0:
+        return None
+    out: dict[str, str] = {}
+    for item in (r.stdout or b"").decode("utf-8", "surrogateescape").split("\0"):
+        meta, sep, rel = item.partition("\t")
+        if not sep:
+            continue
+        mode, blob, stage = meta.split()
+        out[rel] = f"{mode}:{blob}" if stage == "0" and out.get(rel) != "conflict" else "conflict"
+    return out
+
+
 def dirty_inventory(root: Path) -> tuple[dict[str, str] | None, str | None, int]:
-    """({path: "sha256:<hex>" | "deleted" | "not-hashed"}, why unknown, total). None when git status failed."""
+    """({path: "<working tree> index=<identity>"}, why unknown, total), None when git cannot be read. The working tree
+    token is "sha256:<hex>" (with "+x" when executable), "deleted" or "not-hashed"; the index identity is the staged
+    blob and mode, "none", or "conflict". Digests only: nothing is copied."""
     r = git_bytes(root, "status", "--porcelain=v1", "-z", "--untracked-files=all")
     if r.returncode != 0:
         return None, f"git status failed: {(r.stderr or b'').decode(errors='replace').strip()[:120]}", 0
@@ -141,18 +159,22 @@ def dirty_inventory(root: Path) -> tuple[dict[str, str] | None, str | None, int]
             if item[0] in "RC":
                 i += 1                                # the next entry is the rename's source path
         i += 1
+    index = index_entries(root)
+    if index is None:
+        return None, "git ls-files failed: the staged state cannot be read", 0
     out: dict[str, str] = {}
     for rel in sorted(set(paths))[:MAX_DIRTY]:
         p = root / rel
         if not os.path.lexists(p):
-            out[rel] = "deleted"
+            token = "deleted"
         elif p.is_file() and not p.is_symlink():
             try:
-                out[rel] = "sha256:" + sha256_file(p)
+                token = "sha256:" + sha256_file(p) + ("+x" if os.stat(p).st_mode & 0o111 else "")
             except OSError:
-                out[rel] = "not-hashed"
+                token = "not-hashed"
         else:
-            out[rel] = "not-hashed"
+            token = "not-hashed"
+        out[rel] = f"{token} index={index.get(rel, 'none')}"
     return out, None, len(set(paths))
 
 
@@ -508,17 +530,24 @@ def check(path: Path, root: Path, fresh: bool = False) -> tuple[str, list[str]]:
     if now["dirty"] is not None:
         if headers["Working tree"] != now["worktree"]:
             drift(f"working tree was '{headers['Working tree']}', now '{now['worktree']}'")
-        recorded_dirty = {m.group(1): m.group(2) for m in (DIRTY_LINE.match(l) for l in sections.get("State", [])) if m}
+        recorded_dirty = {m.group(1): (m.group(2), m.group(3))
+                          for m in (DIRTY_LINE.match(l) for l in sections.get("State", [])) if m}
         if now["dirty"] or recorded_dirty:
             if set(recorded_dirty) != set(now["dirty"]):
                 drift(f"the uncommitted paths differ from those listed under State "
                       f"(now: {', '.join(list(now['dirty'])[:5]) or 'none'})")
             else:
-                for rel, digest in now["dirty"].items():
-                    if "not-hashed" in (digest, recorded_dirty[rel]):
+                for rel, token in now["dirty"].items():
+                    work, _, staged = token.partition(" index=")
+                    was_work, was_staged = recorded_dirty[rel]
+                    if "not-hashed" in (work, was_work):
                         unknown(f"the uncommitted content of {rel} is not hashed: compare it by hand")
-                    elif digest != recorded_dirty[rel]:
+                    elif work != was_work:
                         drift(f"the uncommitted content of {rel} changed since the record (same path, other content)")
+                    if was_staged is None:
+                        unknown(f"the staged state of {rel} was not recorded (an older record): compare it by hand")
+                    elif staged != was_staged:
+                        drift(f"the staged state of {rel} changed since the record ({was_staged} -> {staged})")
                 if not flags["drift"]:
                     out.append(f"ok: {len(now['dirty'])} uncommitted paths match the record by content")
     for heading, lines in sections.items():
@@ -610,12 +639,12 @@ def verify_auth(path: Path, root: Path, operation: dict, gather=None, policy_sou
         return [(r, "invalid", why, {}) for r in references] or [(None, "invalid", why, {})]
     policy, _ = (policy_source or auth.canonical_policy)()
     owners = policy.get("owners", []) if policy else []
+    owner_ids = list((policy or {}).get("owner_account_ids", {}).values())
     out = []
     for reference in references:
         facts = {}
         if isinstance(reference, dict) and reference.get("source") == "standing":
-            facts = (gather or facts_mod.gather)(reference, root, owners, pin=pin) if pin else \
-                (gather or facts_mod.gather)(reference, root, owners)
+            facts = (gather or facts_mod.gather)(reference, root, owners, pin=pin, owner_ids=owner_ids)
         status, reason = auth.evaluate(reference, operation, facts, policy, now or utcnow())
         out.append((reference, status, reason, facts))
     return out
@@ -892,6 +921,44 @@ def self_test() -> list[str]:
             fail("a changed inventory of uncommitted paths was not reported")
         (root / "other.txt").unlink()
         (root / "notes.txt").write_text("draft 1\n")
+        # Staged and unstaged changes: the staged content changes, the working tree and the inventory do not.
+        tracked = root / "src" / "parser.py"
+        committed = tracked.read_text()
+        tracked.write_text("staged v1\n")
+        run(root, "add", "src/parser.py")
+        tracked.write_text("working copy\n")
+        staged_record = new(root, "Staged", "a", "", "", True, pr="none")
+        publish(staged_record, fill(staged_record.read_text(encoding="utf-8")).encode("utf-8"))
+        if check(staged_record, root)[0] != "matches":
+            fail(f"a record with staged and unstaged changes did not match: {check(staged_record, root)}")
+        tracked.write_text("staged v2\n")
+        run(root, "add", "src/parser.py")
+        tracked.write_text("working copy\n")
+        if not drifted(check(staged_record, root)[1], "staged state of src/parser.py changed"):
+            fail("a changed staged state with an unchanged working tree was not reported")
+        os.chmod(tracked, 0o755)
+        if not drifted(check(staged_record, root)[1], "uncommitted content of src/parser.py changed"):
+            fail("a changed file mode was not reported")
+        os.chmod(tracked, 0o644)
+        run(root, "reset", "-q", "--", "src/parser.py")
+        tracked.write_text(committed)
+        # A conflicted index entry is recorded as a conflict, not as a staged blob.
+        conflict = base / "conflict"
+        (conflict / "f.txt").parent.mkdir(parents=True)
+        (conflict / "f.txt").write_text("base\n")
+        run(conflict, "init", "-q", "-b", "main")
+        run(conflict, "add", ".")
+        run(conflict, "commit", "-q", "-m", "base")
+        run(conflict, "checkout", "-q", "-b", "side")
+        (conflict / "f.txt").write_text("side\n")
+        run(conflict, "commit", "-qam", "side")
+        run(conflict, "checkout", "-q", "main")
+        (conflict / "f.txt").write_text("main\n")
+        run(conflict, "commit", "-qam", "main")
+        subprocess.run(["git", "-C", str(conflict), "merge", "-q", "side"], capture_output=True)
+        inventory = dirty_inventory(conflict)[0] or {}
+        if not inventory.get("f.txt", "").endswith("index=conflict"):
+            fail(f"a conflicted index entry was not recorded as a conflict: {inventory}")
         # A failing git status is unknown, never clean.
         index = root / ".git" / "index"
         saved_index = index.read_bytes()
@@ -1084,12 +1151,13 @@ def self_test() -> list[str]:
                                         "granted_by": "github:example-owner",
                                         "approved_in": "https://github.com/example/repo/pull/1",
                                         "expires": "2027-06-30T00:00:00Z"},
-                 "approval": {"kind": "merge", "by": "github:example-owner", "state": "active",
+                 "approval": {"kind": "merge", "by": "github:example-owner", "by_id": 42, "state": "active",
                               "entry_at_approved_revision": "identical", "introduced_entry": True,
                               "merged_into_default_branch": True},
                  "entry_on_default_branch": "identical", "reinstated_after_approval": False,
                  "changed_after_approval": False}
-        test_policy = lambda: ({"owners": ["github:example-owner"], "repositories": ["github.com/example/repo"]}, "test")
+        test_policy = lambda: ({"owners": ["github:example-owner"], "repositories": ["github.com/example/repo"],
+                                "owner_account_ids": {"github:example-owner": 42}}, "test")
         now = datetime.datetime(2026, 11, 28, tzinfo=datetime.timezone.utc)
         op = {"action": "push-branch", "level": "R2", "repository": "github.com/example/repo", "branch": "feature/x",
               "destination": "origin"}
@@ -1116,8 +1184,9 @@ def self_test() -> list[str]:
         results = verify_auth(broken, root, op, gather=lambda *a, **k: facts, policy_source=test_policy, now=now)
         if not results or any(r[1] != "invalid" for r in results):
             fail(f"a duplicate JSON key did not make the references invalid: {results}")
-        if auth.canonical_policy()[0] is not None:
-            fail("a canonical policy appeared before Phase 1d defines one")
+        if auth.canonical_policy()[0] is not None and not Path("/Library/Application Support/AgentOperations").exists() \
+                and not Path("/etc/agent-operations").exists():
+            fail("a canonical policy was found without an installed trust policy")
         for url, want in [("git@github.com:Example/Repo.git", "github.com/example/repo"),
                           ("https://github.com/example/repo", "github.com/example/repo"),
                           ("ssh://git@gitlab.example.com:2222/team/app.git", "gitlab.example.com/team/app"),

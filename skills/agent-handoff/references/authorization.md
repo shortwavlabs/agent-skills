@@ -42,6 +42,21 @@ widen a grant.
 | `cost_usd` | The operation's spending, a number | Likewise |
 | `aspect` | `execute` (the default) or `spend` | For cost-only grants |
 
+**Completeness.** Whatever an entry limits, each class of consequential action must state its required parameters,
+or the result is unknown:
+
+| Class (action verb) | Must state |
+|---|---|
+| Publication (`publish-`, `release-`, `upload-`, `deploy-`) | `destination` and `target` (the artifact) |
+| Branch (`push-`, `merge-`, `rebase-`, `delete-branch`, `open-`, `mark-pr`, `close-pr`) | `repository` and `branch` (or `target`, a PR) |
+| Files (`delete-`, `edit-`, `write-`, `move-`, `clean-`, `remove-`) | `repository` and `paths` |
+| Execution (`run-`, `trigger-`, `start-`, `stop-`) | `repository` and `target` or `purpose` |
+| Any other action | `repository` and `target` |
+| Any operation that spends (`aspect` spend, or a `cost_usd`) | also `cost_usd` and `purpose` or `target` (its budget scope) |
+
+The table is deliberately small: a future operation registry or `resource-budgeting` can extend it; an entry can never
+relax it.
+
 ```bash
 python3 $H verify-auth --action run-ci --level R2 --purpose qualification --cost-usd 1.50
 python3 $H verify-auth --action push-branch --level R2 --branch feature/parser --destination origin --pin <sha>
@@ -91,9 +106,11 @@ The first condition that fails decides.
 4. A trusted policy exists, and the reference names the designated authorizations file (`ops/authorizations.json`,
    or the file the policy names). Otherwise unknown, or **invalid** for another file.
 5. The host was reached, and the default branch has not moved since a pinned revision (`--pin`). Otherwise unknown.
-6. The repository is trusted. The referenced commit exists and holds the entry, which is well formed, matches the
-   reference, was granted by an owner identity and names an `approved_in` PR of this repository.
-7. The host records an approval or merge of that PR by an owner identity, still active (not dismissed, not superseded
+6. The repository is trusted by name and, where the policy pins one, by stable repository ID (a recreated or renamed
+   repository is not). The referenced commit exists and holds the entry, which is well formed, matches the reference,
+   was granted by an owner and names an `approved_in` PR of this repository.
+7. The host records an approval or merge of that PR by an owner's account, identified by its stable account ID (the
+   policy must record one for every owner; a login alone never counts), still active (not dismissed, not superseded
    by a later change request), of content identical to the referenced entry.
 8. The PR's merge lies on the default branch's first-parent chain, and **the PR itself introduced or changed the
    entry**: the entry is absent or different just before the PR's own changes. Merging an unrelated PR approves
@@ -102,7 +119,7 @@ The first condition that fails decides.
    is identical at the pinned revision. Removal or change needs fresh owner approval.
 10. Neither the entry nor the reference has expired.
 11. The action is listed; the level does not exceed the entry's; a cost-only entry is used only to spend; the
-    operation is inside the entry's scope and the reference's limits.
+    operation states every parameter its class requires; it is inside the entry's scope and the reference's limits.
 
 Only then: **verified**. Content is compared, not commit IDs, so squash merges are handled.
 
@@ -131,11 +148,13 @@ It is deliberately narrow: no general reading of PR approvals as permission, no 
 
 ## The trusted policy
 
-Owner identities and trusted repositories come only from the canonical policy (RFC 0001, D14), whose format Phase 1d
-defines. Until then `authorization.canonical_policy()` returns none, and `verify-auth` reports every standing
-reference as unknown. It still gathers and prints the facts the host records (a `facts:` line per reference), so the
-owner can decide quickly. No flag, environment variable, repository file or handoff record can supply the policy
-instead: a trust root the agent could write is not one.
+Owner identities and trusted repositories come only from the owner-installed trust policy (`instruction-governance`;
+a generated copy of its reader is `scripts/trust_policy.py`): root-owned, at a fixed system location, with stable
+account IDs for every owner. Without an installed, valid, securely owned and reviewed policy,
+`authorization.canonical_policy()` returns none and `verify-auth` reports every standing reference as unknown, still
+printing the facts the host records. No flag, environment variable, repository file or handoff record can supply the
+policy instead: a trust root the agent could write is not one. Verification is advisory: it enforces nothing unless
+the executor acts on it.
 
 ## Limitations
 

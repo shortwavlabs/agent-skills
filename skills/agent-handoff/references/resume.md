@@ -34,7 +34,8 @@ you act on it.
 | `drift: recorded repository …, this checkout is …` | Another repository, whatever its remote is called | Stop: this record is not for this repository |
 | `drift: recorded in checkout …` | Another checkout or machine | Local artifacts and jobs may differ; check each |
 | `unknown: git status failed` (or other `unknown:`) | Something could not be inspected | Treat it as unknown, never as clean or ended; fix the cause and check again |
-| `drift: the uncommitted content of … changed` | Same paths, other content | Find out who changed it before building on it |
+| `drift: the uncommitted content of … changed` | Same paths, other content (or another file mode) | Find out who changed it before building on it |
+| `drift: the staged state of … changed` | The index differs, even if the working tree does not | Find out who staged what before committing |
 | `drift: N commits since the record` | Someone (maybe the previous session) committed after writing it | Read them; re-verify Done items that depend on them |
 | `drift: recorded HEAD … does not exist here` | Rewritten history, or a commit not fetched | Fetch; if still missing, treat the record's state as unknown and ask |
 | `drift: recorded on branch X, the checkout is on Y` | Wrong branch, or the work moved | Do not switch blindly: check who uses the checkout (`development-coordination`) |

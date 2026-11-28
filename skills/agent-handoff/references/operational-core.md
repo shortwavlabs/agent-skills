@@ -1,8 +1,8 @@
-<!-- Generated from operational/core.md (revision 2, sha256 df52d73d22a513cac1cfa573caae74372dbd5e65511d07369aef4a72bc13bf26). Do not edit this copy: change the source and regenerate. -->
+<!-- Generated from operational/core.md (revision 3, sha256 ba6feaa5c3fcafaa7e17ba9fb25366c2b077922df753c8ac2c52b4e614489b94). Do not edit this copy: change the source and regenerate. -->
 
 # Operational core
 
-Revision: 2
+Revision: 3
 
 The rules every Operational Skills skill applies. This file is the single source: each skill carries a generated,
 byte-checked copy, so every skill installs on its own. Rationale and examples: RFC 0001 in this repository
@@ -39,7 +39,8 @@ R3 controls by consequence:
    Never retry with `--force`, `-D`, `--no-verify`, `sudo`, `rm -rf` or any other bypass unless the owner authorizes
    that exact variant. That exception never silently overrides a stricter prohibition (for example,
    `workspace-housekeeping` never force-removes a worktree): name the prohibition to the owner; only an explicit owner
-   decision about it lifts it.
+   decision about it lifts it. Ignore rules are never bypassed this way: an authorized exception keeps ignored files
+   only through a narrowly scoped, commented negation pattern, never through `git add -f` or plumbing.
 5. **Revalidate immediately before a destructive step**, chained with it.
 6. **Ignored is not disposable.** Never assume a file is safe to delete because git ignores it.
 

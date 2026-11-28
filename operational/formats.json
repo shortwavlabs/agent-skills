@@ -263,6 +263,21 @@
         "purposes": "list+:str",
         "max_usd": "usd"
       }
+    },
+    "trust-owner": {
+      "required": {
+        "identity": "identity",
+        "account_id": "pid"
+      }
+    },
+    "trust-repository": {
+      "required": {
+        "identity": "str"
+      },
+      "optional": {
+        "repository_id": "pid",
+        "authorizations_file": "str"
+      }
     }
   },
   "json": {
@@ -341,6 +356,24 @@
         "forbidden": "list:str",
         "authorization": "enum:none_needed,must_request,must_not_request,must_not_proceed_without_owner",
         "overhead": "obj:overhead"
+      }
+    },
+    "trust-policy": {
+      "versions": [
+        1
+      ],
+      "required": {
+        "kind": "str",
+        "version": "int",
+        "revision": "pid",
+        "owners": "list+:obj:trust-owner",
+        "repositories": "list+:obj:trust-repository"
+      },
+      "optional": {
+        "previous_sha256": "sha256?",
+        "agent_accounts": "list:identity",
+        "provenance": "any",
+        "notes": "str"
       }
     }
   },

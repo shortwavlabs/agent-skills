@@ -8,9 +8,10 @@ contacts nothing. The facts about the host come from github_facts.py (the narrow
 fixtures in references/authorization-runtime.json. Statuses: invalid, verified, inapplicable, unknown. Only
 `verified` grants authority, and only for the operation it was evaluated against.
 
-The trusted policy (owner identities and trusted repositories) comes only from the canonical policy, whose format
-Phase 1d defines. Until then canonical_policy() returns None and every standing reference evaluates to unknown: ask
-the owner once. A repository, a handoff record or a command-line flag never supplies its own trust boundary.
+The trusted policy (owners by stable account ID, trusted repositories) comes only from the owner-installed trust
+policy, read by the generated copy of operational/trust_policy.py; without one, canonical_policy() returns None and
+every standing reference evaluates to unknown: ask the owner once. A repository, a handoff record or a command-line
+flag never supplies its own trust boundary. The result is advice: only the executor enforces.
 Standard library only.
 """
 
@@ -33,6 +34,18 @@ RANK = {"R0": 0, "R1": 1, "R2": 2, "R3": 3}
 DEFAULT_FILE = "ops/authorizations.json"             # the canonical policy may name another (RFC 0001, document 05)
 # Operation field -> the scope key that limits it. Scope lives in standing entries (`scope`) and, only ever narrowing,
 # in references (`limits`). Free-text descriptions are never consulted.
+# The minimal completeness contract: what each class of consequential action must state, whatever its entry limits.
+# Classes are recognised by the action's verb; each requirement is a tuple of alternatives. Future classes extend
+# this table; an entry can never relax it.
+CLASSES = [
+    ("publication", ("publish-", "release-", "upload-", "deploy-"), [("destination",), ("target",)]),
+    ("branch", ("push-", "rebase-", "delete-branch"), [("repository",), ("branch",)]),
+    ("pull request", ("merge-", "open-", "mark-pr", "close-pr"), [("repository",), ("branch", "target")]),
+    ("files", ("delete-", "edit-", "write-", "move-", "clean-", "remove-"), [("repository",), ("paths",)]),
+    ("execution", ("run-", "trigger-", "start-", "stop-"), [("repository",), ("target", "purpose")]),
+]
+DEFAULT_REQUIREMENTS = [("repository",), ("target",)]
+SPEND_REQUIREMENTS = [("cost_usd",), ("purpose", "target")]
 DIMENSIONS = {"repository": "repositories", "branch": "branches", "paths": "paths", "destination": "destinations",
               "target": "targets", "purpose": "purposes", "cost_usd": "max_usd"}
 FIXTURES = HERE.parent / "references" / "authorization-runtime.json"
@@ -50,9 +63,13 @@ def records():
 
 
 def canonical_policy() -> tuple[dict | None, str]:
-    """(trusted policy, where it came from). Phase 1d defines the canonical policy; until then there is none."""
-    return None, ("no canonical policy declares owner identities and trusted repositories yet (Phase 1d): "
-                  "ask the owner once")
+    """(trusted policy, where it came from): the owner-installed trust policy (instruction-governance), loaded by the
+    generated copy of operational/trust_policy.py next to this file. None when it is missing, invalid or insecure."""
+    spec = importlib.util.spec_from_file_location("trust_policy_copy", HERE / "trust_policy.py")
+    loader = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(loader)
+    policy, where = loader.load()
+    return policy, where if policy else f"no trust: {where}; ask the owner once"
 
 
 def parse_ref(ref: str) -> tuple[str, str, str]:
@@ -99,14 +116,10 @@ def evaluate(reference, operation, facts: dict, policy: dict | None, now: dateti
     if aspect not in ("execute", "spend"):
         return "unknown", f"the operation's aspect {aspect!r} is neither 'execute' nor 'spend'"
     if policy is None:
-        return "unknown", ("no canonical policy declares owner identities and trusted repositories yet: ask the owner "
-                           "once")
+        return "unknown", ("no installed trust policy declares owner identities and trusted repositories: ask the "
+                           "owner once")
     owners, trusted = set(policy.get("owners", [])), {r.lower() for r in policy.get("repositories", [])}
     path, commit, entry_id = parse_ref(reference["ref"])
-    designated = policy.get("authorizations_file", DEFAULT_FILE)
-    if path != designated:
-        return "invalid", (f"a standing reference must name the designated authorizations file {designated}, not "
-                           f"{path}: an authorizations-shaped file elsewhere is not one")
     if not facts.get("host_reachable"):
         return "unknown", facts.get("why") or "the host cannot be reached now: ask the owner once"
     if facts.get("default_branch_moved") is not False and "default_branch_moved" in facts:
@@ -115,6 +128,18 @@ def evaluate(reference, operation, facts: dict, policy: dict | None, now: dateti
     if repository not in trusted:
         return "inapplicable", (f"{repository or 'this repository'} is not a trusted repository in the canonical "
                                 "policy: an untrusted repository cannot establish its own trust boundary")
+    files = policy.get("authorization_files") or {}
+    designated = files.get(repository) or policy.get("authorizations_file", DEFAULT_FILE)
+    if path != designated:
+        return "invalid", (f"a standing reference must name the designated authorizations file {designated}, not "
+                           f"{path}: an authorizations-shaped file elsewhere is not one")
+    pinned_id = (policy.get("repository_ids") or {}).get(repository)
+    if pinned_id is not None:
+        if facts.get("repository_id") is None:
+            return "unknown", "the repository's stable id is not recorded with the facts: ask the owner once"
+        if facts["repository_id"] != pinned_id:
+            return "inapplicable", (f"{repository} has another id than the trusted one: a recreated or replaced "
+                                    "repository is not the trusted repository")
     if facts.get("commit_exists") is None:
         return "unknown", "whether the referenced commit exists cannot be established: ask the owner once"
     if facts["commit_exists"] is not True:
@@ -137,8 +162,16 @@ def evaluate(reference, operation, facts: dict, policy: dict | None, now: dateti
     if kind not in ("merge", "approval") or not by:
         return "inapplicable", ("no host-recorded approval or merge of the entry: git author and committer fields are "
                                 "self-asserted and never establish provenance")
-    if by not in owners:
-        return "inapplicable", f"the host records the approval by {by}, not by an owner identity of the canonical policy"
+    account_ids = policy.get("owner_account_ids") or {}
+    unpinned = sorted(set(owners) - set(account_ids))
+    if unpinned:
+        return "unknown", (f"the trust policy records no stable account id for {unpinned[0]}: a login alone never "
+                           "establishes an owner")
+    if approval.get("by_id") is None:
+        return "unknown", f"the stable account id of {by} is not recorded with the approval: ask the owner once"
+    if approval["by_id"] not in set(account_ids.values()):
+        return "inapplicable", (f"the approving account ({by}, id {approval['by_id']}) is not an owner's account: a "
+                                "login that matches an owner's name, renamed or reused, is not the owner")
     if state != "active":
         return "inapplicable", f"the owner's approval was {state}: a dismissed or superseded approval grants nothing"
     merged = approval.get("merged_into_default_branch")
@@ -194,6 +227,9 @@ def evaluate(reference, operation, facts: dict, policy: dict | None, now: dateti
     if entry.get("cost_only") and aspect != "spend":
         return "inapplicable", ("a cost-only authorization covers spending only, never the execution itself: the "
                                 "execution needs its own authorization")
+    incomplete = completeness_problem(operation)
+    if incomplete:
+        return "unknown", incomplete
     scope = entry.get("scope")
     if not isinstance(scope, dict):
         return "unknown", ("the entry has no structured scope (repositories, branches, paths, destinations, targets, "
@@ -211,6 +247,20 @@ def evaluate(reference, operation, facts: dict, policy: dict | None, now: dateti
     return "verified", (f"entry {entry_id} granted by {by}, recorded by the host as a {kind} in {entry['approved_in']}, "
                         f"unchanged at the approved revision and on the default branch, covers '{operation['action']}' "
                         f"until {entry['expires']}")
+
+
+def completeness_problem(operation: dict) -> str | None:
+    """Which required parameter a consequential operation leaves out, or None."""
+    action = operation["action"]
+    name, required = next(((n, r) for n, verbs, r in CLASSES if action.startswith(verbs)), ("other", DEFAULT_REQUIREMENTS))
+    if operation.get("aspect") == "spend" or operation.get("cost_usd") is not None:
+        required = required + SPEND_REQUIREMENTS
+        name += " with spending"
+    for alternatives in required:
+        if all(operation.get(f) in (None, [], "") for f in alternatives):
+            return (f"the operation is incomplete: a {name} operation must state its {' or '.join(alternatives)}; "
+                    "missing information is never permission")
+    return None
 
 
 def matches(key: str, value: str, allowed: str) -> bool:
@@ -375,8 +425,10 @@ def self_test() -> list[str]:
         case = copy.deepcopy(control)
         edit(case)
         return evaluate(case["reference"], case["request"], case["state"], case.get("policy", policy), now)[1]
-    if "does not state its branch" not in reason_with(lambda c: c["request"].pop("branch")):
+    if "does not state its destination" not in reason_with(lambda c: c["request"].pop("destination")):
         failures.append("an unstated, limited dimension is not reported as unstated")
+    if "must state its branch" not in reason_with(lambda c: c["request"].pop("branch")):
+        failures.append("an incomplete branch operation is not reported as incomplete")
     if "reconfirm with the owner" not in reason_with(lambda c: c["request"].update(level="R3")):
         failures.append("an R3 operation is not sent back to the owner for reconfirmation")
     missing = next(c for c in fixtures["cases"] if c["id"] == "missing-entry")
@@ -386,9 +438,11 @@ def self_test() -> list[str]:
         failures.append("a standing entry expiring at task-end was not unknown")
     if status_with(lambda c: c["request"].update(level="R1")) != "verified":
         failures.append("an operation below the entry's level is not covered")
-    # Owner identities are compared exactly; repositories case-insensitively (GitHub names are case-insensitive).
-    if status_with(lambda c: c["state"]["approval"].update(by="github:Example-Owner")) == "verified":
-        failures.append("an owner identity matched another spelling")
+    # Owners are established by stable account id; the login is a label. Repositories compare case-insensitively.
+    if status_with(lambda c: c["state"]["approval"].update(by="github:Example-Owner")) != "verified":
+        failures.append("the owner's account, under another spelling of its login, was not recognised by its id")
+    if status_with(lambda c: c["state"]["approval"].update(by_id=1001)) == "verified":
+        failures.append("the owner's login on another account was accepted")
     if status_with(lambda c: c["state"].update(repository="github.com/Example/Repo")) != "verified":
         failures.append("a repository name differing only in case did not match")
     return failures
