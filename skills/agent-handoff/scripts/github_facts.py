@@ -235,7 +235,8 @@ def provenance(host: Host, path: str, entry_id: str, entry: dict, pr: dict, head
     return out
 
 
-def gather(reference: dict, root: Path, owners=(), api=gh_api, remote: str = "origin", pin: str | None = None) -> dict:
+def gather(reference: dict, root: Path, owners=(), api=gh_api, remote: str = "origin", pin: str | None = None,
+           owner_ids=()) -> dict:
     """Facts for one standing reference, in the shape of the runtime fixtures' `state`."""
     path, _, rest = str(reference.get("ref", "")).partition("@")
     commit, _, entry_id = rest.partition("#")
@@ -278,7 +279,8 @@ def gather(reference: dict, root: Path, owners=(), api=gh_api, remote: str = "or
             c["entry_at_approved_revision"] = None if c["revision"] is None else \
                 ("identical" if at_revision is not None and same(at_revision, entry) else "changed")
         shared = provenance(host, path, entry_id, entry, pr, head)
-        owned = [c for c in candidates if c["by"] in owners]
+        owned = [c for c in candidates if c.get("by_id") in set(owner_ids)] if owner_ids else \
+            [c for c in candidates if c["by"] in owners]   # by stable account id whenever the policy gives ids
         usable = [c for c in owned if c["state"] == "active" and c["entry_at_approved_revision"] == "identical"
                   and shared["merged_into_default_branch"] is True and shared["introduced_entry"] is True]
         chosen = (usable or owned or candidates or [{"kind": "none", "by": None, "state": "active",
@@ -417,7 +419,7 @@ def self_test() -> list[str]:
                     "expires": "2027-06-30T00:00:00Z"}
 
         def outcome(gh, at, pin=None, req=None):
-            facts = gather(reference(at), root, owners, api=gh, pin=pin)
+            facts = gather(reference(at), root, owners, api=gh, pin=pin, owner_ids=[42])
             return model.evaluate(reference(at), req or request, facts, policy, now)
 
         def linear(after=(), merge_doc=None, before_doc=None, pr=None, assoc=(1,)):
@@ -543,6 +545,18 @@ def self_test() -> list[str]:
             got = outcome(gh, sha("1"))
             if got[0] != want:
                 failures.append(f"{label}: expected {want}, got {got}")
+        # Candidates are chosen by stable account id: a renamed owner who only reviewed, and a reused login that
+        # merged while the real owner approved.
+        renamed = {"user": {"login": "example-owner-renamed", "id": 42}, "state": "APPROVED", "commit_id": sha("e"),
+                   "submitted_at": "2026-11-27T17:00:00Z"}
+        gh = linear(pr={"merged_by": {"login": "someone", "id": 99}})
+        gh.reviews, gh.docs = [renamed], {sha("e"): doc(entry)}
+        if outcome(gh, sha("1"))[0] != "verified":
+            failures.append(f"a renamed owner's approval was not chosen: {outcome(gh, sha('1'))}")
+        gh = linear(pr={"merged_by": {"login": "example-owner", "id": 1001}})
+        gh.reviews, gh.docs = [renamed], {sha("e"): doc(entry)}
+        if outcome(gh, sha("1"))[0] != "verified":
+            failures.append(f"a reused login's merge shadowed the real owner's approval: {outcome(gh, sha('1'))}")
         # A recreated repository under the trusted name: another stable id.
         gh = linear()
         gh.repository_id = 8

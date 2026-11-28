@@ -507,7 +507,8 @@ These are implementation details within the approved design, to be settled in th
   exact format of that declaration.
 - **Runtime verification of host-recorded approvals (1c).** Which host API calls establish a merge or approving review
   by an owner identity and the revision it applied to, and what happens offline (the status is *unknown*: ask once).
-  Until 1d declares owner identities in the canonical policy, runtime verification reports *unknown*: ask once.
+  Settled in Phase 1d: owners and trusted repositories come from the owner-installed trust policy; without one,
+  runtime verification reports *unknown*: ask once.
 - **Identifying the claim holder's process (1b).** The tool must record the agent's long-lived process, not the
   short-lived shell that ran it; otherwise every claim would look dead at once and be taken over. Safe default: if the
   long-lived process cannot be determined, record no PID, and other agents treat the holder as *unknown*, never
@@ -533,8 +534,8 @@ These are implementation details within the approved design, to be settled in th
   chain from the pin back to the merge (never by timestamp; at most 100 commits); offline, ambiguous or unreadable is
   unknown. The `approved_in` PR must have introduced or changed the entry. Standing entries list `actions` (exact
   slugs) and a structured `scope` that a structured operation must match; an entry without them is unknown. Handoffs are refreshed at milestones; Claude Code and Codex document
-  `PreCompact` hooks the owner may configure, and this family installs none. Owner identities still come only from
-  the canonical policy, so until Phase 1d standing references are unknown.
+  `PreCompact` hooks the owner may configure, and this family installs none. Owner identities come only from the
+  owner-installed trust policy (Phase 1d); without it, standing references are unknown.
 - **Related operations (Phase 2).** How a task is identified for cumulative budget accounting (a PR, a run series, a
   declared task ID), and whether a per-period ledger is needed beyond providers' own spending limits.
 - **Hook adapters (1d).** Whether opt-in hook examples live in `instruction-governance`'s references or outside the

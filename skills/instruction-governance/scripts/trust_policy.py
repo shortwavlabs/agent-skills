@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Generated from operational/trust_policy.py (sha256 f7f0a0bdd4f8abffb850c03cde33ef5919ec3b2d48700563403b882fd49c7cfc). Do not edit this copy: change the source and regenerate.
+# Generated from operational/trust_policy.py (sha256 40d6bf8070b9aeaac9441d6e6a96a34c0909565e2a197caf206643ecf3e1d80f). Do not edit this copy: change the source and regenerate.
 """The canonical trust policy: who the owner is, which repositories are trusted, and where their authorizations live.
 
     trust_policy.py verify [--path FILE]   report whether a trust policy is installed and valid (read-only)
@@ -175,10 +175,18 @@ def succession_problem(data: dict, digest: str, seen: dict | None) -> str | None
 
 
 def read_seen(path: Path | None) -> dict | None:
+    """The last reviewed revision, None if never recorded; any malformed record is damaged and trusts nothing."""
+    damaged = {"revision": 10 ** 9, "sha256": "unreadable", "trust": {}}
+    if not path or not path.exists():
+        return None
     try:
-        return json.loads(path.read_text()) if path and path.exists() else None
+        data = json.loads(path.read_text())
     except (OSError, ValueError):
-        return {"revision": 10 ** 9, "sha256": "unreadable"}   # a damaged record trusts nothing until rewritten
+        return damaged
+    if not (isinstance(data, dict) and type(data.get("revision")) is int and isinstance(data.get("sha256"), str)
+            and isinstance(data.get("trust"), dict)):
+        return damaged
+    return data
 
 
 def load(path: Path | None = None, trusted_uid: int = 0, boundary: Path | None = None,
@@ -352,9 +360,10 @@ def self_test() -> list[str]:
         expect("revision 3 that only narrows trust", True, seen_path=seen)
         write(good)
         expect("rollback to revision 1 after revision 2 was reviewed", False, seen_path=seen)
-        seen.write_text("{damaged")
-        write(r2)
-        expect("a damaged review record", False, seen_path=seen)
+        for damaged in ("{damaged", "{}", "[]", '{"revision": 2}'):
+            seen.write_text(damaged)
+            write(r2)
+            expect(f"a damaged review record {damaged!r}", False, seen_path=seen)
         if load(policy_file, trusted_uid=me, seen=None)[0] is not None:
             failures.append("without a test boundary, a fixture below user-owned directories was trusted")
     return failures

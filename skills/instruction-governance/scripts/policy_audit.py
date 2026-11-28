@@ -244,22 +244,31 @@ def audit_skills(manifest: dict, home: Path, repo_skills: Path | None) -> list[s
     return out or ["skills: no installed copies of this repository's skills found"]
 
 
-def credential_check(policy_owners: list[str] | None) -> str:
-    """Whether this machine's GitHub CLI is authenticated as an owner identity (read-only)."""
+def gh_user() -> tuple[str, int] | None:
+    """(login, stable account id) of the account this machine's gh is authenticated as, or None."""
     try:
-        r = subprocess.run(["gh", "api", "user", "--jq", ".login"], capture_output=True, text=True, timeout=30)
+        r = subprocess.run(["gh", "api", "user", "--jq", ".login + \" \" + (.id|tostring)"], capture_output=True,
+                           text=True, timeout=30)
     except (OSError, subprocess.SubprocessError):
-        return "credentials: gh is not available; nothing to check"
-    if r.returncode != 0 or not r.stdout.strip():
-        return "credentials: gh is not authenticated here"
-    login = f"github:{r.stdout.strip()}"
-    if policy_owners is None:
-        return (f"credentials: gh is authenticated as {login}. No trust policy is installed; if {login} is an owner, "
-                "agents on this machine can approve and merge as the owner")
-    if login in policy_owners:
-        return (f"credentials: gh is authenticated as {login}, an owner identity: approvals made with it here cannot "
-                "be told apart from the owner's; agents must not approve or merge authority changes with it")
-    return f"credentials: gh is authenticated as {login}, not an owner identity"
+        return None
+    parts = r.stdout.split()
+    return (parts[0], int(parts[1])) if r.returncode == 0 and len(parts) == 2 and parts[1].isdigit() else None
+
+
+def credential_check(owner_ids: list[int] | None, user=gh_user) -> str:
+    """Whether this machine's GitHub CLI is authenticated as an owner's account, compared by stable id (read-only)."""
+    found = user()
+    if found is None:
+        return "credentials: gh is not available or not authenticated here; nothing to check"
+    login, account = found
+    if owner_ids is None:
+        return (f"credentials: gh is authenticated as github:{login} (id {account}). No trust policy is installed; if "
+                "this is the owner's account, agents on this machine can approve and merge as the owner")
+    if account in owner_ids:
+        return (f"credentials: gh is authenticated as an owner's account (github:{login}, id {account}): approvals made "
+                "with it here cannot be told apart from the owner's; agents must not approve or merge authority "
+                "changes with it")
+    return f"credentials: gh is authenticated as github:{login} (id {account}), not an owner's account"
 
 
 # ------------------------------------------------------------------------------------------------- self-test
@@ -372,6 +381,15 @@ def self_test() -> list[str]:
         shutil.copy(repo_skills / "demo" / "SKILL.md", installed / "SKILL.md")
         if not any("in sync" in line for line in audit_skills(man, home, repo_skills)):
             failures.append("an installed skill in sync was not reported")
+        # credential separation, compared by stable account id, never by login
+        for label, user, ids, fragment in [
+                ("an owner's account", lambda: ("example-owner", 42), [42], "an owner's account"),
+                ("the owner's login on another account", lambda: ("example-owner", 1001), [42], "not an owner's account"),
+                ("a renamed owner account", lambda: ("renamed", 42), [42], "an owner's account"),
+                ("no trust policy", lambda: ("example-owner", 42), None, "No trust policy is installed"),
+                ("gh unavailable", lambda: None, [42], "nothing to check")]:
+            if fragment not in credential_check(ids, user):
+                failures.append(f"credential check, {label}: {credential_check(ids, user)}")
     return failures
 
 
@@ -420,7 +438,7 @@ def main(argv: list[str]) -> int:
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
             loaded, _ = mod.load()
-            policy = loaded["owners"] if loaded else None
+            policy = list(loaded["owner_account_ids"].values()) if loaded else None
         except (OSError, ImportError, AttributeError):
             policy = None
         print(credential_check(policy))

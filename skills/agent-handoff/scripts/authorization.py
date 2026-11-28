@@ -8,9 +8,10 @@ contacts nothing. The facts about the host come from github_facts.py (the narrow
 fixtures in references/authorization-runtime.json. Statuses: invalid, verified, inapplicable, unknown. Only
 `verified` grants authority, and only for the operation it was evaluated against.
 
-The trusted policy (owner identities and trusted repositories) comes only from the canonical policy, whose format
-Phase 1d defines. Until then canonical_policy() returns None and every standing reference evaluates to unknown: ask
-the owner once. A repository, a handoff record or a command-line flag never supplies its own trust boundary.
+The trusted policy (owners by stable account ID, trusted repositories) comes only from the owner-installed trust
+policy, read by the generated copy of operational/trust_policy.py; without one, canonical_policy() returns None and
+every standing reference evaluates to unknown: ask the owner once. A repository, a handoff record or a command-line
+flag never supplies its own trust boundary. The result is advice: only the executor enforces.
 Standard library only.
 """
 
@@ -38,8 +39,8 @@ DEFAULT_FILE = "ops/authorizations.json"             # the canonical policy may 
 # this table; an entry can never relax it.
 CLASSES = [
     ("publication", ("publish-", "release-", "upload-", "deploy-"), [("destination",), ("target",)]),
-    ("branch", ("push-", "merge-", "rebase-", "delete-branch", "open-", "mark-pr", "close-pr"),
-     [("repository",), ("branch", "target")]),
+    ("branch", ("push-", "rebase-", "delete-branch"), [("repository",), ("branch",)]),
+    ("pull request", ("merge-", "open-", "mark-pr", "close-pr"), [("repository",), ("branch", "target")]),
     ("files", ("delete-", "edit-", "write-", "move-", "clean-", "remove-"), [("repository",), ("paths",)]),
     ("execution", ("run-", "trigger-", "start-", "stop-"), [("repository",), ("target", "purpose")]),
 ]
@@ -115,15 +116,10 @@ def evaluate(reference, operation, facts: dict, policy: dict | None, now: dateti
     if aspect not in ("execute", "spend"):
         return "unknown", f"the operation's aspect {aspect!r} is neither 'execute' nor 'spend'"
     if policy is None:
-        return "unknown", ("no canonical policy declares owner identities and trusted repositories yet: ask the owner "
-                           "once")
+        return "unknown", ("no installed trust policy declares owner identities and trusted repositories: ask the "
+                           "owner once")
     owners, trusted = set(policy.get("owners", [])), {r.lower() for r in policy.get("repositories", [])}
     path, commit, entry_id = parse_ref(reference["ref"])
-    files = policy.get("authorization_files") or {}
-    designated = files.get(str(facts.get("repository") or "").lower()) or policy.get("authorizations_file", DEFAULT_FILE)
-    if path != designated:
-        return "invalid", (f"a standing reference must name the designated authorizations file {designated}, not "
-                           f"{path}: an authorizations-shaped file elsewhere is not one")
     if not facts.get("host_reachable"):
         return "unknown", facts.get("why") or "the host cannot be reached now: ask the owner once"
     if facts.get("default_branch_moved") is not False and "default_branch_moved" in facts:
@@ -132,6 +128,11 @@ def evaluate(reference, operation, facts: dict, policy: dict | None, now: dateti
     if repository not in trusted:
         return "inapplicable", (f"{repository or 'this repository'} is not a trusted repository in the canonical "
                                 "policy: an untrusted repository cannot establish its own trust boundary")
+    files = policy.get("authorization_files") or {}
+    designated = files.get(repository) or policy.get("authorizations_file", DEFAULT_FILE)
+    if path != designated:
+        return "invalid", (f"a standing reference must name the designated authorizations file {designated}, not "
+                           f"{path}: an authorizations-shaped file elsewhere is not one")
     pinned_id = (policy.get("repository_ids") or {}).get(repository)
     if pinned_id is not None:
         if facts.get("repository_id") is None:

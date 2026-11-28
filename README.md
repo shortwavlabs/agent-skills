@@ -553,8 +553,9 @@ skill ([RFC 0001](rfcs/0001-agent-operations/README.md), Phase 1c).
 - **Runtime authorization verification:** a pure evaluator of standing authorizations for one structured operation
   (trusted repository, owner identity, host-recorded approval or merge of the exact content by the PR that introduced
   it, a pinned default-branch revision, revocation, change and reinstatement established by ancestry, expiry, listed
-  actions, risk level and structured scope including spending limits), with a narrow GitHub facts adapter. Only `verified` grants authority; until Phase 1d
-  declares owner identities in the canonical policy, standing references report unknown.
+  actions, risk level and structured scope including spending limits), with a narrow GitHub facts adapter. Only `verified` grants authority; owners and
+  trusted repositories come from the owner-installed trust policy (`instruction-governance`), and without one
+  standing references report unknown. Verification is advisory: only the executor enforces.
 - **Continuity** across compaction, interruption, outages, quota exhaustion, model and agent switches, restarts and
   long-running jobs; an extension point for lessons, skill defects and proposals.
 

@@ -83,7 +83,10 @@ sudo -k                                                                         
 - it parses strictly and passes the format and semantic checks above;
 - it may follow the last reviewed revision (next section).
 
-Otherwise it returns no policy with the reason, and every consumer treats that as no trust. `verify --path` inspects a
+Otherwise it returns no policy with the reason, and every consumer treats that as no trust. Ownership and mode bits
+are checked; access control lists are not, so an ACL granting someone else write access would go unnoticed (none are
+present on the standard macOS and Linux locations). On the owner's Mac, `/`, `/Library` and
+`/Library/Application Support` are root-owned and writable by no group or other user, as the check requires. `verify --path` inspects a
 draft anywhere, but a file found that way never grants authority.
 
 ## Revisions, rollback and trust expansion

@@ -639,12 +639,12 @@ def verify_auth(path: Path, root: Path, operation: dict, gather=None, policy_sou
         return [(r, "invalid", why, {}) for r in references] or [(None, "invalid", why, {})]
     policy, _ = (policy_source or auth.canonical_policy)()
     owners = policy.get("owners", []) if policy else []
+    owner_ids = list((policy or {}).get("owner_account_ids", {}).values())
     out = []
     for reference in references:
         facts = {}
         if isinstance(reference, dict) and reference.get("source") == "standing":
-            facts = (gather or facts_mod.gather)(reference, root, owners, pin=pin) if pin else \
-                (gather or facts_mod.gather)(reference, root, owners)
+            facts = (gather or facts_mod.gather)(reference, root, owners, pin=pin, owner_ids=owner_ids)
         status, reason = auth.evaluate(reference, operation, facts, policy, now or utcnow())
         out.append((reference, status, reason, facts))
     return out

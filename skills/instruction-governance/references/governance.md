@@ -73,7 +73,8 @@ It also reports installed copies of this repository's skills and the account `gh
    differs), keeps the current file under `~/.local/state/agent-operations/instruction-backups/`, and replaces the
    file atomically.
 4. `rollback --harness <h> --backup <file> --approve <digest>` restores a kept version the same way (it prints the
-   digest to approve when none is given).
+   full diff and the digest to approve when none is given). It restores the **whole** kept file, so it also reverts
+   any unrelated edit made since that backup: read the diff before approving.
 
 The tool never edits harness settings, installs hooks or skills, or writes outside the adapter it was asked about and
 its backup directory.

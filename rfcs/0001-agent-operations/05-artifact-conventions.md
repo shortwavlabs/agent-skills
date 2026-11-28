@@ -162,6 +162,15 @@ Phase 1a's validator reports only *invalid* or *unverified*. The expected runtim
 expired, revoked, changed and quoted authorizations is defined as fixtures in `operational/fixtures/` (Phase 1a), for
 the runtime checks of Phase 1c to satisfy; Phase 1a does not perform those checks.
 
+## Trust policy
+
+Owner: `instruction-governance` (Phase 1d). The trust root for standing authorizations: `trust-policy` version 1, a
+JSON file the owner installs root-owned at a fixed system location (`/Library/Application Support/AgentOperations/`
+on macOS, `/etc/agent-operations/` on Linux). It declares `owners` (stable GitHub account IDs required; logins are
+labels), `agent_accounts`, `repositories` (canonical names, stable repository IDs where practical, designated
+authorizations files), a `revision` with the `previous_sha256` of the revision it replaces, and optional
+`provenance`. See `skills/instruction-governance/references/trust-policy.md`.
+
 ## Standing authorizations
 
 Committed in `ops/authorizations.json` (or the file the canonical policy names), and trusted only within the
