@@ -1,0 +1,4 @@
+interface:
+  display_name: "Workspace Housekeeping"
+  short_description: "Preserve evidence, keep checkouts and builds lean"
+  default_prompt: "Use $workspace-housekeeping to check what must be preserved and backed up before cleaning up checkouts, build directories, caches or research output, and to report recoverable disk space."
