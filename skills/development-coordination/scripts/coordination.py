@@ -80,6 +80,7 @@ GIT_IN_PROGRESS = {"index.lock": "a git command holds the index lock", "MERGE_HE
                    "BISECT_LOG": "a bisect is in progress", "rebase-merge": "a rebase is in progress",
                    "rebase-apply": "a rebase or am is in progress"}
 VISIBILITY_RANK = ("complete", "owner-complete", "not checked", "partial", "failed")
+COMPLETE = ("complete", "owner-complete")
 HERE = Path(__file__).resolve().parent
 
 
@@ -937,8 +938,10 @@ def activity_check(repo, scope: dict | None = None, *, session: str | None = Non
                    f"{counts['accepted']} accepted passive)"] if lines else []
         if len(lines) > len(shown):
             summary.append(f"{len(lines) - len(shown)} more not shown: use --all to list every one")
-        worst = worst_visibility(visibilities)
-        tail = [f"process visibility: {worst}"] if worst.startswith(("partial", "failed")) else []
+        worst = worst_visibility([v for _, v in visibilities])
+        several = len(visibilities) > 1
+        tail = [f"process visibility: {v}" + (f" (for {t.relative_to(root).as_posix()})" if several else "")
+                for t, v in visibilities if not v.startswith(COMPLETE)]
         verdict = "busy" if flags["busy"] else "unknown" if flags["unknown"] else "idle"
         return {"verdict": verdict, "coordination": info["coordination"], "visibility": worst, "processes": counts,
                 "evidence": evidence + summary + shown + tail, "excluded": info["excluded"], "holder": info["holder"]}
@@ -951,6 +954,7 @@ def activity_check(repo, scope: dict | None = None, *, session: str | None = Non
         flags["busy"] = True
         evidence.append(why)
 
+    root = None
     try:
         root = checkout_root(repo)
     except Unknown as e:
@@ -1037,8 +1041,10 @@ def activity_check(repo, scope: dict | None = None, *, session: str | None = Non
             for target in targets:
                 verdict, visibility, matches = pin.classify(str(target), os.stat(root).st_uid, procs, records,
                                                             own | {os.getpid(), lsof_pid})
-                visibilities.append(visibility)
-                if verdict == pin.UNKNOWN:
+                visibilities.append((target, visibility))
+                # Incomplete visibility is unknown even when something matched: a match that turns out accepted
+                # must never leave the processes nobody could inspect looking idle.
+                if verdict == pin.UNKNOWN or not visibility.startswith(COMPLETE):
                     flags["unknown"] = True
                 for pid, cmd, fd, name in matches:
                     if (cmd, fd, name) not in by_pid.setdefault(pid, []):
@@ -1071,7 +1077,7 @@ def activity_check(repo, scope: dict | None = None, *, session: str | None = Non
             for ident in sorted(accepted - seen):
                 evidence.append(f"accepted identity {ident} matches no passive process here now: not applied")
         except (Unknown, OSError, RuntimeError, subprocess.SubprocessError) as e:
-            visibilities.append(f"failed ({e})")
+            visibilities.append((root, f"failed ({e})"))
             unknown(f"process inspection failed: {e}")
     return result()
 
@@ -1833,6 +1839,24 @@ def self_test() -> list[str]:
         expect("an acceptance never hides partial visibility",
                activity_check(idle, session=session, holder_pid=me, disruptive=True, accept_passive=[ident],
                               lsof=str(fake_lsof())), "unknown", "partial")
+        saved_loader = module.load_path_in_use
+
+        def partial_with_matches():
+            pin = saved_loader()
+            real = pin.classify
+
+            def classify(target, *a, **k):
+                v, vis, m = real(target, *a, **k)
+                return v, "partial (simulated, with the accepted process matched)", m
+            pin.classify = classify
+            return pin
+        module.load_path_in_use = partial_with_matches
+        try:
+            expect("an acceptance never hides partial visibility, even when the accepted process is matched",
+                   activity_check(idle, session=session, holder_pid=me, disruptive=True, accept_passive=[ident]),
+                   "unknown", "partial (simulated, with the accepted process matched)")
+        finally:
+            module.load_path_in_use = saved_loader
         expect("an acceptance never stands in for this session's claim",
                activity_check(idle, holder_pid=me, disruptive=True, accept_passive=[ident]), "busy",
                "exclusive claim")
@@ -1884,8 +1908,9 @@ def self_test() -> list[str]:
         module.load_path_in_use = one_target_partial
         try:
             r = activity_check(idle, parse_scope("paths=src/**,docs/**"), holder_pid=me)
-            expect("two targets, one with partial visibility", r, "unknown", "partial (simulated for one target)")
-            if r["visibility"] != "partial (simulated for one target)":
+            expect("two targets, one with partial visibility", r, "unknown",
+                   "process visibility: partial (simulated for one target) (for docs)")
+            if not r["visibility"].startswith("partial"):
                 fail(f"the reported visibility is not the worst of the targets: {r['visibility']}")
         finally:
             module.load_path_in_use = saved_pin
