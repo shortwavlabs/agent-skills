@@ -140,7 +140,10 @@
           "pid",
           "process_start"
         ]
-      ]
+      ],
+      "optional": {
+        "boot": "str?"
+      }
     },
     "scope": {
       "required": {
@@ -179,6 +182,44 @@
       "required": {
         "max_questions": "count",
         "max_new_records": "count"
+      }
+    },
+    "transfer": {
+      "required": {
+        "token_sha256": "sha256",
+        "offered": "timestamp",
+        "expires": "timestamp"
+      },
+      "after": [
+        [
+          "expires",
+          "offered"
+        ]
+      ]
+    },
+    "holder-identity": {
+      "required": {
+        "agent": "str",
+        "host": "str",
+        "pid": "pid?",
+        "process_start": "str?"
+      },
+      "optional": {
+        "boot": "str?"
+      },
+      "null_together": [
+        [
+          "pid",
+          "process_start"
+        ]
+      ]
+    },
+    "ownership-event": {
+      "required": {
+        "event": "enum:transferred,recovered",
+        "at": "timestamp",
+        "from": "obj:holder-identity",
+        "to": "obj:holder-identity"
       }
     }
   },
@@ -227,7 +268,9 @@
         "expires": "timestamp"
       },
       "optional": {
-        "handoff": "str"
+        "handoff": "str",
+        "transfer": "obj:transfer",
+        "history": "list+:obj:ownership-event"
       },
       "after": [
         [

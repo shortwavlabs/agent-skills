@@ -2,6 +2,7 @@
 
 ## Contents
 - [Session lifecycle](#session-lifecycle)
+- [Handing a claim to another session](#handing-a-claim-to-another-session)
 - [Safe execution of disruptive operations](#safe-execution-of-disruptive-operations)
 - [Common operations](#common-operations)
 - [When the checkout is busy](#when-the-checkout-is-busy)
@@ -16,17 +17,32 @@
    claim ID and session token; write them into your handoff record.
 2. **Work.** Edit, build and test normally. No claim per edit, no check before every test run.
 3. **Renew** before the claim expires if the task continues (`--ttl` is in minutes, at most 1440).
-4. **Release** when the task ends. If another session takes over, hand over the claim ID and token in the handoff
-   instead of releasing; the next session renews it.
+4. **Release** when the task ends. If another session takes over, transfer the claim instead of releasing it (see
+   below); the session token itself is never handed over as a substitute.
 
 Read-only work (reviewing, running tests in your own build directory, reading logs) needs no claim.
+
+## Handing a claim to another session
+
+| Situation | What to do |
+|---|---|
+| You are handing over (compaction ahead, quota running out, switching agent or model) | `transfer --id I --session T --ttl 60`; put the claim ID and the printed transfer token in the handoff record. The successor runs `accept --id I --transfer-token X` and receives its own session token. The claim stays yours until then, and stays protected if your process ends first |
+| The successor finds an open offer | `accept` before it lapses. Your earlier token stops working: renew with the new one |
+| The previous session died without offering a transfer, and its token is in the handoff | `adopt --id I --session T` succeeds only once the holder is provably dead (process gone, PID reused or host rebooted). The claim's history records the recovery |
+| The holder is alive, unknown, or on another host | Nothing takes the claim over. Ask the holder to transfer or release it, or wait for expiry and the owner's decision |
+| No safe transfer is possible | Release it (or let it expire) and acquire anew; report the gap between the two claims in the handoff |
+
+A token pasted from one session into another does not make the second session the holder: `renew` refuses it and
+`check` reports the claim as someone else's.
 
 ## Safe execution of disruptive operations
 
 1. **Authorization.** Establish what the risk model requires (the operational core): task scope for R1, a verified
    authorization or the owner's instruction for R2, owner reconfirmation for R3.
 2. **Claim.** Hold an exclusive claim covering the operation's scope.
-3. **Check.** `check --session <token> --disruptive`: claims, processes, git state, uncommitted work.
+3. **Check.** `check --session <token> --disruptive` (or `--destructive` for deletions and discards): claims,
+   processes, git state, uncommitted work. A passive process blocks unless the owner accepted that exact identity for
+   this reversible operation (see [passive processes](activity-check.md#passive-processes-and-interactive-shells)).
 4. **Preconditions.** Confirm what the operation assumes still holds (the branch exists, the tree is clean, the commits
    are pushed).
 5. **Execute** within the authorized scope, chained with the check so nothing slips in between:
@@ -54,7 +70,7 @@ because the checkout is busy; treat owner approval as proof that an unknown conc
 
 A busy or unknown verdict normally leads to one of:
 - **Defer:** wait for the claim to be released or the process to finish, then check again.
-- **Hand off:** ask the owner, or the holding session through its handoff, to release or transfer the claim.
+- **Hand off:** ask the owner, or the holding session, to release the claim or offer you a transfer.
 - **Choose a non-conflicting alternative:** work that does not touch the shared tree (planning, reviewing, writing
   notes in your own files), or a narrower paths claim if its independence from the holder's work is established.
 
@@ -80,7 +96,7 @@ immediately before pushing to a branch you did not create. These are signals, no
 
 - **`workspace-housekeeping`** owns worktree policy and removal, deletion manifests, backups and the authoritative
   in-use check. This skill's `scripts/path_in_use.py` is a generated, byte-checked copy of that check.
-- **`agent-handoff`** (Phase 1c) will carry the claim ID and token across sessions, and verify authorization
+- **`agent-handoff`** (Phase 1c) carries the claim ID and transfer token across sessions, and verifies authorization
   references before a receiving agent acts.
 - **`instruction-governance`** (Phase 1d) will put this skill's consultation triggers into each agent's instruction
   file and hold owner-approved standing exceptions.
@@ -92,8 +108,9 @@ immediately before pushing to a branch you did not create. These are signals, no
 - Cross-machine coordination and network filesystems are out of scope for the lock.
 - Process visibility is limited to what `lsof` can read; other users' processes need root.
 - Tested on macOS and Linux only; the Windows behaviour is a documented fallback (unknown), not a tested feature.
-- Agents in containers sharing the checkout see different PID namespaces: holder liveness is unreliable across that
-  boundary. Coordinate such setups manually.
-- Any stray file in `.agent-state/claims/` (a `.DS_Store` written by Finder, for example) makes the registry
-  uninspectable, so every acquisition reports unknown until it is removed. This is deliberate: an unrecognized entry
-  is never skipped silently.
+- Agents in containers sharing the checkout see different PID namespaces: inside a container claims are unavailable
+  and the check reports unknown. Coordinate such setups manually.
+- A shell that started two agents is recognised as shared only once one of them holds a claim; until then an explicit
+  `--holder-pid` naming that shell would be accepted. Leave `--holder-pid` unset unless the automatic choice is wrong.
+- A stray file in `.agent-state/claims/` other than a regular `.DS_Store` makes the registry uninspectable, so every
+  acquisition reports unknown until the owner removes it. An unrecognized entry is never skipped silently.

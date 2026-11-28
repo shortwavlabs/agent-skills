@@ -1,6 +1,6 @@
 ---
 name: development-coordination
-description: Coordinate cooperating coding agents that share one git checkout, without a daemon, database or service. Covers session-level checkout claims through a serialized advisory registry (acquire, renew, release, stale archival), conservative overlap of checkout, branch, path and resource scopes, holder identity by session, host, PID and process start time, activity checks of process working directories, open files, claims, git operations in progress and uncommitted work, partial process visibility reported as unknown, safe execution of disruptive operations, and documented fallbacks for Windows and network filesystems. Use before switching branches, committing, resetting, rebasing, cleaning or rebuilding in a checkout other agents may use, before starting or stopping a shared dev server, before pushing to a branch you did not create, when another agent's activity is observed, when a harness offers an isolated worktree, or when a checkout looks idle but has not been checked.
+description: Coordinate cooperating coding agents sharing one git checkout, without a daemon or service. Covers session claims through a serialized advisory registry (acquire, renew, release, transfer to a successor, recovery after holder death), conservative overlap of checkout, branch, path and resource scopes, holder identity by session, host, PID and start time validated as a session boundary, activity checks of process working directories, open files, claims, git operations in progress and uncommitted work, passive interactive shells, partial visibility reported as unknown, safe disruptive and destructive operations, and fallbacks for Windows, network filesystems and containers. Use before switching branches, committing, resetting, rebasing, cleaning or rebuilding in a checkout other agents may use, before starting or stopping a shared dev server, before pushing to a branch you did not create, when handing work to another session, when another agent's activity is observed, or when a harness offers a worktree.
 ---
 
 # Development Coordination
@@ -29,7 +29,7 @@ confirmation prompts. One session-level claim covers a whole task.
 1. **A clean working tree is not an idle checkout.** Another agent may be running a server, a build or a git command
    in it. Check before disruptive operations.
 2. **Claim the checkout once per session** when you will modify a shared working tree, then work normally. Renew it
-   for long tasks; release it when the task ends or ownership is handed over.
+   for long tasks; release it when the task ends, or transfer it when another session takes over.
 3. **Unknown is not idle.** Partial process visibility, an uninspectable registry or a missing capability is reported
    as unknown, and unknown blocks disruptive operations.
 4. **Claims are advisory.** They stop cooperating agents, not other processes. The activity check is the backstop.
@@ -51,20 +51,28 @@ python3 $C check --session <token>                               # after acquiri
 # ... edit, build and test normally: no further checks ...
 python3 $C check --session <token> --disruptive && git switch release/1.4     # before a disruptive step
 python3 $C renew --id <id> --session <token> --ttl 120                         # long task
-python3 $C release --id <id> --session <token>                                 # task ends or is handed over
+python3 $C release --id <id> --session <token>                                 # task ends
+python3 $C transfer --id <id> --session <token>       # handing over: prints a one-time transfer token for the handoff
+python3 $C accept --id <id> --transfer-token <x>      # the successor takes over and gets its own session token
 ```
 
-Record the claim ID and session token in your handoff record so another session can renew or release it. The tool
-records the session's long-lived process as holder automatically; use `--holder-pid` only with your own agent process,
-never a shared ancestor such as a terminal multiplexer or IDE, whose other sessions `check` would then treat as yours.
-An interactive shell sitting in the checkout is reported as busy (marked "no child processes"): a person may type a
-command there at any moment, so ask the owner before a disruptive step rather than treating it as idle.
+The tool records the session's long-lived process as holder and checks that it stands for this session alone (no
+other terminal and no other claim holder beneath it); it never goes by process names. Leave `--holder-pid` unset
+unless that choice is wrong. A token alone is not ownership: a session that only copied another's token cannot renew
+the claim, so hand over with `transfer` and `accept` ([ownership lifecycle](references/protocol.md#ownership-lifecycle)).
+
+An interactive shell sitting in the checkout with no children and no open files is reported as **passive**, and still
+busy: a person may type a command there at any moment. For a reversible operation the owner may accept that one
+process by its identity; for a destructive one nothing overrides it
+([passive processes](references/activity-check.md#passive-processes-and-interactive-shells)).
 
 | Command | Purpose | Exit status |
 |---|---|---|
-| `check [--scope S] [--session T] [--disruptive]` | Read-only activity check | 0 idle, 1 busy, 2 unknown |
+| `check [--scope S] [--session T] [--disruptive \| --destructive] [--accept-passive ID] [--all]` | Read-only activity check | 0 idle, 1 busy, 2 unknown |
 | `acquire --scope S --intent TEXT [--mode shared] [--ttl M]` | Serialized conflict check and claim | 0 granted, 1 conflict, 2 unknown |
-| `renew --id I --session T [--ttl M]` / `release --id I --session T` | Extend or end your claim | 0 done, 2 otherwise |
+| `renew --id I --session T [--ttl M]` / `release --id I --session T` | Extend or end your claim (the holder only) | 0 done, 2 otherwise |
+| `transfer --id I --session T` / `accept --id I --transfer-token X` | Hand a claim to a successor, atomically | 0 done, 2 otherwise |
+| `adopt --id I --session T` | Recover a claim whose holder provably died | 0 done, 2 otherwise |
 | `status` | List claims with their holder state | 0, or 2 if uninspectable |
 | `archive-stale` | Move claims that are expired **and** whose holder is dead to `claims/stale/` | 0, or 2 |
 
@@ -96,9 +104,9 @@ the command narrows it; nothing closes it. The protocol does not guarantee safet
 ## Platforms
 
 - **Tested:** macOS (locally) and Linux (CI), with `fcntl.flock`, `ps` and `lsof`.
-- **Documented fallback, not tested:** on Windows, on network filesystems (NFS, SMB and similar) and wherever locking
-  or process inspection cannot be established, the tool reports the capability as unavailable and the result as
-  unknown. It never reports a grant or "idle" it cannot back. Ordinary non-conflicting work continues; disruptive
+- **Documented fallback, not tested:** on Windows, on network or unidentified filesystems, inside containers and
+  wherever locking or process inspection cannot be established, the tool reports coordination as unavailable and the
+  result as unknown. It never reports a grant or "idle" it cannot back. Ordinary non-conflicting work continues; disruptive
   operations follow the manual procedure in [procedures](references/procedures.md#manual-coordination-fallback).
 - Remote branches and PRs are coordination signals across machines, not distributed locks.
 
@@ -108,8 +116,8 @@ the command narrows it; nothing closes it. The protocol does not guarantee safet
   in-use check; this skill runs a generated copy of that check (`scripts/path_in_use.py`) and never re-implements it.
   If housekeeping is not installed, delete nothing that is not a disposable, task-owned file without the owner's
   approval.
-- **`agent-handoff`** (Phase 1c) records the claim ID and session token so another session can resume, renew or
-  release the claim.
+- **`agent-handoff`** (Phase 1c) records the claim ID and transfer token so the next session can accept the claim
+  and resume.
 - **`instruction-governance`** (Phase 1d) carries this skill's consultation triggers into each agent's instruction
   file and holds any owner-approved standing exception, for example one permitting worktrees for a named task.
 
@@ -123,8 +131,10 @@ B$ python3 coordination.py acquire --scope checkout --intent "Switch to release/
  "intent": "Refactor the parser", "agent": "claude-code", "expires": "2026-11-27T20:40:00Z", ...}]}
 B$ python3 coordination.py check
 verdict: busy
+coordination: available
 evidence: claim 20261127T184000Z-7f3a1c2b (exclusive checkout, live: process 41237 is running): Refactor the parser
-evidence: process 52110 (node) works in /work/app
+evidence: 1 matching processes (1 active, 0 passive, 0 accepted passive)
+evidence: active: process 52110 (node) works in /work/app; has child processes
 ```
 
 B does not switch, stash or open a worktree. It tells the owner the checkout is held for the parser refactor until
@@ -141,3 +151,5 @@ B does not switch, stash or open a worktree. It tells the owner the checkout is 
 | Opening a worktree because the checkout is busy | Defer, hand off or pick a non-conflicting task; worktrees need explicit authorization |
 | Retrying with `--force` after git refuses | Investigate the refusal |
 | Using a branch claim to edit the working tree | Branch claims cover the ref only; edits need a checkout or independent paths claim |
+| Pasting another session's token to take over its claim | `transfer` then `accept`; `adopt` only once the holder has provably died |
+| Treating an idle terminal shell in the checkout as nothing | It is passive and busy; ask the owner, who may accept that one identity for a reversible step |

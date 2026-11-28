@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Revision 4: approved by the owner, with all 14 decisions and the Phase 1a review decisions recorded (2026-11-27). Phase 1a merged (#19); Phase 1b in progress |
+| **Status** | Revision 5: approved by the owner, with all 14 decisions and the Phase 1a and Phase 1b review decisions recorded (2026-11-27). Phase 1a merged (#19); Phase 1b in final review |
 | **Created** | 2026-11-27 |
 | **Scope** | The Operational Skills family for coding agents, alongside the existing `workspace-housekeeping` skill |
 | **Terms** | "Operational Skills" is the family name. "Agent Operations" is a descriptive architectural term only ([D1](#d1-family-name)) |
@@ -402,6 +402,32 @@ Approved by the owner on 2026-11-27, after the Phase 1a review:
 Runtime authorization verification and its regression fixtures belong to Phase 1c; budget enforcement belongs to
 Phase 2.
 
+### Decisions from the Phase 1b final review (revision 5)
+
+Approved by the owner on 2026-11-27, after the Phase 1b review:
+- **Idle interactive shells** are reported separately as passive (working directory only, no children, no open files
+  in the scope), with identity, working directory and children. A process is never excluded by name, and the absence
+  of children is not proof of inactivity. Destructive operations block on them strictly. For a reversible operation,
+  the owner may accept one established passive process, pinned to its PID and start time and revalidated at each
+  check. There is no global ignore switch, and an acceptance never hides claims, uncommitted work, git operations in
+  progress or incomplete visibility.
+- **Registry entries:** a regular `.DS_Store` file is reported and ignored, never deleted; every other unexpected or
+  hidden entry keeps the registry uninspectable.
+- **Holder identity:** an automatic or explicit holder must be a demonstrable session boundary (no other controlling
+  terminal and no other registered claim holder beneath it). Broad shared ancestors (terminal multiplexers, IDEs,
+  terminal applications, a shell hosting sibling agents) are rejected without consulting names; the fallback is no
+  holder, and then no claim.
+- **Ownership lifecycle:** renew by the current holder only; release; transfer under the lock to a named successor
+  with a one-time token, auditable, after which the former holder cannot renew; recovery only after verified holder
+  death. A token alone is never ownership, and shared claims never authorize writes. Where no safe transfer exists:
+  release and reacquire, with the gap reported.
+- **Fail closed, check and acquire alike:** missing locking, network or unidentified filesystems, containers, an
+  unsafe or git-tracked registry, malformed identities and partial visibility (on any target) give unknown in both.
+  An unavailable capability is reported as coordination being unavailable, never as an idle checkout. The read-only
+  check writes nothing: no registry, no optional git locks, no bytecode.
+- **Reporting:** the verdict uses every matching process; the output gives the total and the number omitted, and
+  `--all` lists every one.
+
 Specified in [04](04-risk-and-authorization.md#host-recorded-approvals) and
 [05](05-artifact-conventions.md#standing-authorizations).
 ## Architectural corrections
@@ -432,9 +458,10 @@ These are implementation details within the approved design, to be settled in th
   *dead*.
 - **Settled in Phase 1b** (see `skills/development-coordination/references/protocol.md`): process start time comes
   from `/proc/<pid>/stat` on Linux and `ps -o lstart=` (C locale, UTC) elsewhere; the holder is the nearest
-  non-wrapper ancestor, with an override limited to ancestors and a null (unknown) fallback; Windows and network
-  filesystems report claims as unavailable (unknown) with a manual procedure; across machines, remote branches and PRs
-  are signals only. The original questions follow for the record.
+  non-wrapper ancestor that is a session boundary, with an override limited to ancestors that are boundaries too, and
+  no claim when none is found; Windows, network or unidentified filesystems and containers report claims as
+  unavailable (unknown) with a manual procedure; across machines, remote branches and PRs are signals only. The
+  original questions follow for the record.
 - **Process start time (1b).** `ps -o lstart=` output is locale-dependent; Linux has `/proc/<pid>/stat`. The portable
   choice, and the behaviour when neither is readable (the holder's status is then unknown).
 - **Windows (1b).** `fcntl` is unavailable; whether `msvcrt.locking` is an adequate substitute, or claims are
@@ -460,3 +487,4 @@ These are implementation details within the approved design, to be settled in th
 | 2 | 2026-11-27 | Owner decisions D1–D13 recorded; architectural corrections (coordination protocol, instruction-governance trust boundary and audit tool, evidence and verification records, shared-state safety); reconciled with PR #18 (merged); family renamed Operational Skills |
 | 3 | 2026-11-27 | Final review: D14 (host-recorded approvals as evidence for explicitly scoped standing authorizations); authorization statuses (invalid, unverified, verified, inapplicable, unknown); owner identities and trusted repositories only in the canonical policy; revocation and approval binding; level-1 constraints never overridden; force-exception and R0-deletion limits; identity is not state. Approved |
 | 4 | 2026-11-27 | Phase 1a review decisions recorded: approved interpretations, fresh approval for reintroduced authorizations, inapplicable approvals grant nothing, GitHub PR URLs as the initial `approved_in` capability, the 1.25 factor as a reassessment threshold, stale claims require expiry and holder death |
+| 5 | 2026-11-27 | Phase 1b review decisions recorded: passive processes and owner-accepted identities for reversible operations only, `.DS_Store` tolerated in the registry, holders validated as session boundaries, the ownership lifecycle (renew, release, transfer, recovery) with token rotation and history, fail-closed parity between check and acquire, full-set reporting |
