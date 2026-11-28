@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agent Handoff"
+  short_description: "Hand work to another agent session and resume it safely"
+  default_prompt: "Use $agent-handoff to write a handoff record for this unfinished work, or to resume from one after checking it against the repository."

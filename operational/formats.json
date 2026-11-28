@@ -124,7 +124,8 @@
         "expires": "expiry"
       },
       "optional": {
-        "cost_only": "bool"
+        "cost_only": "bool",
+        "actions": "list+:slug"
       }
     },
     "holder": {
@@ -221,6 +222,32 @@
         "from": "obj:holder-identity",
         "to": "obj:holder-identity"
       }
+    },
+    "job": {
+      "required": {
+        "id": "str",
+        "kind": "enum:process,ci-run,remote",
+        "command": "str",
+        "started": "timestamp"
+      },
+      "optional": {
+        "host": "str",
+        "pid": "pid?",
+        "process_start": "str?",
+        "cwd": "str",
+        "log": "str",
+        "outputs": "list:str",
+        "inputs_sha256": "sha256",
+        "expected_end": "timestamp",
+        "stop": "str",
+        "cost": "str"
+      },
+      "null_together": [
+        [
+          "pid",
+          "process_start"
+        ]
+      ]
     }
   },
   "json": {
@@ -344,6 +371,18 @@
       ],
       "json_sections": {
         "Authorizations in force": "list:obj:authorization-reference"
+      },
+      "optional_headers": {
+        "Transfer": "str"
+      },
+      "optional_headings": [
+        "Artifacts",
+        "Budget",
+        "Lessons and proposals"
+      ],
+      "optional_json_sections": {
+        "Artifacts": "list:obj:artifact",
+        "Running processes and jobs": "list:obj:job"
       }
     }
   }

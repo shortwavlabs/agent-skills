@@ -26,6 +26,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 FORMATS = ROOT / "operational" / "formats.json"
 RUNTIME_FIXTURES = ROOT / "operational" / "fixtures" / "authorization-runtime.json"
+if not FORMATS.exists():                      # installed in a skill: scripts/ beside generated copies in references/
+    FORMATS = ROOT / "references" / "formats.json"
+    RUNTIME_FIXTURES = ROOT / "references" / "authorization-runtime.json"
 TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$")
 EXPIRY_WORDS = ("task-end", "until revoked")
 
@@ -42,9 +45,19 @@ def strict_json(text: str):
     return json.loads(text, object_pairs_hook=pairs)
 
 
+def read_json(path: Path):
+    """A JSON file, or the content of its generated copy (scripts/operational_sync.py wraps JSON copies)."""
+    data = strict_json(path.read_text(encoding="utf-8"))
+    if isinstance(data, dict) and "$generated" in data:
+        if set(data) != {"$generated", "content"}:
+            raise ValueError(f"{path}: malformed generated copy")
+        data = data["content"]
+    return data
+
+
 def load_formats(path: Path = FORMATS) -> dict:
     """The format definitions. Raises ValueError for an unknown kind or version: readers never guess."""
-    formats = strict_json(path.read_text(encoding="utf-8"))
+    formats = read_json(path)
     if not isinstance(formats, dict) or formats.get("kind") != "formats" or type(formats.get("version")) is not int \
             or formats.get("version") != 1:
         raise ValueError(f"{path}: incompatible format definitions (expected kind 'formats', integer version 1)")
@@ -215,6 +228,9 @@ class Checker:
                 problems.append(f"{where}: header '{key}:' missing")
             else:
                 self.check_type(headers[key], t, f"{where}: header '{key}'", problems)
+        for key, t in spec.get("optional_headers", {}).items():
+            if key in headers:
+                self.check_type(headers[key], t, f"{where}: header '{key}'", problems)
         sections: dict[str, list[str]] = {}
         current = None
         for line in lines[first_section:]:
@@ -242,8 +258,11 @@ class Checker:
                         problems.append(f"{where}: a VERIFIED item lacks {', '.join(missing)}: {line[:70]!r}")
                     elif not at or parse_timestamp(at.group(1).rstrip(".;,")) is None:
                         problems.append(f"{where}: a VERIFIED item's 'at:' is not a UTC timestamp: {line[:70]!r}")
-        for heading, t in spec["json_sections"].items():
+        optional = spec.get("optional_json_sections", {})
+        for heading, t in [*spec["json_sections"].items(), *optional.items()]:
             blocks = re.findall(r"```json\n(.*?)\n```", "\n".join(sections.get(heading, [])), re.S)
+            if heading in optional and heading not in spec["json_sections"] and not blocks:
+                continue
             if len(blocks) != 1:
                 problems.append(f"{where}: '## {heading}' needs exactly one ```json block")
                 continue
@@ -499,10 +518,33 @@ def self_test() -> list[str]:
                "artifact: a; at: yesterday"), "h.md"), "not a UTC timestamp")
     expect_bad("handoff without JSON", Checker(formats).check_text(
         handoff([]).replace("```json\n[]\n```", "none"), "h.md"), "exactly one ```json block")
+    job = {"id": "sweep-a", "kind": "process", "command": "python3 sweep.py", "started": "2026-11-27T18:00:00Z",
+           "host": "h", "pid": 4242, "process_start": "lstart:Fri Nov 27 18:00:00 2026"}
+    artifact = {"type": "file", "id": "results/summary.json", "sha256": "0" * 64}
+
+    def extended(jobs, artifacts, transfer="none") -> str:
+        text = handoff([]).replace("Supersedes: none", f"Transfer: {transfer}\nSupersedes: none")
+        text = text.replace("## Running processes and jobs\n-", "## Running processes and jobs\n```json\n"
+                            + json.dumps(jobs) + "\n```")
+        return text.replace("## Verification", "## Artifacts\n```json\n" + json.dumps(artifacts) + "\n```\n\n"
+                            "## Verification")
+    expect_ok("handoff with jobs, artifacts and a transfer", Checker(formats).check_text(extended([job], [artifact]),
+                                                                                         "h.md"))
+    expect_ok("handoff with prose jobs and no artifacts section", Checker(formats).check_text(handoff([]), "h.md"))
+    expect_bad("job with a PID but no start time", Checker(formats).check_text(
+        extended([mutate(job, "process_start", None)], []), "h.md"), "must be null together")
+    expect_bad("job of an unknown kind", Checker(formats).check_text(extended([mutate(job, "kind", "cron")], []),
+                                                                      "h.md"), "not one of process")
+    expect_bad("file artifact without a digest", Checker(formats).check_text(
+        extended([], [mutate(artifact, "sha256", ...)]), "h.md"), "sha256: missing")
+    expect_bad("empty transfer header", Checker(formats).check_text(extended([], [], transfer=""), "h.md"),
+               "header 'Transfer'")
+    expect_bad("two artifact blocks", Checker(formats).check_text(extended([], []).replace(
+        "## Verification", "```json\n[]\n```\n## Verification"), "h.md"), "exactly one ```json block")
 
     # Runtime fixtures: Phase 1a checks the structural column only, and never grants authority.
     try:
-        fixtures = strict_json(RUNTIME_FIXTURES.read_text(encoding="utf-8"))
+        fixtures = read_json(RUNTIME_FIXTURES)
     except (OSError, ValueError) as e:
         return failures + [f"runtime fixtures cannot be read: {e}"]
     statuses = formats["authorization_statuses"]

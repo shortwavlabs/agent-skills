@@ -15,7 +15,9 @@ Trust boundary:
   `..`, no symlink anywhere on a path) before anything is written, and any such problem blocks every write.
 - A Markdown copy is exactly one generated header line naming the source, its revision and its SHA-256, a blank line,
   then the source bytes unchanged. A Python copy keeps the source's shebang line first, then one `#` header line
-  (source and SHA-256), then the rest of the source unchanged. Comparison is byte for byte.
+  (source and SHA-256), then the rest of the source unchanged. JSON has no comments, so a JSON copy is an object whose
+  first line carries the generated header as `"$generated"` and whose `"content"` is the source bytes unchanged.
+  Comparison is byte for byte.
 - An existing file that does not carry this source's generated header is never overwritten.
 - `--write` revalidates each path immediately before an atomic replacement, and writes mode 0644. The check and
   `--diff` never modify anything.
@@ -39,11 +41,16 @@ MANIFEST = "operational/copies.json"
 APPROVED = {                                                   # source -> its designated destination in a skill
     "operational/core.md": "references/operational-core.md",
     "skills/workspace-housekeeping/scripts/path_in_use.py": "scripts/path_in_use.py",
+    "scripts/operational_records.py": "scripts/operational_records.py",
+    "operational/formats.json": "references/formats.json",
+    "operational/fixtures/authorization-runtime.json": "references/authorization-runtime.json",
 }
 HEADER = ("<!-- Generated from {source} (revision {revision}, sha256 {digest}). Do not edit this copy: change the source "
           "and regenerate. -->")
 PY_HEADER = "# Generated from {source} (sha256 {digest}). Do not edit this copy: change the source and regenerate."
-HEADER_RE = re.compile(rb"^(?:<!-- |# )Generated from (\S+) \((?:revision (\d+), )?sha256 ([0-9a-f]{64})\)\. Do not edit")
+JSON_HEADER = ('{{"$generated": "Generated from {source} (sha256 {digest}). Do not edit this copy: change the source and '
+               'regenerate.",')
+HEADER_RE = re.compile(rb"^(?:<!-- |# |\{\"\$generated\": \")Generated from (\S+) \((?:revision (\d+), )?sha256 ([0-9a-f]{64})\)\. Do not edit")
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
@@ -89,6 +96,13 @@ def expected_copy(source: str, data: bytes) -> tuple[bytes | None, str | None]:
         text = data.decode("utf-8")
     except UnicodeDecodeError:
         return None, f"{source}: not UTF-8"
+    if source.endswith(".json"):
+        try:
+            strict_json(text)
+        except ValueError as e:
+            return None, f"{source}: not valid JSON: {e}"
+        header = JSON_HEADER.format(source=source, digest=hashlib.sha256(data).hexdigest()).encode("utf-8")
+        return header + b'\n"content":\n' + data.rstrip(b"\n") + b"\n}\n", None
     if source.endswith(".py"):
         header = PY_HEADER.format(source=source, digest=hashlib.sha256(data).hexdigest()).encode("utf-8")
         if data.startswith(b"#!"):
@@ -187,7 +201,7 @@ def plan(root: Path) -> tuple[list[str], list[str], list[tuple[Path, bytes, str]
         writes.append((path, want, source))
     listed = {copy for _, copy in pairs}
     skills = root / "skills"
-    for path in sorted([*skills.rglob("*.md"), *skills.rglob("*.py")]) if skills.is_dir() else []:
+    for path in sorted([*skills.rglob("*.md"), *skills.rglob("*.py"), *skills.rglob("*.json")]) if skills.is_dir() else []:
         rel = path.relative_to(root).as_posix()
         if rel not in listed and path.is_file() and generated_header_source(path) is not None:
             structural.append(f"unlisted: {rel} carries a generated header but is not listed in {MANIFEST}")
@@ -421,6 +435,36 @@ def self_test() -> list[str]:
         finally:
             del APPROVED["skills/src/scripts/tool.py"]
         copy.unlink()
+
+        # A JSON source: a wrapper object whose first line is the header and whose content is the source unchanged.
+        data_src = root / "operational" / "data.json"
+        data_src.write_bytes(b'{\n  "kind": "formats",\n  "version": 1\n}\n')
+        data_copy = root / "skills" / "a" / "references" / "data.json"
+        APPROVED["operational/data.json"] = "references/data.json"
+        try:
+            manifest([{"source": "operational/data.json", "copies": ["skills/a/references/data.json"]}])
+            expect("json copy missing", ["missing: skills/a/references/data.json"], structural=False)
+            write(root)
+            wrapped = strict_json(data_copy.read_text(encoding="utf-8"))
+            if set(wrapped) != {"$generated", "content"} or wrapped["content"] != {"kind": "formats", "version": 1} \
+                    or not data_copy.read_bytes().startswith(b'{"$generated": "Generated from operational/data.json'):
+                failures.append(f"json copy layout: {data_copy.read_bytes()[:120]!r}")
+            expect("json copy in sync", [])
+            data_copy.write_bytes(data_copy.read_bytes().replace(b'"version": 1', b'"version": 2'))
+            expect("json copy edited", ["edited: skills/a/references/data.json"], structural=False)
+            write(root)
+            data_src.write_bytes(b'{"kind": "formats", "version": 1, "x": 2}\n')
+            expect("json source changed", ["outdated: skills/a/references/data.json"], structural=False)
+            data_src.write_bytes(b'{"kind": ')
+            expect("json source invalid", ["not valid JSON"], structural=True)
+            data_src.write_bytes(b'{"kind": "formats", "version": 1, "x": 2}\n')
+            write(root)
+            manifest()
+            expect("unlisted json copy", ["unlisted: skills/a/references/data.json"], structural=True)
+        finally:
+            del APPROVED["operational/data.json"]
+        data_copy.unlink()
+        data_src.unlink()
         manifest()
 
         # Malformed and incompatible manifests: refused before anything is written.

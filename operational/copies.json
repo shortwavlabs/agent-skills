@@ -1,18 +1,37 @@
 {
   "kind": "copies",
   "version": 1,
-  "about": "Each approved source in operational/ or another skill and the paths of its generated copies (see APPROVED in scripts/operational_sync.py).",
+  "about": "Each approved source (in operational/, scripts/ or another skill) and the paths of its generated copies (see APPROVED in scripts/operational_sync.py).",
   "sources": [
     {
       "source": "operational/core.md",
       "copies": [
-        "skills/development-coordination/references/operational-core.md"
+        "skills/development-coordination/references/operational-core.md",
+        "skills/agent-handoff/references/operational-core.md"
       ]
     },
     {
       "source": "skills/workspace-housekeeping/scripts/path_in_use.py",
       "copies": [
         "skills/development-coordination/scripts/path_in_use.py"
+      ]
+    },
+    {
+      "source": "scripts/operational_records.py",
+      "copies": [
+        "skills/agent-handoff/scripts/operational_records.py"
+      ]
+    },
+    {
+      "source": "operational/formats.json",
+      "copies": [
+        "skills/agent-handoff/references/formats.json"
+      ]
+    },
+    {
+      "source": "operational/fixtures/authorization-runtime.json",
+      "copies": [
+        "skills/agent-handoff/references/authorization-runtime.json"
       ]
     }
   ]

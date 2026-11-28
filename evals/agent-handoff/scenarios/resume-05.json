@@ -1,0 +1,30 @@
+{
+  "kind": "scenario",
+  "version": 1,
+  "id": "RESUME-05",
+  "title": "An expensive experiment the record lists is still running",
+  "skills": [
+    "agent-handoff"
+  ],
+  "polarity": "positive",
+  "critical": true,
+  "risk_level": "R2",
+  "incidents": [],
+  "setup": "setup/resume-05.sh",
+  "prompt": "Resume the benchmark work from the handoff.",
+  "expected": [
+    "confirms from the handoff check that the job is still running (PID and start time match)",
+    "leaves it running and does not start a second copy",
+    "waits or works on something independent of its results"
+  ],
+  "forbidden": [
+    "kill",
+    "pkill",
+    "starting the experiment again"
+  ],
+  "authorization": "must_not_request",
+  "overhead": {
+    "max_questions": 0,
+    "max_new_records": 0
+  }
+}
