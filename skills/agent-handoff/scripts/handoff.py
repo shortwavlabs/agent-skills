@@ -552,39 +552,45 @@ def self_test() -> list[str]:
         sleeper.kill()
         sleeper.wait()
         verdict, lines = check(path, root)
-        if verdict != "drift" or not any("has ended" in line for line in lines):
+        if verdict != "drift" or not any(line.startswith("drift:") and "has ended" in line for line in lines):
             fail(f"an ended job was not reported: {lines}")
         artifact.write_text("x = 2\n")
         verdict, lines = check(path, root)
-        if not any("src/parser.py changed" in line for line in lines) or not any("working tree" in line for line in lines):
+        if not any(line.startswith("drift:") and "src/parser.py changed" in line for line in lines) or not any("working tree" in line for line in lines):
             fail(f"a changed artifact or working tree was not reported: {lines}")
         dirty_record = path.read_text(encoding="utf-8")
         tampered = dirty_record.replace("Working tree: clean", "Working tree: dirty (1 paths, listed under State)")
         tampered = tampered.replace("Refactor half done; tests pass on HEAD.", "Refactor half done.\n- notes.txt")
         path.write_text(tampered, encoding="utf-8")
         _, lines = check(path, root)
-        if not any("uncommitted paths differ" in line for line in lines):
+        if not any(line.startswith("drift:") and "uncommitted paths differ" in line for line in lines):
             fail(f"a different set of dirty paths with the same count was not reported: {lines}")
+        counted = dirty_record.replace("Working tree: clean", "Working tree: dirty (12 paths, listed under State)")
+        counted = counted.replace("Refactor half done; tests pass on HEAD.", "Refactor half done.\n- src/parser.py")
+        path.write_text(counted, encoding="utf-8")
+        _, lines = check(path, root)
+        if not any(line.startswith("drift:") and "working tree was 'dirty (12 paths" in line for line in lines):
+            fail(f"a different count of dirty paths was not reported: {lines}")
         path.write_text(dirty_record.replace("Upstream: not pushed", "Upstream: ahead 12"), encoding="utf-8")
         _, lines = check(path, root)
-        if not any("upstream was 'ahead 12'" in line for line in lines):
+        if not any(line.startswith("drift:") and "upstream was 'ahead 12'" in line for line in lines):
             fail(f"a changed upstream was not reported: {lines}")
         path.write_text(dirty_record.replace("Claim: none", "Claim: ../../etc/passwd"), encoding="utf-8")
         _, lines = check(path, root)
-        if not any("is not a claim id" in line for line in lines):
+        if not any(line.startswith("drift:") and "is not a claim id" in line for line in lines):
             fail(f"a malformed claim id was not reported: {lines}")
         path.write_text(dirty_record, encoding="utf-8")
         run(root, "commit", "-qam", "more work")
         verdict, lines = check(path, root)
-        if not any("1 commits since the record" in line for line in lines):
+        if not any(line.startswith("drift:") and "1 commits since the record" in line for line in lines):
             fail(f"commits since the record were not reported: {lines}")
         artifact.unlink()
         verdict, lines = check(path, root)
-        if not any("src/parser.py is missing" in line for line in lines):
+        if not any(line.startswith("drift:") and "src/parser.py is missing" in line for line in lines):
             fail(f"a missing artifact was not reported: {lines}")
         run(root, "checkout", "-q", "-b", "other")
         verdict, lines = check(path, root)
-        if not any("the checkout is on other" in line for line in lines):
+        if not any(line.startswith("drift:") and "the checkout is on other" in line for line in lines):
             fail(f"a branch change was not reported: {lines}")
         run(root, "checkout", "-q", "feature/parser")
         # Claims: an active claim with a pending transfer, and a claim that is gone.
@@ -600,7 +606,7 @@ def self_test() -> list[str]:
             fail(f"a pending transfer was not reported: {lines}")
         (claims / f"{cid}.json").unlink()
         _, lines = check(path, root)
-        if not any(f"claim {cid} is no longer active" in line for line in lines):
+        if not any(line.startswith("drift:") and f"claim {cid} is no longer active" in line for line in lines):
             fail(f"a vanished claim was not reported: {lines}")
         # Invalid records.
         bad = base / "bad.md"
@@ -610,6 +616,18 @@ def self_test() -> list[str]:
         bad.write_text(text.replace("Version: 1", "Version: 2"), encoding="utf-8")
         if check(bad, root)[0] != "invalid":
             fail("an incompatible version was not invalid")
+        # A state directory git would track is refused.
+        tracked = base / "tracked"
+        tracked.mkdir()
+        run(tracked, "init", "-q")
+        run(tracked, "commit", "-q", "--allow-empty", "-m", "init")
+        (tracked / STATE).mkdir()
+        (tracked / STATE / ".gitignore").write_text("# ignores nothing\n")
+        try:
+            new(tracked, "x", "a", "", "", False, pr="none")
+            fail("a record was written where git would track it")
+        except SystemExit:
+            pass
         # Superseding keeps the previous record as history.
         try:
             new(root, "Again", "codex", "", "", False, pr="none")

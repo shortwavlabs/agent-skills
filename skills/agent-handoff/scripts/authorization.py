@@ -232,7 +232,11 @@ def self_test() -> list[str]:
         "repositories": lambda c: c.update(policy={"owners": policy["owners"], "repositories": []}),
         "action": lambda c: c.update(action=None),
         "R3 operation": lambda c: c.update(operation_extra={"level": "R3"}),
-        "level above entry": lambda c: c["state"]["entry_at_reference"].update(level="R1"),
+        "level above entry": lambda c: (c["state"]["entry_at_reference"].update(level="R1"),
+                                        c["reference"].update(level="R1"), c.update(operation_extra={"level": "R2"})),
+        "grantor": lambda c: (c["state"]["entry_at_reference"].update(granted_by="github:someone-else"),
+                              c["reference"].update(by="github:someone-else")),
+        "well-formed reference": lambda c: c["reference"].pop("scope"),
         "approval state": lambda c: c["state"]["approval"].update(state="superseded"),
         "approval binding": lambda c: c["state"]["approval"].pop("introduced_entry"),
         "designated file": lambda c: c["reference"].update(ref=c["reference"]["ref"].replace("ops/", "docs/", 1)),
@@ -246,6 +250,27 @@ def self_test() -> list[str]:
     if status_with(lambda c: c["state"]["entry_at_reference"].update(actions=["push-branch", "open-draft-pr"])) \
             != "verified":
         failures.append("the positive control with its own actions is not verified")
+    # Missing evidence is unknown, not a guess either way; the reasons tell the agent what to do.
+    for label, edit, want in [
+            ("approval binding", lambda c: c["state"]["approval"].pop("introduced_entry"), "unknown"),
+            ("reinstatement", lambda c: c["state"].pop("reinstated_after_approval"), "unknown"),
+            ("approved revision", lambda c: c["state"]["approval"].pop("entry_at_approved_revision"), "unknown"),
+            ("commit", lambda c: c["state"].pop("commit_exists"), "unknown")]:
+        if status_with(edit) != want:
+            failures.append(f"positive control without its {label}: expected {want}, got {status_with(edit)}")
+
+    def reason_with(edit) -> str:
+        case = copy.deepcopy(control)
+        edit(case)
+        return evaluate(case["reference"], {"action": case.get("action"), **case.get("operation_extra", {})},
+                        case["state"], case.get("policy", policy), now)[1]
+    if "reconfirm with the owner" not in reason_with(lambda c: c.update(operation_extra={"level": "R3"})):
+        failures.append("an R3 operation is not sent back to the owner for reconfirmation")
+    missing = next(c for c in fixtures["cases"] if c["id"] == "missing-entry")
+    if "holds no entry" not in evaluate_case(missing, fixtures)[1]:
+        failures.append("a missing entry is not reported as missing")
+    if status_with(lambda c: c["state"]["entry_at_reference"].update(expires="task-end")) != "unknown":
+        failures.append("a standing entry expiring at task-end was not unknown")
     if status_with(lambda c: c.update(operation_extra={"level": "R1"})) != "verified":
         failures.append("an operation below the entry's level is not covered")
     # Owner identities are compared exactly; repositories case-insensitively (GitHub names are case-insensitive).

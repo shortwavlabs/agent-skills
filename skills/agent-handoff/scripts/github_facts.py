@@ -349,8 +349,9 @@ def self_test() -> list[str]:
             failures.append(f"the adapter queried outside the repository: {gh.calls}")
         subprocess.run(["git", "-C", str(root), "remote", "set-url", "origin", "https://gitlab.com/example/repo.git"],
                        check=True, env=env)
-        if gather(reference, root, owners, api=host())["host_reachable"]:
-            failures.append("a non-GitHub remote was treated as reachable")
+        facts = gather(reference, root, owners, api=host())
+        if facts["host_reachable"] or "not a GitHub repository" not in facts.get("why", ""):
+            failures.append(f"a non-GitHub remote was not reported as having no adapter: {facts}")
         for stderr, want in [("gh: No commit found for SHA: 1111 (HTTP 422)", True), ("gh: Not Found (HTTP 404)", True),
                              ("gh: Validation Failed (HTTP 422)", False), ("gh: Bad credentials (HTTP 401)", False),
                              ("error connecting to api.github.com", False)]:

@@ -539,6 +539,17 @@ def self_test() -> list[str]:
         extended([], [mutate(artifact, "sha256", ...)]), "h.md"), "sha256: missing")
     expect_bad("empty transfer header", Checker(formats).check_text(extended([], [], transfer=""), "h.md"),
                "header 'Transfer'")
+    with tempfile.TemporaryDirectory() as tmp:
+        wrapped = Path(tmp) / "copy.json"
+        wrapped.write_text('{"$generated": "Generated from x", "content": {"kind": "formats"}, "extra": 1}')
+        try:
+            read_json(wrapped)
+            failures.append("a generated JSON copy with extra keys was accepted")
+        except ValueError:
+            pass
+        wrapped.write_text('{"$generated": "Generated from x", "content": {"kind": "formats"}}')
+        if read_json(wrapped) != {"kind": "formats"}:
+            failures.append("a generated JSON copy was not unwrapped")
     expect_bad("two artifact blocks", Checker(formats).check_text(extended([], []).replace(
         "## Verification", "```json\n[]\n```\n## Verification"), "h.md"), "exactly one ```json block")
 

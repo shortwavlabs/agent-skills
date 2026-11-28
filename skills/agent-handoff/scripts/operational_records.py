@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Generated from scripts/operational_records.py (sha256 eedefe3bd751ade769799c3f9ddef67f313cc4ef6fc0c4abecc3c907417be6b7). Do not edit this copy: change the source and regenerate.
+# Generated from scripts/operational_records.py (sha256 4de77bfd86af3333e762bf1dc1f63c127f05d983a59d276fbea6f5be9be5994c). Do not edit this copy: change the source and regenerate.
 """Check operational records against operational/formats.json (RFC 0001, document 05).
 
     python3 scripts/operational_records.py FILE...    exit 0 when every file is valid
@@ -540,6 +540,17 @@ def self_test() -> list[str]:
         extended([], [mutate(artifact, "sha256", ...)]), "h.md"), "sha256: missing")
     expect_bad("empty transfer header", Checker(formats).check_text(extended([], [], transfer=""), "h.md"),
                "header 'Transfer'")
+    with tempfile.TemporaryDirectory() as tmp:
+        wrapped = Path(tmp) / "copy.json"
+        wrapped.write_text('{"$generated": "Generated from x", "content": {"kind": "formats"}, "extra": 1}')
+        try:
+            read_json(wrapped)
+            failures.append("a generated JSON copy with extra keys was accepted")
+        except ValueError:
+            pass
+        wrapped.write_text('{"$generated": "Generated from x", "content": {"kind": "formats"}}')
+        if read_json(wrapped) != {"kind": "formats"}:
+            failures.append("a generated JSON copy was not unwrapped")
     expect_bad("two artifact blocks", Checker(formats).check_text(extended([], []).replace(
         "## Verification", "```json\n[]\n```\n## Verification"), "h.md"), "exactly one ```json block")
 
