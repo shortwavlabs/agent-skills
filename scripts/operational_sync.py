@@ -8,13 +8,14 @@
 
 Trust boundary:
 - Sources come only from APPROVED below, which is reviewed code. Each approved source has exactly one designated
-  destination name, and its copies may only live at `skills/<skill>/references/<that name>`. Extending the list is a
-  reviewed change (Phase 1b adds the in-use check).
+  destination, and its copies may only live at `skills/<skill>/<that destination>` in a skill other than the source's
+  own. Extending the list is a reviewed change.
 - `operational/copies.json` only says which skills receive which approved source. It is validated completely (kind,
   integer version, exact keys, types, approved sources, designated destinations, no duplicates, no absolute paths, no
   `..`, no symlink anywhere on a path) before anything is written, and any such problem blocks every write.
-- A copy is exactly one generated header line naming the source, its revision and its SHA-256, a blank line, then
-  the source bytes unchanged. Comparison is byte for byte: line-ending, BOM or final-newline changes are edits.
+- A Markdown copy is exactly one generated header line naming the source, its revision and its SHA-256, a blank line,
+  then the source bytes unchanged. A Python copy keeps the source's shebang line first, then one `#` header line
+  (source and SHA-256), then the rest of the source unchanged. Comparison is byte for byte.
 - An existing file that does not carry this source's generated header is never overwritten.
 - `--write` revalidates each path immediately before an atomic replacement, and writes mode 0644. The check and
   `--diff` never modify anything.
@@ -35,10 +36,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = "operational/copies.json"
-APPROVED = {"operational/core.md": "operational-core.md"}       # source -> its designated destination name
+APPROVED = {                                                   # source -> its designated destination in a skill
+    "operational/core.md": "references/operational-core.md",
+    "skills/workspace-housekeeping/scripts/path_in_use.py": "scripts/path_in_use.py",
+}
 HEADER = ("<!-- Generated from {source} (revision {revision}, sha256 {digest}). Do not edit this copy: change the source "
           "and regenerate. -->")
-HEADER_RE = re.compile(rb"^<!-- Generated from (\S+) \(revision (\d+), sha256 ([0-9a-f]{64})\)\. Do not edit")
+PY_HEADER = "# Generated from {source} (sha256 {digest}). Do not edit this copy: change the source and regenerate."
+HEADER_RE = re.compile(rb"^(?:<!-- |# )Generated from (\S+) \((?:revision (\d+), )?sha256 ([0-9a-f]{64})\)\. Do not edit")
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
@@ -62,10 +67,19 @@ def strict_json(text: str):
     return json.loads(text, object_pairs_hook=pairs)
 
 
+def header_match(data: bytes):
+    """The generated-header match on the first line, or on the second when the first is a shebang."""
+    lines = data.split(b"\n", 2)
+    m = HEADER_RE.match(lines[0])
+    if not m and lines[0].startswith(b"#!") and len(lines) > 1:
+        m = HEADER_RE.match(lines[1])
+    return m
+
+
 def generated_header_source(path: Path) -> str | None:
     """The source a file's generated header names, or None."""
     with path.open("rb") as fh:
-        m = HEADER_RE.match(fh.readline())
+        m = header_match(fh.readline() + fh.readline())
     return m.group(1).decode("utf-8", "replace") if m else None
 
 
@@ -75,6 +89,12 @@ def expected_copy(source: str, data: bytes) -> tuple[bytes | None, str | None]:
         text = data.decode("utf-8")
     except UnicodeDecodeError:
         return None, f"{source}: not UTF-8"
+    if source.endswith(".py"):
+        header = PY_HEADER.format(source=source, digest=hashlib.sha256(data).hexdigest()).encode("utf-8")
+        if data.startswith(b"#!"):
+            shebang, _, rest = data.partition(b"\n")
+            return shebang + b"\n" + header + b"\n" + rest, None
+        return header + b"\n" + data, None
     m = re.search(r"^Revision: (\d+)$", text, re.M)
     if not m:
         return None, f"{source}: no 'Revision: N' line"
@@ -117,12 +137,13 @@ def validate_manifest(root: Path) -> tuple[list[str], list[tuple[str, str]]]:
         if not isinstance(copies, list):
             problems.append(f"{where}: 'copies' must be a list")
             continue
+        own = Path(source).parts[1] if source.startswith("skills/") else None
         for copy in copies:
             parts = Path(copy).parts if isinstance(copy, str) else ()
-            if (len(parts) != 4 or parts[0] != "skills" or not SLUG.match(parts[1]) or parts[2] != "references"
-                    or parts[3] != APPROVED[source] or not plain_path(root, copy)):
-                problems.append(f"refused: {copy!r} (copies of {source} may only be skills/<skill>/references/"
-                                f"{APPROVED[source]}, as a plain path, not through a symlink)")
+            if (len(parts) < 3 or parts[0] != "skills" or not SLUG.match(parts[1]) or parts[1] == own
+                    or copy != f"skills/{parts[1]}/{APPROVED[source]}" or not plain_path(root, copy)):
+                problems.append(f"refused: {copy!r} (copies of {source} may only be skills/<skill>/"
+                                f"{APPROVED[source]} in another skill, as a plain path, not through a symlink)")
             elif copy in seen_destinations:
                 problems.append(f"{where}: destination {copy} is declared twice")
             else:
@@ -154,19 +175,19 @@ def plan(root: Path) -> tuple[list[str], list[str], list[tuple[Path, bytes, str]
         have = path.read_bytes()
         if have == want:
             continue
-        found = HEADER_RE.match(have.split(b"\n", 1)[0])
+        found = header_match(have)
         if not found or found.group(1).decode("utf-8", "replace") != source:
             structural.append(f"unrelated: {copy} exists without a generated header for {source}; refusing to overwrite it")
             continue
-        if HEADER_RE.match(want.split(b"\n", 1)[0]).groups()[1:] != found.groups()[1:]:
-            drift.append(f"outdated: {copy} (generated from revision {found.group(2).decode()}, sha256 "
-                         f"{found.group(3).decode()[:12]}…)")
+        if header_match(want).groups()[1:] != found.groups()[1:]:
+            revision = f"revision {found.group(2).decode()}, " if found.group(2) else ""
+            drift.append(f"outdated: {copy} (generated from {revision}sha256 {found.group(3).decode()[:12]}…)")
         else:
             drift.append(f"edited: {copy} (bytes differ from the generated copy of {source})")
         writes.append((path, want, source))
     listed = {copy for _, copy in pairs}
     skills = root / "skills"
-    for path in sorted(skills.rglob("*.md")) if skills.is_dir() else []:
+    for path in sorted([*skills.rglob("*.md"), *skills.rglob("*.py")]) if skills.is_dir() else []:
         rel = path.relative_to(root).as_posix()
         if rel not in listed and path.is_file() and generated_header_source(path) is not None:
             structural.append(f"unlisted: {rel} carries a generated header but is not listed in {MANIFEST}")
@@ -313,6 +334,12 @@ def self_test() -> list[str]:
         a.unlink()
         write(root)
 
+        # plain_path itself rejects non-canonical spellings (a second layer behind the exact destination rule).
+        for spelling in ["skills/./a/references/operational-core.md", "skills//a/references/operational-core.md",
+                         "skills/a/references/operational-core.md/", "./operational/core.md"]:
+            if plain_path(root, spelling):
+                failures.append(f"plain_path accepted the non-canonical spelling {spelling!r}")
+
         # Destinations: designated name, location and symlink rules; duplicates.
         outside = base / "outside"
         (outside / "references").mkdir(parents=True)
@@ -357,6 +384,44 @@ def self_test() -> list[str]:
         expect("symlinked source directory", ["refused: source operational/core.md"], structural=True)
         (root / "operational").unlink()
         (root / "operational.real").rename(root / "operational")
+
+        # A Python source: shebang first, header second, rest unchanged; never copied into the source's own skill.
+        tool = root / "skills" / "src" / "scripts" / "tool.py"
+        tool.parent.mkdir(parents=True)
+        tool.write_bytes(b'#!/usr/bin/env python3\n"""Tool."""\nprint("ok")\n')
+        (root / "skills" / "a" / "scripts").mkdir()
+        copy = root / "skills" / "a" / "scripts" / "tool.py"
+        for core_copy in (a, b):              # otherwise they would be unlisted, which blocks every write
+            core_copy.unlink(missing_ok=True)
+        APPROVED["skills/src/scripts/tool.py"] = "scripts/tool.py"
+        try:
+            manifest([{"source": "skills/src/scripts/tool.py", "copies": ["skills/a/scripts/tool.py"]}])
+            expect("python copy missing", ["missing: skills/a/scripts/tool.py"], structural=False)
+            write(root)
+            lines = copy.read_bytes().split(b"\n", 2)
+            if (lines[0] != b"#!/usr/bin/env python3" or not lines[1].startswith(
+                    b"# Generated from skills/src/scripts/tool.py (sha256 ") or lines[2] != b'"""Tool."""\nprint("ok")\n'):
+                failures.append(f"python copy layout: {lines}")
+            try:
+                compile(copy.read_bytes(), "tool.py", "exec")
+            except SyntaxError as e:
+                failures.append(f"the python copy no longer compiles: {e}")
+            expect("python copy in sync", [])
+            copy.write_bytes(copy.read_bytes().replace(b'"ok"', b'"changed"'))
+            expect("python copy edited", ["edited: skills/a/scripts/tool.py"], structural=False)
+            write(root)
+            tool.write_bytes(tool.read_bytes() + b'print("new")\n')
+            expect("python source changed", ["outdated: skills/a/scripts/tool.py (generated from sha256"], structural=False)
+            write(root)
+            expect("python copy regenerated", [])
+            manifest([{"source": "skills/src/scripts/tool.py", "copies": ["skills/src/scripts/tool.py"]}])
+            expect("copy into the source's own skill", ["refused: 'skills/src/scripts/tool.py'"], structural=True)
+            manifest([{"source": "skills/src/scripts/tool.py", "copies": ["skills/a/references/tool.py"]}])
+            expect("python copy at a non-designated path", ["refused: 'skills/a/references/tool.py'"], structural=True)
+        finally:
+            del APPROVED["skills/src/scripts/tool.py"]
+        copy.unlink()
+        manifest()
 
         # Malformed and incompatible manifests: refused before anything is written.
         for label, raw in [("unreadable", "{"), ("not an object", "[]"), ("version 2", {"kind": "copies", "version": 2}),

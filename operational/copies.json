@@ -1,8 +1,19 @@
 {
   "kind": "copies",
   "version": 1,
-  "about": "Each source in operational/ and the paths of its generated copies. Phase 1a lists no copies: the family skills that will carry them do not exist yet. Phase 1b adds the first.",
+  "about": "Each approved source in operational/ or another skill and the paths of its generated copies (see APPROVED in scripts/operational_sync.py).",
   "sources": [
-    { "source": "operational/core.md", "copies": [] }
+    {
+      "source": "operational/core.md",
+      "copies": [
+        "skills/development-coordination/references/operational-core.md"
+      ]
+    },
+    {
+      "source": "skills/workspace-housekeeping/scripts/path_in_use.py",
+      "copies": [
+        "skills/development-coordination/scripts/path_in_use.py"
+      ]
+    }
   ]
 }
