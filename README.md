@@ -504,9 +504,9 @@ Keep a workspace of many plug-in and research projects recoverable and lean with
   with SHA-256 provenance.
 - **Research evidence:** committed provenance for qualification runs (retrospective commits do not establish it);
   frozen evidence changed only by versioned amendment.
-- **Destructive operations:** owner-approved deletion manifests, revalidated against the filesystem and against
-  running processes before execution.
-- **Checkouts:** no unauthorised worktrees or duplicate checkouts.
+- **Destructive operations:** owner-approved deletion manifests, revalidated before execution against the filesystem
+  and, with a tested in-use check, against the working directories and open files of every process.
+- **Checkouts:** no unauthorised worktrees or duplicate checkouts; worktrees are never force-removed.
 - **Disk accounting:** APFS-aware recoverable space.
 
 Project-specific retention rules always take precedence. Disposable caches need no backup.
@@ -520,6 +520,9 @@ progress; preserving audition builds; citing a binary or research result; report
 skills/workspace-housekeeping/
 ├── SKILL.md                    Principles, workflow and pitfalls
 ├── agents/openai.yaml
+├── scripts/
+│   └── path_in_use.py          Is any process using a path? Working directories and open files of every process,
+│                               explicit visibility, CLEAR / IN USE / UNKNOWN; self-test covers git worktree removal
 └── references/
     ├── policy.md               The full workspace policy (revision 3)
     └── procedures.md           WIP snapshots, bundle backups and remote verification, Restic, whole-tree digests,

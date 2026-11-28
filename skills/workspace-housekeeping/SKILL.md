@@ -8,7 +8,8 @@ description: Keep a multi-project audio-plugin and research workspace recoverabl
 Rules and procedures for keeping a workspace of many projects (plug-ins, research code, simulation outputs) small
 without losing evidence or getting in the way of development:
 - the full policy: [references/policy.md](references/policy.md);
-- the commands and verification recipes: [references/procedures.md](references/procedures.md).
+- the commands and verification recipes: [references/procedures.md](references/procedures.md);
+- the in-use check before any removal or deletion: [scripts/path_in_use.py](scripts/path_in_use.py).
 
 ## Principles
 
@@ -68,8 +69,8 @@ without losing evidence or getting in the way of development:
 6. **Revalidate and execute.**
    - Immediately before deleting, check that:
      - the set is unchanged and nothing was written recently;
-     - **no process uses it** (check the complete process list, including dev servers whose working directory is
-       inside it);
+     - **no process uses it**: `scripts/path_in_use.py` reports CLEAR, having checked the working directories and
+       open files of every process (UNKNOWN blocks the entry like IN USE);
      - every bundle has a whole-bundle twin in the preserved set;
      - diagnostic files are preserved;
      - the backups required by principle 2 are verified.
@@ -84,8 +85,11 @@ without losing evidence or getting in the way of development:
 
 ## Pitfalls
 
-- **A truncated process list hides dev servers.** Removing a worktree under a running dev server orphans it, and its
-  file watcher may recreate files in the deleted path. List every process's working directory first.
+- **A truncated process list hides dev servers.** So does a filter on process names. Removing a worktree under a
+  running dev server orphans it, and its file watcher may recreate files in the deleted path. Check every process's
+  working directory and open files first, with `scripts/path_in_use.py`.
+- **Never force a worktree removal.** Plain `git worktree remove` already handles ignored files. Its refusals protect
+  modified, untracked or locked work: investigate them.
 - **"Preservation" pushes publish.** A push to a public repository makes work in progress public, whatever the
   intent.
 - **Duplicates may share blocks.** On APFS, deleting a "duplicate" may free nothing. See
