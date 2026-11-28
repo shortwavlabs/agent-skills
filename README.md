@@ -20,6 +20,10 @@ Runs every skill script's `--self-test` (normally and under `python -O`), checks
 
 - [RFC 0001: Operational Skills](rfcs/0001-agent-operations/README.md) (revision 3, approved): a family of operational skills (coordination, handoff, instruction governance, research provenance, resource budgeting, release governance and, provisionally, technical debt) alongside `workspace-housekeeping`. Not yet implemented.
 
+## Design proposals
+
+- [RFC 0001: Operational Skills](rfcs/0001-agent-operations/README.md) (revision 3, approved): a family of operational skills (coordination, handoff, instruction governance, research provenance, resource budgeting, release governance and, provisionally, technical debt) alongside `workspace-housekeeping`. Not yet implemented.
+
 ## Skills
 
 ### plugdata-patch
