@@ -42,3 +42,6 @@ report for each of those cases; Phase 1a checks only the structural column.
 `operational_sync.py` accepts only the sources listed in its reviewed `APPROVED` table (today, `core.md`), each with
 one designated destination name, and never overwrites a file that is not already a generated copy of that source. A
 matching digest shows identity or integrity, not correctness, provenance or authorization.
+
+`approved_in` accepts GitHub PR URLs (pattern `pr-url` in `formats.json`). That is the initial capability, not an
+architectural restriction: support for another host is added with that host's trusted approval metadata.

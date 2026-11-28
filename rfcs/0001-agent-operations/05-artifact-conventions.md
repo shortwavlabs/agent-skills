@@ -200,7 +200,8 @@ Committed in `ops/authorizations.json` (or the file the canonical policy names),
   only if its content at that revision equals its content at the referenced commit and on the current default branch;
   an entry changed after approval is not covered until approved again.
 - **Revocation** is removal: an entry that no longer appears, unchanged, on the current default branch is revoked, and
-  older commits that still contain it grant nothing.
+  older commits that still contain it grant nothing. Reintroducing it needs fresh owner approval.
+- **Hosts.** `approved_in` accepts GitHub PR URLs: the initial capability, not an architectural restriction.
 
 ## Claims and the coordination protocol
 
@@ -258,7 +259,7 @@ for **cooperating** agents, without a daemon, database or service.
 |---|---|---|
 | **live** | Same host; the PID exists with the recorded start time | Conflict while unexpired |
 | **expired-held** | Live, but past `expires` | Still a conflict: the holder is active. Report it; the holder renews or releases, or the owner decides |
-| **dead** | Same host; the recorded PID is gone, or its start time differs (reused) | The claim is stale: move it to `claims/stale/`, record the takeover, continue |
+| **dead** | Same host; the recorded PID is gone, its start time differs (reused), or the host has rebooted since | Stale **only once also expired**: then move it to `claims/stale/`, record it, continue. Until expiry it remains a conflict |
 | **unknown** | Another host, no recorded PID, or the process table cannot be read | Conflict while unexpired; after expiry, **expired-unknown**: still a conflict, and the owner may release it (ask once) |
 
 ### Procedure
@@ -269,8 +270,9 @@ for **cooperating** agents, without a daemon, database or service.
    not supported, claims are **unavailable**: report unknown, and do not pretend to hold a claim.
 3. Read every claim and determine each holder's state.
 4. Compare the request with every claim that overlaps in an incompatible mode. Any live, expired-held, unknown or
-   expired-unknown holder is a conflict: release the lock and report holder, intent and state. Dead holders' claims
-   are moved to `claims/stale/`.
+   expired-unknown holder is a conflict, and so is a dead holder's claim that has not expired: release the lock and
+   report holder, intent and state. Claims that are both expired and held by a dead holder are moved to
+   `claims/stale/`.
 5. Write the new claim to a temporary file in `claims/`, flush it, rename it into place, and **leave the critical
    section**. The lock is held for milliseconds, never for the operation.
 6. **Run the activity check after acquiring:** every process's working directory **and** open files under the scoped
@@ -451,7 +453,8 @@ Earlier runs keep their original criteria and verdicts; any re-evaluation is lab
 
 Owner: `resource-budgeting` (Phase 2; this format is a proposal until then). Thresholds are configurable and
 owner-approved. **The `per_operation` values below are the owner's initial workspace values, not universal
-defaults.** `material_overrun` (1.25) is a proposed default for owner review, not one of the owner's values.
+defaults.** `material_overrun` (1.25) is approved as a material-deviation threshold that requires reassessment; it
+never permits exceeding an authorized hard limit.
 
 ```json
 {
@@ -486,7 +489,8 @@ Design requirements (D9):
   compare the **high** value, accumulated, with the threshold.
 - **Stop conditions** are declared before launch (maximum wall time, maximum spend, early-termination rule). When
   actuals exceed the high estimate by the material-overrun factor, or would cross a threshold, the job stops or the
-  agent seeks authorization.
+  agent seeks authorization. The factor triggers reassessment; it is never permission to exceed an authorized hard
+  limit on spending, compute, storage or execution time.
 
 ## Artifact provenance manifest (proposal, Phase 3)
 

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Revision 3: approved by the owner (2026-11-27), with all 14 decisions recorded. Implementation proceeds in phases; Phase 1a is in review |
+| **Status** | Revision 4: approved by the owner, with all 14 decisions and the Phase 1a review decisions recorded (2026-11-27). Phase 1a merged (#19); Phase 1b in progress |
 | **Created** | 2026-11-27 |
 | **Scope** | The Operational Skills family for coding agents, alongside the existing `workspace-housekeeping` skill |
 | **Terms** | "Operational Skills" is the family name. "Agent Operations" is a descriptive architectural term only ([D1](#d1-family-name)) |
@@ -377,6 +377,31 @@ operational permission.
   repositories are declared only in the canonical policy.
 - R3 authorization is still reconfirmed, as the operational core requires.
 
+### Decisions from the Phase 1a review (revision 4)
+
+Approved by the owner on 2026-11-27, after the Phase 1a review:
+- The approved revision of a standing authorization comes from trusted host metadata.
+- Removing a standing authorization from the current default branch revokes it. **Reintroducing** a revoked
+  authorization requires fresh owner approval; historical approval never revives it.
+- Host-recorded approval must apply to the exact authorization content. Dismissed, superseded or otherwise
+  inapplicable approvals grant no authority.
+- The five authorization statuses stay: invalid, unverified, verified, inapplicable, unknown.
+- Owner identities and trusted repositories are declared exclusively in the canonical policy.
+- Operational record formats stay at version 1: Phase 1a had not been released when they changed.
+- `approved_in` accepts GitHub PR URLs. This is the initial capability, not an architectural restriction: other
+  hosts can be added with their own trusted metadata.
+- The cross-skill link baseline stays as it is, domain skills included.
+- A generated copy whose byte-order mark hides its generated identity is refused, never rewritten.
+- The 1.25 material-overrun factor is approved as a **material-deviation threshold that requires reassessment**. It
+  never permits exceeding an authorized hard limit on spending, compute, storage or execution time.
+- From the Phase 1b instructions: an expired claim is not automatically abandoned. A claim is archived as stale only
+  when it has expired **and** its holder is established to be dead; a claim whose holder cannot be verified stays
+  unknown. Session tokens prevent accidental misuse between cooperating agents; they are not authentication against a
+  hostile process running as the same user.
+
+Runtime authorization verification and its regression fixtures belong to Phase 1c; budget enforcement belongs to
+Phase 2.
+
 Specified in [04](04-risk-and-authorization.md#host-recorded-approvals) and
 [05](05-artifact-conventions.md#standing-authorizations).
 ## Architectural corrections
@@ -401,7 +426,6 @@ These are implementation details within the approved design, to be settled in th
 - **Runtime verification of host-recorded approvals (1c).** Which host API calls establish a merge or approving review
   by an owner identity and the revision it applied to, and what happens offline (the status is *unknown*: ask once).
   Until 1d declares owner identities in the canonical policy, runtime verification reports *unknown*: ask once.
-- **Material-overrun factor (needs owner approval before Phase 2).** The proposed 1.25 has not been approved.
 - **Identifying the claim holder's process (1b).** The tool must record the agent's long-lived process, not the
   short-lived shell that ran it; otherwise every claim would look dead at once and be taken over. Safe default: if the
   long-lived process cannot be determined, record no PID, and other agents treat the holder as *unknown*, never
@@ -430,3 +454,4 @@ These are implementation details within the approved design, to be settled in th
 | 1 | 2026-11-27 | First draft for owner review (Phase 0) |
 | 2 | 2026-11-27 | Owner decisions D1–D13 recorded; architectural corrections (coordination protocol, instruction-governance trust boundary and audit tool, evidence and verification records, shared-state safety); reconciled with PR #18 (merged); family renamed Operational Skills |
 | 3 | 2026-11-27 | Final review: D14 (host-recorded approvals as evidence for explicitly scoped standing authorizations); authorization statuses (invalid, unverified, verified, inapplicable, unknown); owner identities and trusted repositories only in the canonical policy; revocation and approval binding; level-1 constraints never overridden; force-exception and R0-deletion limits; identity is not state. Approved |
+| 4 | 2026-11-27 | Phase 1a review decisions recorded: approved interpretations, fresh approval for reintroduced authorizations, inapplicable approvals grant nothing, GitHub PR URLs as the initial `approved_in` capability, the 1.25 factor as a reassessment threshold, stale claims require expiry and holder death |
