@@ -133,10 +133,23 @@ symlink targets**. An archive checksum proves only that the archive file is inta
    (`git rev-list --count <branch> --not --remotes` is 0), or backed up under `refs/backup/*` in a private store.
 2. **Ignored evidence is moved:** test outputs, logs and renders go into an ignored folder of the primary checkout
    (`mv` on the same volume costs nothing). Record a README of the origins.
-3. **No process uses it.** Check every process, without truncating the list:
+3. **No process uses it.** Check the working directory of every process. Do not filter by process name: a name
+   filter misses `make`, `ninja`, `bun`, `java`, agents and anything else not on the list.
    ```bash
-   for p in $(pgrep -f 'node|vite|cargo|python|cmake'); do lsof -p $p -a -d cwd -Fn 2>/dev/null | sed -n "s|^n||p"; done | grep -F "$WORKTREE"
+   target=$(cd "$WORKTREE" && pwd -P)    # lsof reports resolved paths (on macOS, /tmp is /private/tmp)
+   if out=$(lsof -w -d cwd -Fpn 2>/dev/null) && [ -n "$out" ]; then
+     printf '%s\n' "$out" | awk -v t="$target" '/^p/ {pid = substr($0, 2)}
+       /^n/ {d = substr($0, 2); if (d == t || index(d, t "/") == 1) print pid, d}'
+   else
+     echo "UNKNOWN: process working directories could not be listed"
+   fi
    ```
+   - Every PID printed is using the worktree. The match is on the path prefix, so a sibling `<path>-old` is not
+     matched.
+   - No output means no such process among those `lsof` can read. Run the check as the user who owns the
+     workspace's processes.
+   - A failed listing means *unknown*, not *idle*: do not proceed.
+
    Stop leftover dev servers only with the owner's agreement.
 4. `git worktree remove [--force] <path>` (force only for ignored files you have just checked), then
    `git worktree prune`. Confirm the path is gone and stays gone: a still-running watcher can recreate it.
