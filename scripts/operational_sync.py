@@ -43,10 +43,23 @@ SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
 def plain_path(root: Path, rel) -> bool:
-    """A repository-relative path with no absolute part, no `..`, and no symlink anywhere on it."""
-    if not isinstance(rel, str) or not rel or Path(rel).is_absolute() or ".." in Path(rel).parts or "\\" in rel:
+    """A canonical repository-relative path (no absolute part, no `.`, `..` or empty segment) with no symlink on it."""
+    if (not isinstance(rel, str) or not rel or Path(rel).is_absolute() or ".." in Path(rel).parts or "\\" in rel
+            or rel != Path(rel).as_posix()):
         return False
     return (root / rel).resolve() == root.resolve() / rel
+
+
+def strict_json(text: str):
+    """json.loads that rejects duplicate keys: a second 'sources' or 'copies' must not silently win."""
+    def pairs(items):
+        out = {}
+        for key, value in items:
+            if key in out:
+                raise ValueError(f"duplicate key {key!r}")
+            out[key] = value
+        return out
+    return json.loads(text, object_pairs_hook=pairs)
 
 
 def generated_header_source(path: Path) -> str | None:
@@ -72,7 +85,7 @@ def expected_copy(source: str, data: bytes) -> tuple[bytes | None, str | None]:
 def validate_manifest(root: Path) -> tuple[list[str], list[tuple[str, str]]]:
     """(structural problems, [(source, destination)])."""
     try:
-        manifest = json.loads((root / MANIFEST).read_text(encoding="utf-8"))
+        manifest = strict_json((root / MANIFEST).read_text(encoding="utf-8"))
     except (OSError, ValueError) as e:
         return [f"{MANIFEST}: cannot be read: {e}"], []
     if (not isinstance(manifest, dict) or manifest.get("kind") != "copies"
@@ -309,7 +322,9 @@ def self_test() -> list[str]:
         bad = ["skills/b/references/operational-core.md", "skills/d/references/operational-core.md",
                str(outside / "references" / "operational-core.md"), "../escape/references/operational-core.md",
                "skills/../operational/operational-core.md", "skills/a/references/notes.md",
-               "skills/a/operational-core.md", "skills/A/references/operational-core.md", "operational/x.md", 7]
+               "skills/a/operational-core.md", "skills/A/references/operational-core.md", "operational/x.md", 7,
+               "skills/./c/references/operational-core.md", "skills//c/references/operational-core.md",
+               "skills/c/references/operational-core.md/"]
         manifest([{"source": "operational/core.md", "copies": bad}])
         before = tree_digest(base)
         expect("refused destinations", [f"refused: {c!r}" for c in bad], structural=True)
@@ -352,6 +367,9 @@ def self_test() -> list[str]:
                                          encoding="utf-8")
             expect(f"manifest {label}", ["cannot be read" if label == "unreadable" else "incompatible manifest"],
                    structural=True)
+        (root / MANIFEST).write_text('{"kind": "copies", "version": 1, "sources": [], "sources": '
+                                     '[{"source": "operational/core.md", "copies": []}]}', encoding="utf-8")
+        expect("manifest duplicate key", ["duplicate key 'sources'"], structural=True)
         for label, top, fragment in [("extra key", {"extra": 1}, "unexpected keys"),
                                      ("sources not a list", {"sources": {}}, "'sources' must be a list")]:
             manifest(**top)

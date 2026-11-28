@@ -460,6 +460,10 @@ def self_test() -> list[str]:
         ("bad identity", mutate(STANDING, "by", "example-owner"), "invalid", True),
         ("bad expiry", mutate(STANDING, "expires", "soon"), "invalid", True),
         ("expires before granted", mutate(STANDING, "expires", "2026-01-01T00:00:00Z"), "invalid", True),
+        ("absolute path in ref", mutate(STANDING, "ref", f"/etc/authorizations.json@{COMMIT}#push"), "invalid", True),
+        ("traversal in ref", mutate(STANDING, "ref", f"../authorizations.json@{COMMIT}#push"), "invalid", True),
+        ("inner traversal in ref", mutate(STANDING, "ref", f"ops/../x.json@{COMMIT}#push"), "invalid", True),
+        ("dot segment in ref", mutate(STANDING, "ref", f"./ops/authorizations.json@{COMMIT}#push"), "invalid", True),
         ("not an object", ["standing"], "invalid", True),
     ]
     for label, reference, want, has_problems in cases:
