@@ -1,4 +1,4 @@
-{"$generated": "Generated from operational/fixtures/authorization-runtime.json (sha256 5e795893f0d484f65de68dc22fa31721656261ac1d5d1399d84999942b7b7b60). Do not edit this copy: change the source and regenerate.",
+{"$generated": "Generated from operational/fixtures/authorization-runtime.json (sha256 a1e2b22836d2a68e148f6e59943b4221db3a3859db04fe7d0beefe4807f5e0ff). Do not edit this copy: change the source and regenerate.",
 "content":
 {
   "kind": "authorization-fixtures",
@@ -3789,14 +3789,14 @@
     },
     {
       "id": "incomplete-spend",
-      "title": "Spending that states no amount",
+      "title": "Spending that states no amount, against an entry that does not limit cost",
       "operation": "Push the feature branch phase-1b to origin and open a draft PR",
       "reference": {
         "level": "R2",
-        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "scope": "Qualification runs of the app's CI",
         "source": "standing",
         "by": "github:example-owner",
-        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#ci-qualification-any-cost",
         "granted": "2026-11-27T18:00:00Z",
         "expires": "2027-06-30T00:00:00Z"
       },
@@ -3804,25 +3804,20 @@
         "repository": "github.com/example/repo",
         "commit_exists": true,
         "entry_at_reference": {
-          "id": "push-feature-branches",
+          "id": "ci-qualification-any-cost",
           "level": "R2",
-          "operations": "Push feature branches of this repository to origin and open draft PRs",
-          "granted_by": "github:example-owner",
-          "approved_in": "https://github.com/example/repo/pull/1",
-          "expires": "2027-06-30T00:00:00Z",
+          "operations": "Qualification runs of the app's CI",
           "actions": [
-            "push-branch",
-            "open-draft-pr"
+            "run-ci"
           ],
           "scope": {
-            "branches": [
-              "phase-*",
-              "feature/*"
-            ],
-            "destinations": [
-              "origin"
+            "purposes": [
+              "qualification"
             ]
-          }
+          },
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z"
         },
         "approval": {
           "kind": "merge",
@@ -3842,11 +3837,10 @@
       "runtime": "unknown",
       "reason": "spending must state its amount",
       "request": {
-        "action": "push-branch",
+        "action": "run-ci",
         "level": "R2",
         "repository": "github.com/example/repo",
-        "branch": "phase-1b",
-        "destination": "origin",
+        "purpose": "qualification",
         "aspect": "spend"
       }
     }

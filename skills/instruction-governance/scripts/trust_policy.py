@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Generated from operational/trust_policy.py (sha256 d887af55fc16909fc14f1c699e578817d047e5afbf604cfd30e6973d97c890e9). Do not edit this copy: change the source and regenerate.
+# Generated from operational/trust_policy.py (sha256 f7f0a0bdd4f8abffb850c03cde33ef5919ec3b2d48700563403b882fd49c7cfc). Do not edit this copy: change the source and regenerate.
 """The canonical trust policy: who the owner is, which repositories are trusted, and where their authorizations live.
 
     trust_policy.py verify [--path FILE]   report whether a trust policy is installed and valid (read-only)
@@ -305,6 +305,8 @@ def self_test() -> list[str]:
             failures.append("a policy reached through a symlinked directory was trusted")
         # Missing, malformed, unsupported.
         expect("missing policy", False)
+        if "no trust policy is installed" not in loaded()[1]:
+            failures.append(f"a missing policy was not reported as missing: {loaded()[1]}")
         for label, data in [
                 ("unsupported version", {**good, "version": 2}), ("boolean version", {**good, "version": True}),
                 ("wrong kind", {**good, "kind": "policy"}), ("not an object", [good]),

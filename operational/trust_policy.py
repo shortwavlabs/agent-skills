@@ -304,6 +304,8 @@ def self_test() -> list[str]:
             failures.append("a policy reached through a symlinked directory was trusted")
         # Missing, malformed, unsupported.
         expect("missing policy", False)
+        if "no trust policy is installed" not in loaded()[1]:
+            failures.append(f"a missing policy was not reported as missing: {loaded()[1]}")
         for label, data in [
                 ("unsupported version", {**good, "version": 2}), ("boolean version", {**good, "version": True}),
                 ("wrong kind", {**good, "kind": "policy"}), ("not an object", [good]),
