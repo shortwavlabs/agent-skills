@@ -1419,6 +1419,16 @@ def self_test() -> list[str]:
         expect("claim from another machine", acquire(root, checkout, intent="x", holder_pid=me), "conflict",
                "another host")
         clear(root)
+        recorded_start = process_start(holder)
+        saved_reader = _identity.process_start
+        _identity.process_start = lambda pid: None
+        try:
+            state = holder_state({"pid": holder, "process_start": recorded_start, "host": socket.gethostname(),
+                                  "boot": boot_id()}, here())[0]
+            if state != "unknown":
+                fail(f"a live holder whose start time cannot be read was {state}, not unknown")
+        finally:
+            _identity.process_start = saved_reader
         fixture_claim(root, checkout, pid=holder, boot="previous-boot", expires_in=-5)
         expect("holder from before a reboot, expired", acquire(root, checkout, intent="x", holder_pid=me), "granted")
         clear(root)
