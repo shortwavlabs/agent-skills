@@ -326,6 +326,9 @@ def self_test() -> list[str]:
         "cost limit": lambda c: c["request"].update(cost_usd=5),
         "narrowing reference": lambda c: c["reference"].update(limits={"branches": ["feature/*"]}),
         "cost-only entry": lambda c: c["state"]["entry_at_reference"].update(cost_only=True),
+        "trusted operation repository": lambda c: (
+            c["state"]["entry_at_reference"]["scope"].update(repositories=["github.com/example/untrusted"]),
+            c["request"].update(repository="github.com/example/untrusted")),
         "merge on the default branch": lambda c: c["state"]["approval"].pop("merged_into_default_branch"),
         "change history": lambda c: c["state"].pop("changed_after_approval"),
         "pinned revision": lambda c: c["state"].update(default_branch_moved=True),
@@ -350,7 +353,10 @@ def self_test() -> list[str]:
             ("approval binding", lambda c: c["state"]["approval"].pop("introduced_entry"), "unknown"),
             ("reinstatement", lambda c: c["state"].pop("reinstated_after_approval"), "unknown"),
             ("approved revision", lambda c: c["state"]["approval"].pop("entry_at_approved_revision"), "unknown"),
-            ("commit", lambda c: c["state"].pop("commit_exists"), "unknown")]:
+            ("commit", lambda c: c["state"].pop("commit_exists"), "unknown"),
+            ("merge on the default branch", lambda c: c["state"]["approval"].pop("merged_into_default_branch"),
+             "unknown"),
+            ("change history", lambda c: c["state"].pop("changed_after_approval"), "unknown")]:
         if status_with(edit) != want:
             failures.append(f"positive control without its {label}: expected {want}, got {status_with(edit)}")
 

@@ -838,6 +838,17 @@ def self_test() -> list[str]:
         publish(dirty, record.replace("Upstream: not pushed;", "Upstream: ahead 12 (origin/x);").encode())
         if not drifted(check(dirty, root)[1], "upstream was 'ahead 12 (origin/x)'"):
             fail("a changed upstream was not reported")
+        publish(dirty, record.replace("Checkout: ", "Checkout: elsewhere:", 1).encode())
+        if not drifted(check(dirty, root)[1], "recorded in checkout elsewhere:"):
+            fail("a record from another checkout was not reported")
+        empty = base / "empty"
+        empty.mkdir()
+        run(empty, "init", "-q")
+        try:
+            new(empty, "x", "a", "", "", False, pr="none")
+            fail("a record was written without a readable HEAD")
+        except SystemExit:
+            pass
         publish(dirty, record.replace("Claim: none", "Claim: ../../etc/passwd").encode())
         if not drifted(check(dirty, root)[1], "is not a claim id"):
             fail("a malformed claim id was not reported")

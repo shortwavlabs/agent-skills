@@ -454,6 +454,16 @@ def self_test() -> list[str]:
         gh.pr = {**merged, "merge_commit_sha": sha("1")}
         if outcome(gh, sha("1"))[0] != "verified":
             failures.append(f"side-branch states were counted as default-branch history: {outcome(gh, sha('1'))}")
+        # A side branch that removed the entry, merged into the default branch: that removal did reach it.
+        gh = FakeGitHub()
+        gh.add(sha("0"), [], doc())
+        gh.add(sha("1"), [sha("0")], doc(entry), prs=(1,))
+        gh.add(sha("2"), [sha("1")], doc(), prs=(3,))
+        gh.add(sha("4"), [sha("1")], doc(entry), prs=(4,))
+        gh.add(sha("5"), [sha("4"), sha("2")], doc(), prs=(3,))
+        gh.pr = {**merged, "merge_commit_sha": sha("1")}
+        if outcome(gh, sha("1"))[0] != "inapplicable":
+            failures.append("a removal merged in from a side branch was missed")
         # A rebase merge of a two-commit PR whose first commit added the entry.
         gh = FakeGitHub()
         gh.add(sha("0"), [], doc())
