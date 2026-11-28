@@ -49,7 +49,7 @@ Every record carries `kind` and `version` (JSON) or a `Version:` header line (Ma
 | **`ops/`**, committed (or the project's declared override) | Standing authorizations, budget, debt register, release decisions, amendments | Normal git history |
 | **Next to the results they describe** | Run manifests | The project's research layout decides |
 | **Private storage** (`workspace-housekeeping`) | Anything that must outlive the machine but must not be published, including important handoffs | Verified backup |
-| **PR description** | A public-safe status summary taken from a handoff | Public: nothing private |
+| **PR description** | A redacted status draft taken from a handoff, reviewed before posting | Public: nothing private |
 
 ### `.agent-state/` layout and exclusion
 
@@ -60,6 +60,7 @@ Every record carries `kind` and `version` (JSON) or a `Version:` header line (Ma
   claims/<id>.json  live claims
   claims/stale/     claims archived after expiry with a dead holder, kept until reviewed
   handoffs/<branch>.md
+  handoffs/history/ superseded handoff records, kept until reviewed
 ```
 
 - **Sandbox-compatible exclusion.** The agent creates `.agent-state/.gitignore` containing `*` before writing anything
@@ -71,7 +72,7 @@ Every record carries `kind` and `version` (JSON) or a `Version:` header line (Ma
 - **Claims are ephemeral.** A released claim is deleted by its holder. Stale claims are moved to `claims/stale/`, not
   deleted, until reviewed. Any other entry in `claims/` makes the registry uninspectable (unknown), except a regular
   `.DS_Store` file, which is reported, ignored and never deleted.
-- **Handoffs are valuable.** They are never deleted automatically. The preservation path: a public-safe summary in
+- **Handoffs are valuable.** They are never deleted automatically. The preservation path: a reviewed, redacted summary in
   the PR description; a copy in the owner's private backup (`workspace-housekeeping`); or, in a **private**
   repository whose owner chooses it, a committed `ops/handoffs/` directory that is not ignored. Never force-add an
   ignored file, use index plumbing or rename files to get them committed.
@@ -175,6 +176,7 @@ Committed in `ops/authorizations.json` (or the file the canonical policy names),
       "id": "push-feature-branches",
       "level": "R2",
       "operations": "Push feature branches of this repository to origin and open draft PRs",
+      "actions": ["push-branch", "open-draft-pr"],
       "granted_by": "github:<owner login>",
       "approved_in": "https://github.com/<owner>/<repo>/pull/<n>",
       "expires": "2027-06-30T00:00:00Z"
@@ -193,6 +195,18 @@ Committed in `ops/authorizations.json` (or the file the canonical policy names),
 ```
 
 - `level` is R1 or R2, never R3. A `cost_only` entry authorizes spending alone, never publication or deletion.
+- `actions` (Phase 1c) lists the operations the entry covers as exact slugs, and `scope` limits where and how much:
+  `repositories`, `branches`, `paths`, `destinations`, `targets`, `purposes` and `max_usd`. Runtime verification
+  matches a structured operation (action, risk level, and each stated dimension) against both, because whether a
+  sentence covers an operation is not decided mechanically. Every dimension the operation states must be limited, and
+  every limited dimension must be stated. A reference may carry narrower `limits`, never wider. An entry without
+  `actions` or `scope` stays structurally valid and verifies as unknown.
+- **Bound to its PR.** The `approved_in` PR must have been merged into the default branch (its merge on the
+  first-parent chain from a pinned revision) and must itself have introduced or changed the entry: compared with the
+  merge commit's first parent, or, for a squash or rebase merge, with the first commit the host does not associate
+  with the PR; never with the PR's recorded base, which can predate an entry pushed to the branch later. An owner
+  merging an unrelated PR approves nothing already on the branch. Since that merge, the entry must never have been
+  removed or changed (even if restored). Standing references must name the designated file.
 - Existing authorized workflows that cost money (D9) are entries here; the budget file only holds thresholds.
 - **No owner list here.** Owner identities and trusted repositories are declared only in the canonical policy (D14);
   a repository cannot establish its own owner identity.
@@ -337,8 +351,11 @@ non-fast-forward pushes, and that refusal is investigated, never forced.
 
 ## Handoff record
 
-Owner: `agent-handoff` (Phase 1c). Location: `.agent-state/handoffs/<branch>.md`. Refreshed at milestones and at the
-end of a session with unfinished work. Phase 1a defines its required header lines and headings.
+Owner: `agent-handoff` (Phase 1c). Location: `.agent-state/handoffs/<percent-encoded branch>.<digest of the branch name>.md`
+(collision-resistant, also on case-insensitive filesystems), private (0600), published atomically. Refreshed at milestones and at the end of a session with unfinished work. Phase 1a defines its required header
+lines and headings; Phase 1c adds optional parts, still version 1: a `Transfer:` header (the one-time claim transfer
+token), `## Artifacts` (a JSON list of artifacts), a JSON list of jobs under `## Running processes and jobs`,
+`## Budget` and `## Lessons and proposals`. See `skills/agent-handoff/references/record.md`.
 
 ````markdown
 # Handoff: <one-line task title>
@@ -346,7 +363,7 @@ end of a session with unfinished work. Phase 1a defines its required header line
 Version: 1
 Created: 2026-11-27T18:40:00Z
 Author: <agent product> / <model> / <session id, if the agent has one>
-Repository: <remote name or URL>
+Repository: <host/owner/name of the remote> | none (no remote: local repository)
 Branch: <branch>
 HEAD: <full commit id>
 Upstream: in sync | ahead <n> | behind <n> | not pushed

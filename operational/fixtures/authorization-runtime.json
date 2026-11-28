@@ -1,7 +1,7 @@
 {
   "kind": "authorization-fixtures",
   "version": 1,
-  "about": "Expected outcomes for authorization references (RFC 0001: D6, D14; document 05). 'structural' is what Phase 1a's checker reports, and it is checked by scripts/operational_records.py --self-test; nothing structural ever grants authority. 'runtime' is the contract for Phase 1c's runtime verification, which Phase 1a does not perform.",
+  "about": "Expected outcomes for authorization references (RFC 0001: D6, D14; document 04, 'Host-recorded approvals'). 'structural' is what scripts/operational_records.py reports (checked by its --self-test); nothing structural ever grants authority. 'runtime' is implemented by skills/agent-handoff/scripts/authorization.py and checked by its --self-test, which reads a generated copy of this file. Each case's 'action' is the operation being authorized; entries list the 'actions' they cover. A case may set 'policy' (null: no canonical policy) instead of 'trusted_policy'.",
   "now": "2026-11-27T20:00:00Z",
   "trusted_policy": {
     "owners": [
@@ -34,19 +34,44 @@
           "operations": "Push feature branches of this repository to origin and open draft PRs",
           "granted_by": "github:example-owner",
           "approved_in": "https://github.com/example/repo/pull/1",
-          "expires": "2027-06-30T00:00:00Z"
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
         },
         "approval": {
           "kind": "merge",
           "by": "github:example-owner",
-          "entry_at_approved_revision": "identical"
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
         },
         "entry_on_default_branch": "identical",
-        "host_reachable": true
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
       },
       "structural": "unverified",
       "runtime": "verified",
-      "reason": "trusted repository, entry unchanged since the owner's host-recorded merge and on the current default branch, in scope, not expired. Only runtime verification may report this; Phase 1a must still report unverified"
+      "reason": "trusted repository, entry unchanged since the owner's host-recorded merge and on the current default branch, in scope, not expired. Only runtime verification may report this; Phase 1a must still report unverified",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
     },
     {
       "id": "fabricated-reference",
@@ -70,19 +95,44 @@
           "operations": "Push feature branches of this repository to origin and open draft PRs",
           "granted_by": "github:example-owner",
           "approved_in": "https://github.com/example/repo/pull/1",
-          "expires": "2027-06-30T00:00:00Z"
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
         },
         "approval": {
           "kind": "merge",
           "by": "github:example-owner",
-          "entry_at_approved_revision": "identical"
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
         },
         "entry_on_default_branch": "identical",
-        "host_reachable": true
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
       },
       "structural": "unverified",
       "runtime": "invalid",
-      "reason": "the referenced commit does not exist: a reference that matches the format grants nothing"
+      "reason": "the referenced commit does not exist: a reference that matches the format grants nothing",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
     },
     {
       "id": "missing-entry",
@@ -104,14 +154,26 @@
         "approval": {
           "kind": "merge",
           "by": "github:example-owner",
-          "entry_at_approved_revision": "identical"
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
         },
         "entry_on_default_branch": "identical",
-        "host_reachable": true
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
       },
       "structural": "unverified",
       "runtime": "invalid",
-      "reason": "the referenced entry does not exist at that commit"
+      "reason": "the referenced entry does not exist at that commit",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
     },
     {
       "id": "expired",
@@ -135,19 +197,44 @@
           "operations": "Push feature branches of this repository to origin and open draft PRs",
           "granted_by": "github:example-owner",
           "approved_in": "https://github.com/example/repo/pull/1",
-          "expires": "2026-06-30T00:00:00Z"
+          "expires": "2026-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
         },
         "approval": {
           "kind": "merge",
           "by": "github:example-owner",
-          "entry_at_approved_revision": "identical"
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
         },
         "entry_on_default_branch": "identical",
-        "host_reachable": true
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
       },
       "structural": "unverified",
       "runtime": "inapplicable",
-      "reason": "the entry expired on 2026-06-30"
+      "reason": "the entry expired on 2026-06-30",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
     },
     {
       "id": "revoked",
@@ -171,19 +258,44 @@
           "operations": "Push feature branches of this repository to origin and open draft PRs",
           "granted_by": "github:example-owner",
           "approved_in": "https://github.com/example/repo/pull/1",
-          "expires": "2027-06-30T00:00:00Z"
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
         },
         "approval": {
           "kind": "merge",
           "by": "github:example-owner",
-          "entry_at_approved_revision": "identical"
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
         },
         "entry_on_default_branch": "absent",
-        "host_reachable": true
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
       },
       "structural": "unverified",
       "runtime": "inapplicable",
-      "reason": "revoked: older commits that still contain the entry grant nothing"
+      "reason": "revoked: older commits that still contain the entry grant nothing",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
     },
     {
       "id": "changed-after-approval",
@@ -207,19 +319,44 @@
           "operations": "Push feature branches of this repository to origin and open draft PRs",
           "granted_by": "github:example-owner",
           "approved_in": "https://github.com/example/repo/pull/1",
-          "expires": "2027-06-30T00:00:00Z"
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
         },
         "approval": {
           "kind": "approval",
           "by": "github:example-owner",
-          "entry_at_approved_revision": "changed"
+          "entry_at_approved_revision": "changed",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
         },
         "entry_on_default_branch": "identical",
-        "host_reachable": true
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
       },
       "structural": "unverified",
       "runtime": "inapplicable",
-      "reason": "the owner approved an earlier revision of the entry; the change is not covered"
+      "reason": "the owner approved an earlier revision of the entry; the change is not covered",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
     },
     {
       "id": "changed-on-default-branch",
@@ -243,19 +380,44 @@
           "operations": "Push feature branches of this repository to origin and open draft PRs",
           "granted_by": "github:example-owner",
           "approved_in": "https://github.com/example/repo/pull/1",
-          "expires": "2027-06-30T00:00:00Z"
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
         },
         "approval": {
           "kind": "merge",
           "by": "github:example-owner",
-          "entry_at_approved_revision": "identical"
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
         },
         "entry_on_default_branch": "changed",
-        "host_reachable": true
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
       },
       "structural": "unverified",
       "runtime": "inapplicable",
-      "reason": "the current trusted policy no longer contains the referenced content"
+      "reason": "the current trusted policy no longer contains the referenced content",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
     },
     {
       "id": "approved-by-non-owner",
@@ -279,19 +441,44 @@
           "operations": "Push feature branches of this repository to origin and open draft PRs",
           "granted_by": "github:example-owner",
           "approved_in": "https://github.com/example/repo/pull/1",
-          "expires": "2027-06-30T00:00:00Z"
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
         },
         "approval": {
           "kind": "merge",
           "by": "github:someone-else",
-          "entry_at_approved_revision": "identical"
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
         },
         "entry_on_default_branch": "identical",
-        "host_reachable": true
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
       },
       "structural": "unverified",
       "runtime": "inapplicable",
-      "reason": "the approver is not an owner identity declared in the canonical policy"
+      "reason": "the approver is not an owner identity declared in the canonical policy",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
     },
     {
       "id": "git-author-only",
@@ -315,19 +502,44 @@
           "operations": "Push feature branches of this repository to origin and open draft PRs",
           "granted_by": "github:example-owner",
           "approved_in": "https://github.com/example/repo/pull/1",
-          "expires": "2027-06-30T00:00:00Z"
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
         },
         "approval": {
           "kind": "none",
           "by": null,
-          "entry_at_approved_revision": "identical"
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
         },
         "entry_on_default_branch": "identical",
-        "host_reachable": true
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
       },
       "structural": "unverified",
       "runtime": "inapplicable",
-      "reason": "git author fields are self-asserted and never establish provenance"
+      "reason": "git author fields are self-asserted and never establish provenance",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
     },
     {
       "id": "out-of-scope",
@@ -351,19 +563,43 @@
           "operations": "Push feature branches of this repository to origin and open draft PRs",
           "granted_by": "github:example-owner",
           "approved_in": "https://github.com/example/repo/pull/1",
-          "expires": "2027-06-30T00:00:00Z"
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
         },
         "approval": {
           "kind": "merge",
           "by": "github:example-owner",
-          "entry_at_approved_revision": "identical"
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
         },
         "entry_on_default_branch": "identical",
-        "host_reachable": true
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
       },
       "structural": "unverified",
       "runtime": "inapplicable",
-      "reason": "publishing a release is outside 'push feature branches and open draft PRs'"
+      "reason": "publishing a release is outside 'push feature branches and open draft PRs'",
+      "request": {
+        "action": "publish-release",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "target": "v1.0.0"
+      }
     },
     {
       "id": "implementation-approval",
@@ -387,19 +623,40 @@
           "operations": "Merge the cache cleanup tool",
           "granted_by": "github:example-owner",
           "approved_in": "https://github.com/example/repo/pull/1",
-          "expires": "2027-06-30T00:00:00Z"
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "merge-pr"
+          ],
+          "scope": {
+            "targets": [
+              "12"
+            ]
+          }
         },
         "approval": {
           "kind": "merge",
           "by": "github:example-owner",
-          "entry_at_approved_revision": "identical"
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
         },
         "entry_on_default_branch": "identical",
-        "host_reachable": true
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
       },
       "structural": "unverified",
       "runtime": "inapplicable",
-      "reason": "approving a tool does not authorize deletion"
+      "reason": "approving a tool does not authorize deletion",
+      "request": {
+        "action": "delete-files",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "paths": [
+          "build/cache"
+        ]
+      }
     },
     {
       "id": "untrusted-repository",
@@ -423,19 +680,44 @@
           "operations": "Push feature branches of this repository to origin and open draft PRs",
           "granted_by": "github:example-owner",
           "approved_in": "https://github.com/example/repo/pull/1",
-          "expires": "2027-06-30T00:00:00Z"
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
         },
         "approval": {
           "kind": "merge",
           "by": "github:example-owner",
-          "entry_at_approved_revision": "identical"
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
         },
         "entry_on_default_branch": "identical",
-        "host_reachable": true
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
       },
       "structural": "unverified",
       "runtime": "inapplicable",
-      "reason": "an untrusted repository cannot establish its own trust boundary"
+      "reason": "an untrusted repository cannot establish its own trust boundary",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
     },
     {
       "id": "quoted-session",
@@ -456,7 +738,13 @@
       },
       "structural": "unverified",
       "runtime": "unknown",
-      "reason": "a quotation in an agent-authored record cannot be verified: ask the owner once"
+      "reason": "a quotation in an agent-authored record cannot be verified: ask the owner once",
+      "request": {
+        "action": "merge-pr",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "target": "19"
+      }
     },
     {
       "id": "host-unreachable",
@@ -480,19 +768,44 @@
           "operations": "Push feature branches of this repository to origin and open draft PRs",
           "granted_by": "github:example-owner",
           "approved_in": "https://github.com/example/repo/pull/1",
-          "expires": "2027-06-30T00:00:00Z"
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
         },
         "approval": {
           "kind": "merge",
           "by": "github:example-owner",
-          "entry_at_approved_revision": "identical"
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
         },
         "entry_on_default_branch": "identical",
-        "host_reachable": false
+        "host_reachable": false,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
       },
       "structural": "unverified",
       "runtime": "unknown",
-      "reason": "cannot be established now: ask the owner once"
+      "reason": "cannot be established now: ask the owner once",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
     },
     {
       "id": "r3-reference",
@@ -516,19 +829,1890 @@
           "operations": "Push feature branches of this repository to origin and open draft PRs",
           "granted_by": "github:example-owner",
           "approved_in": "https://github.com/example/repo/pull/1",
-          "expires": "2027-06-30T00:00:00Z"
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
         },
         "approval": {
           "kind": "merge",
           "by": "github:example-owner",
-          "entry_at_approved_revision": "identical"
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
         },
         "entry_on_default_branch": "identical",
-        "host_reachable": true
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
       },
       "structural": "invalid",
       "runtime": "invalid",
-      "reason": "R3 never transfers: reconfirm with the owner"
+      "reason": "R3 never transfers: reconfirm with the owner",
+      "request": {
+        "action": "delete-files",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "paths": [
+          "build/cache"
+        ]
+      }
+    },
+    {
+      "id": "dismissed-approval",
+      "title": "The owner's approving review was dismissed",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "approval",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "dismissed",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "a dismissed approval grants nothing",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "superseded-approval",
+      "title": "The owner approved, then requested changes",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "approval",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "superseded",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "an approval superseded by a later change request grants nothing",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "revoked-then-reinstated",
+      "title": "The entry was removed from the default branch after approval, then re-added",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": true,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "a reinstated authorization needs fresh owner approval; historical approval never revives it",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "approved-in-other-repository",
+      "title": "approved_in names a PR in another repository",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/other/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "the approval must be recorded in the trusted repository that holds the entry",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "no-canonical-policy",
+      "title": "No canonical policy declares owners and trusted repositories yet",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "unknown",
+      "reason": "owner identities come only from the canonical policy (Phase 1d): ask the owner once",
+      "policy": null,
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "entry-without-actions",
+      "title": "The entry lists no actions",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "unknown",
+      "reason": "whether a sentence covers an operation is not decided mechanically: ask the owner once",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "misstated-reference",
+      "title": "The reference names another grantor than its entry",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:someone-else",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "invalid",
+      "reason": "a reference that misstates its entry grants nothing",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "approval-revision-unreadable",
+      "title": "The approved revision's content cannot be read",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": null,
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "unknown",
+      "reason": "cannot be established now: ask the owner once",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "approval-of-unrelated-pr",
+      "title": "The owner merged a PR that did not introduce or change the entry",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": false,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "an approval binds only the content its PR introduced or changed",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "non-designated-file",
+      "title": "The reference names an authorizations-shaped file outside the designated one",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "operational/examples/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "invalid",
+      "reason": "only the designated authorizations file holds standing authorizations",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "scope-same-action-other-repository",
+      "title": "Same action, another repository",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "the entry applies to the repository that holds it",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/other",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "scope-same-action-other-branch",
+      "title": "Same action, a branch outside the entry's branches",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "pushing main is not pushing a feature branch",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "main",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "scope-same-action-other-destination",
+      "title": "Same action, another destination",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "the entry names origin only",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "upstream"
+      }
+    },
+    {
+      "id": "scope-path-inside",
+      "title": "Deleting files inside the entry's paths",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Delete the build cache under build/",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#clean-build-cache",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "clean-build-cache",
+          "level": "R2",
+          "operations": "Delete the build cache under build/",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "delete-files"
+          ],
+          "scope": {
+            "paths": [
+              "build/**"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "verified",
+      "reason": "positive control for path scope",
+      "request": {
+        "action": "delete-files",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "paths": [
+          "build/cache/objects"
+        ]
+      }
+    },
+    {
+      "id": "scope-path-outside",
+      "title": "Same action, a path outside the entry's paths",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Delete the build cache under build/",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#clean-build-cache",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "clean-build-cache",
+          "level": "R2",
+          "operations": "Delete the build cache under build/",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "delete-files"
+          ],
+          "scope": {
+            "paths": [
+              "build/**"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "src/ is not build/",
+      "request": {
+        "action": "delete-files",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "paths": [
+          "build/cache",
+          "src/main.cpp"
+        ]
+      }
+    },
+    {
+      "id": "scope-path-traversal",
+      "title": "A path that escapes the entry's paths through ..",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Delete the build cache under build/",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#clean-build-cache",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "clean-build-cache",
+          "level": "R2",
+          "operations": "Delete the build cache under build/",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "delete-files"
+          ],
+          "scope": {
+            "paths": [
+              "build/**"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "unknown",
+      "reason": "non-canonical paths are not compared",
+      "request": {
+        "action": "delete-files",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "paths": [
+          "build/../src/main.cpp"
+        ]
+      }
+    },
+    {
+      "id": "scope-spend-within-limit",
+      "title": "A qualification run within the entry's spending limit",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Qualification runs of the app's CI, up to USD 2 each",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#ci-qualification",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "ci-qualification",
+          "level": "R2",
+          "operations": "Qualification runs of the app's CI, up to USD 2 each",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "run-ci"
+          ],
+          "scope": {
+            "purposes": [
+              "qualification"
+            ],
+            "max_usd": 2
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "verified",
+      "reason": "positive control for spending scope",
+      "request": {
+        "action": "run-ci",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "purpose": "qualification",
+        "cost_usd": 1.5
+      }
+    },
+    {
+      "id": "scope-spend-over-limit",
+      "title": "Same action, fifty times the authorized spending",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Qualification runs of the app's CI, up to USD 2 each",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#ci-qualification",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "ci-qualification",
+          "level": "R2",
+          "operations": "Qualification runs of the app's CI, up to USD 2 each",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "run-ci"
+          ],
+          "scope": {
+            "purposes": [
+              "qualification"
+            ],
+            "max_usd": 2
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "approval to spend USD 2 never authorizes USD 50",
+      "request": {
+        "action": "run-ci",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "purpose": "qualification",
+        "cost_usd": 50
+      }
+    },
+    {
+      "id": "scope-spend-unstated",
+      "title": "A run whose cost the operation does not state",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Qualification runs of the app's CI, up to USD 2 each",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#ci-qualification",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "ci-qualification",
+          "level": "R2",
+          "operations": "Qualification runs of the app's CI, up to USD 2 each",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "run-ci"
+          ],
+          "scope": {
+            "purposes": [
+              "qualification"
+            ],
+            "max_usd": 2
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "unknown",
+      "reason": "a limited dimension must be stated",
+      "request": {
+        "action": "run-ci",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "purpose": "qualification"
+      }
+    },
+    {
+      "id": "scope-other-purpose",
+      "title": "Same action, another purpose",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Qualification runs of the app's CI, up to USD 2 each",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#ci-qualification",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "ci-qualification",
+          "level": "R2",
+          "operations": "Qualification runs of the app's CI, up to USD 2 each",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "run-ci"
+          ],
+          "scope": {
+            "purposes": [
+              "qualification"
+            ],
+            "max_usd": 2
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "qualification is not release",
+      "request": {
+        "action": "run-ci",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "purpose": "release",
+        "cost_usd": 1
+      }
+    },
+    {
+      "id": "scope-unlimited-dimension",
+      "title": "The operation states a dimension the entry does not limit",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "unknown",
+      "reason": "an unlimited dimension is not permission",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin",
+        "purpose": "release"
+      }
+    },
+    {
+      "id": "scope-missing-risk-level",
+      "title": "The operation states no risk level",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "unknown",
+      "reason": "a missing risk level is never permission",
+      "request": {
+        "action": "push-branch",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "scope-level-above-entry",
+      "title": "An R2 operation against an R1 entry",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R1",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R1",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "the entry's level caps the operation",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "scope-entry-without-scope",
+      "title": "An entry with actions but no structured scope",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ]
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "unknown",
+      "reason": "existing entries without scope stay valid but grant nothing",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "cost-only-as-execution",
+      "title": "A cost-only grant used to run the workflow itself",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "The nightly benchmark workflow as committed, up to USD 10 per run",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#nightly-benchmarks",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "nightly-benchmarks",
+          "level": "R2",
+          "operations": "The nightly benchmark workflow as committed, up to USD 10 per run",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "run-nightly-benchmarks"
+          ],
+          "scope": {
+            "targets": [
+              "nightly-benchmarks"
+            ],
+            "max_usd": 10
+          },
+          "cost_only": true
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "spending authority is not execution authority",
+      "request": {
+        "action": "run-nightly-benchmarks",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "target": "nightly-benchmarks",
+        "cost_usd": 8
+      }
+    },
+    {
+      "id": "cost-only-spending",
+      "title": "A cost-only grant used for the spending it covers",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "The nightly benchmark workflow as committed, up to USD 10 per run",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#nightly-benchmarks",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "nightly-benchmarks",
+          "level": "R2",
+          "operations": "The nightly benchmark workflow as committed, up to USD 10 per run",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "run-nightly-benchmarks"
+          ],
+          "scope": {
+            "targets": [
+              "nightly-benchmarks"
+            ],
+            "max_usd": 10
+          },
+          "cost_only": true
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "verified",
+      "reason": "positive control for cost-only",
+      "request": {
+        "action": "run-nightly-benchmarks",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "target": "nightly-benchmarks",
+        "cost_usd": 8,
+        "aspect": "spend"
+      }
+    },
+    {
+      "id": "reference-narrows",
+      "title": "The reference limits spending below the entry",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Qualification runs of the app's CI, up to USD 2 each",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#ci-qualification",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z",
+        "limits": {
+          "max_usd": 1
+        }
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "ci-qualification",
+          "level": "R2",
+          "operations": "Qualification runs of the app's CI, up to USD 2 each",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "run-ci"
+          ],
+          "scope": {
+            "purposes": [
+              "qualification"
+            ],
+            "max_usd": 2
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "a reference's narrower limits apply too",
+      "request": {
+        "action": "run-ci",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "purpose": "qualification",
+        "cost_usd": 1.5
+      }
+    },
+    {
+      "id": "reference-cannot-widen",
+      "title": "The reference claims a higher limit than the entry",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Qualification runs of the app's CI, up to USD 2 each",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#ci-qualification",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z",
+        "limits": {
+          "max_usd": 50
+        }
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "ci-qualification",
+          "level": "R2",
+          "operations": "Qualification runs of the app's CI, up to USD 2 each",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "run-ci"
+          ],
+          "scope": {
+            "purposes": [
+              "qualification"
+            ],
+            "max_usd": 2
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "a reference never widens its entry",
+      "request": {
+        "action": "run-ci",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "purpose": "qualification",
+        "cost_usd": 10
+      }
+    },
+    {
+      "id": "changed-then-restored",
+      "title": "The entry was changed after approval, then restored",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": true
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "a material change followed by restoration needs fresh approval",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "approved-pr-not-on-default-branch",
+      "title": "The approved PR's merge is not on the default branch",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": false
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false
+      },
+      "structural": "unverified",
+      "runtime": "inapplicable",
+      "reason": "the entry on the default branch did not come from the approved PR",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
+    },
+    {
+      "id": "default-branch-moved",
+      "title": "The default branch moved since the pinned revision",
+      "operation": "Push the feature branch phase-1b to origin and open a draft PR",
+      "reference": {
+        "level": "R2",
+        "scope": "Push feature branches of this repository to origin and open draft PRs",
+        "source": "standing",
+        "by": "github:example-owner",
+        "ref": "ops/authorizations.json@0123456789abcdef0123456789abcdef01234567#push-feature-branches",
+        "granted": "2026-11-27T18:00:00Z",
+        "expires": "2027-06-30T00:00:00Z"
+      },
+      "state": {
+        "repository": "github.com/example/repo",
+        "commit_exists": true,
+        "entry_at_reference": {
+          "id": "push-feature-branches",
+          "level": "R2",
+          "operations": "Push feature branches of this repository to origin and open draft PRs",
+          "granted_by": "github:example-owner",
+          "approved_in": "https://github.com/example/repo/pull/1",
+          "expires": "2027-06-30T00:00:00Z",
+          "actions": [
+            "push-branch",
+            "open-draft-pr"
+          ],
+          "scope": {
+            "branches": [
+              "phase-*",
+              "feature/*"
+            ],
+            "destinations": [
+              "origin"
+            ]
+          }
+        },
+        "approval": {
+          "kind": "merge",
+          "by": "github:example-owner",
+          "entry_at_approved_revision": "identical",
+          "state": "active",
+          "introduced_entry": true,
+          "merged_into_default_branch": true
+        },
+        "entry_on_default_branch": "identical",
+        "host_reachable": true,
+        "reinstated_after_approval": false,
+        "changed_after_approval": false,
+        "default_branch_moved": true
+      },
+      "structural": "unverified",
+      "runtime": "unknown",
+      "reason": "verify again against the current revision",
+      "request": {
+        "action": "push-branch",
+        "level": "R2",
+        "repository": "github.com/example/repo",
+        "branch": "phase-1b",
+        "destination": "origin"
+      }
     }
   ]
 }

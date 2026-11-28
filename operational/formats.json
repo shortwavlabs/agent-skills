@@ -43,7 +43,8 @@
         "id": "str"
       },
       "optional": {
-        "sha256": "sha256"
+        "sha256": "sha256",
+        "supports": "str"
       },
       "cases": {
         "type": {
@@ -91,7 +92,8 @@
         "expires": "expiry"
       },
       "optional": {
-        "quote": "str"
+        "quote": "str",
+        "limits": "obj:grant-scope"
       },
       "cases": {
         "source": {
@@ -124,7 +126,9 @@
         "expires": "expiry"
       },
       "optional": {
-        "cost_only": "bool"
+        "cost_only": "bool",
+        "actions": "list+:slug",
+        "scope": "obj:grant-scope"
       }
     },
     "holder": {
@@ -220,6 +224,44 @@
         "at": "timestamp",
         "from": "obj:holder-identity",
         "to": "obj:holder-identity"
+      }
+    },
+    "job": {
+      "required": {
+        "id": "str",
+        "kind": "enum:process,ci-run,remote",
+        "command": "str",
+        "started": "timestamp"
+      },
+      "optional": {
+        "host": "str",
+        "pid": "pid?",
+        "process_start": "str?",
+        "cwd": "str",
+        "log": "str",
+        "outputs": "list:str",
+        "inputs_sha256": "sha256",
+        "expected_end": "timestamp",
+        "stop": "str",
+        "cost": "str",
+        "boot": "str"
+      },
+      "null_together": [
+        [
+          "pid",
+          "process_start"
+        ]
+      ]
+    },
+    "grant-scope": {
+      "optional": {
+        "repositories": "list+:str",
+        "branches": "list+:str",
+        "paths": "list+:str",
+        "destinations": "list+:str",
+        "targets": "list+:str",
+        "purposes": "list+:str",
+        "max_usd": "usd"
       }
     }
   },
@@ -344,6 +386,19 @@
       ],
       "json_sections": {
         "Authorizations in force": "list:obj:authorization-reference"
+      },
+      "optional_headers": {
+        "Transfer": "str",
+        "Checkout": "str"
+      },
+      "optional_headings": [
+        "Artifacts",
+        "Budget",
+        "Lessons and proposals"
+      ],
+      "optional_json_sections": {
+        "Artifacts": "list:obj:artifact",
+        "Running processes and jobs": "list:obj:job"
       }
     }
   }

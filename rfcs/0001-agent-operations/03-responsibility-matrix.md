@@ -51,7 +51,7 @@ Each skill names its siblings by name and states a minimum fallback for when a s
 | **Does not own** | Authority: a handoff is never an independent source of it ([D6](README.md#d6-authorization-across-handoffs)); claims (`development-coordination`); run manifests and release decisions (their skills) |
 | **Triggers** | Ending a session with unfinished work; passing work to another agent or model; leaving long-running jobs; blocking on an owner decision; resuming someone else's work; approaching the context limit |
 | **Inputs** | Git and PR state; test and CI results; processes the agent started; decisions and authorization references from the session |
-| **Produces** | `.agent-state/handoffs/<branch>.md`; optionally a public-safe status section in the PR description |
+| **Produces** | `.agent-state/handoffs/<branch>.md`; optionally a redacted status draft for the PR description, reviewed before posting |
 | **References** | `development-coordination`, `research-provenance`, `release-governance` (link their records, never restate them), `workspace-housekeeping` (preserving important handoffs) |
 
 ### instruction-governance

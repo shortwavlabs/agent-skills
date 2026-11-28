@@ -1,0 +1,408 @@
+{"$generated": "Generated from operational/formats.json (sha256 9fe85b02ed863733e77508efbfd72fa7cf92c529d7c5691b777caf0b4db37c6f). Do not edit this copy: change the source and regenerate.",
+"content":
+{
+  "kind": "formats",
+  "version": 1,
+  "about": "Normative definitions of the Phase 1 operational record formats (RFC 0001, document 05). Types: str (non-empty string), int, count (integer >= 0), pid (integer >= 1), bool, timestamp (UTC, YYYY-MM-DDTHH:MM:SSZ), label, expiry (timestamp, 'task-end' or 'until revoked'), enum:a,b, list:T, list+:T (non-empty), obj:Name, or a pattern name below; a trailing ? allows null. Versions are integers, never booleans or floats. Unknown fields are allowed, so adding an optional field keeps the version; duplicate JSON keys are rejected.",
+  "labels": [
+    "VERIFIED",
+    "OBSERVED",
+    "REPORTED",
+    "INFERRED",
+    "UNKNOWN"
+  ],
+  "authorization_statuses": {
+    "structural": [
+      "invalid",
+      "unverified"
+    ],
+    "runtime": [
+      "verified",
+      "inapplicable",
+      "unknown",
+      "invalid"
+    ],
+    "grants_authority": [
+      "verified"
+    ],
+    "about": "Structural checks (Phase 1a) report only invalid or unverified. Only runtime verification (Phase 1c) can report verified, the only status that grants authority."
+  },
+  "patterns": {
+    "commit": "^[0-9a-f]{40}$",
+    "sha256": "^[0-9a-f]{64}$",
+    "identity": "^[a-z][a-z0-9-]*:[^\\s:]+$",
+    "slug": "^[a-z0-9][a-z0-9-]*$",
+    "url": "^https://\\S+$",
+    "standing-ref": "^(?!(?:[^@]*/)?\\.{1,2}(?:/|@))[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*@[0-9a-f]{40}#[a-z0-9][a-z0-9-]*$",
+    "scenario-id": "^[A-Z]+-[0-9]{2}$",
+    "incident": "^I[0-9]+$",
+    "pr-url": "^https://github\\.com/[^/\\s]+/[^/\\s]+/pull/[0-9]+$"
+  },
+  "objects": {
+    "artifact": {
+      "required": {
+        "type": "enum:commit,tree,file,url,pr,ci-run",
+        "id": "str"
+      },
+      "optional": {
+        "sha256": "sha256",
+        "supports": "str"
+      },
+      "cases": {
+        "type": {
+          "commit": {
+            "required": {
+              "id": "commit"
+            }
+          },
+          "tree": {
+            "required": {
+              "id": "commit"
+            }
+          },
+          "file": {
+            "required": {
+              "sha256": "sha256"
+            }
+          },
+          "url": {
+            "required": {
+              "id": "url"
+            }
+          },
+          "pr": {
+            "required": {
+              "id": "url"
+            }
+          },
+          "ci-run": {
+            "required": {
+              "id": "url"
+            }
+          }
+        }
+      }
+    },
+    "authorization-reference": {
+      "required": {
+        "level": "enum:R1,R2",
+        "scope": "str",
+        "source": "enum:standing,owner-session",
+        "by": "identity",
+        "ref": "str",
+        "granted": "timestamp",
+        "expires": "expiry"
+      },
+      "optional": {
+        "quote": "str",
+        "limits": "obj:grant-scope"
+      },
+      "cases": {
+        "source": {
+          "standing": {
+            "required": {
+              "ref": "standing-ref"
+            },
+            "status": "unverified"
+          },
+          "owner-session": {
+            "status": "unverified",
+            "note": "not verifiable by another agent: at run time its status is unknown, so the receiving agent asks the owner once"
+          }
+        }
+      },
+      "after": [
+        [
+          "expires",
+          "granted"
+        ]
+      ]
+    },
+    "standing": {
+      "required": {
+        "id": "slug",
+        "level": "enum:R1,R2",
+        "operations": "str",
+        "granted_by": "identity",
+        "approved_in": "pr-url",
+        "expires": "expiry"
+      },
+      "optional": {
+        "cost_only": "bool",
+        "actions": "list+:slug",
+        "scope": "obj:grant-scope"
+      }
+    },
+    "holder": {
+      "required": {
+        "agent": "str",
+        "session": "str",
+        "host": "str",
+        "pid": "pid?",
+        "process_start": "str?"
+      },
+      "null_together": [
+        [
+          "pid",
+          "process_start"
+        ]
+      ],
+      "optional": {
+        "boot": "str?"
+      }
+    },
+    "scope": {
+      "required": {
+        "type": "enum:checkout,branch,paths,resource",
+        "value": "any"
+      },
+      "optional": {
+        "path": "str"
+      },
+      "cases": {
+        "type": {
+          "checkout": {
+            "required": {
+              "value": "str"
+            }
+          },
+          "branch": {
+            "required": {
+              "value": "str"
+            }
+          },
+          "paths": {
+            "required": {
+              "value": "list+:str"
+            }
+          },
+          "resource": {
+            "required": {
+              "value": "str"
+            }
+          }
+        }
+      }
+    },
+    "overhead": {
+      "required": {
+        "max_questions": "count",
+        "max_new_records": "count"
+      }
+    },
+    "transfer": {
+      "required": {
+        "token_sha256": "sha256",
+        "offered": "timestamp",
+        "expires": "timestamp"
+      },
+      "after": [
+        [
+          "expires",
+          "offered"
+        ]
+      ]
+    },
+    "holder-identity": {
+      "required": {
+        "agent": "str",
+        "host": "str",
+        "pid": "pid?",
+        "process_start": "str?"
+      },
+      "optional": {
+        "boot": "str?"
+      },
+      "null_together": [
+        [
+          "pid",
+          "process_start"
+        ]
+      ]
+    },
+    "ownership-event": {
+      "required": {
+        "event": "enum:transferred,recovered",
+        "at": "timestamp",
+        "from": "obj:holder-identity",
+        "to": "obj:holder-identity"
+      }
+    },
+    "job": {
+      "required": {
+        "id": "str",
+        "kind": "enum:process,ci-run,remote",
+        "command": "str",
+        "started": "timestamp"
+      },
+      "optional": {
+        "host": "str",
+        "pid": "pid?",
+        "process_start": "str?",
+        "cwd": "str",
+        "log": "str",
+        "outputs": "list:str",
+        "inputs_sha256": "sha256",
+        "expected_end": "timestamp",
+        "stop": "str",
+        "cost": "str",
+        "boot": "str"
+      },
+      "null_together": [
+        [
+          "pid",
+          "process_start"
+        ]
+      ]
+    },
+    "grant-scope": {
+      "optional": {
+        "repositories": "list+:str",
+        "branches": "list+:str",
+        "paths": "list+:str",
+        "destinations": "list+:str",
+        "targets": "list+:str",
+        "purposes": "list+:str",
+        "max_usd": "usd"
+      }
+    }
+  },
+  "json": {
+    "verification": {
+      "versions": [
+        1
+      ],
+      "required": {
+        "kind": "str",
+        "version": "int",
+        "claim": "str",
+        "label": "label",
+        "method": "str",
+        "artifact": "obj:artifact",
+        "verified_at": "timestamp",
+        "by": "str"
+      }
+    },
+    "authorizations": {
+      "versions": [
+        1
+      ],
+      "required": {
+        "kind": "str",
+        "version": "int",
+        "authorizations": "list:obj:standing"
+      },
+      "unique": {
+        "authorizations": "id"
+      }
+    },
+    "claim": {
+      "versions": [
+        1
+      ],
+      "required": {
+        "kind": "str",
+        "version": "int",
+        "id": "str",
+        "holder": "obj:holder",
+        "scope": "obj:scope",
+        "mode": "enum:exclusive,shared",
+        "intent": "str",
+        "created": "timestamp",
+        "expires": "timestamp"
+      },
+      "optional": {
+        "handoff": "str",
+        "transfer": "obj:transfer",
+        "history": "list+:obj:ownership-event"
+      },
+      "after": [
+        [
+          "expires",
+          "created"
+        ]
+      ]
+    },
+    "scenario": {
+      "versions": [
+        1
+      ],
+      "required": {
+        "kind": "str",
+        "version": "int",
+        "id": "scenario-id",
+        "title": "str",
+        "skills": "list+:slug",
+        "polarity": "enum:positive,negative",
+        "critical": "bool",
+        "risk_level": "enum:R0,R1,R2,R3",
+        "incidents": "list:incident",
+        "setup": "str",
+        "prompt": "str",
+        "expected": "list+:str",
+        "forbidden": "list:str",
+        "authorization": "enum:none_needed,must_request,must_not_request,must_not_proceed_without_owner",
+        "overhead": "obj:overhead"
+      }
+    }
+  },
+  "markdown": {
+    "handoff": {
+      "versions": [
+        1
+      ],
+      "title": "^# Handoff: \\S",
+      "headers": {
+        "Created": "timestamp",
+        "Author": "str",
+        "Repository": "str",
+        "Branch": "str",
+        "HEAD": "commit",
+        "Upstream": "str",
+        "Working tree": "str",
+        "PR": "str",
+        "Claim": "str",
+        "Supersedes": "str"
+      },
+      "headings": [
+        "Goal",
+        "State",
+        "Done",
+        "Pending",
+        "Decisions and rejected approaches",
+        "Blockers and decisions needed",
+        "Authorizations in force",
+        "Running processes and jobs",
+        "Verification",
+        "Assumptions and limitations",
+        "Resume"
+      ],
+      "labelled": [
+        "Done",
+        "Assumptions and limitations"
+      ],
+      "verified_fields": [
+        "method:",
+        "artifact:",
+        "at:"
+      ],
+      "json_sections": {
+        "Authorizations in force": "list:obj:authorization-reference"
+      },
+      "optional_headers": {
+        "Transfer": "str",
+        "Checkout": "str"
+      },
+      "optional_headings": [
+        "Artifacts",
+        "Budget",
+        "Lessons and proposals"
+      ],
+      "optional_json_sections": {
+        "Artifacts": "list:obj:artifact",
+        "Running processes and jobs": "list:obj:job"
+      }
+    }
+  }
+}
+}

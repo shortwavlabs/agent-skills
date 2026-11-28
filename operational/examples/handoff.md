@@ -3,13 +3,14 @@
 Version: 1
 Created: 2026-11-27T18:40:00Z
 Author: example-agent / example-model / 4b1f0c9e6a2d4e7f
-Repository: origin
+Repository: github.com/example/repo
 Branch: rfc/example
 HEAD: 0123456789abcdef0123456789abcdef01234567
 Upstream: in sync
 Working tree: clean
 PR: https://github.com/example/repo/pull/3
 Claim: 20261127T184000Z-7f3a1c2b
+Transfer: none
 Supersedes: none
 
 ## Goal
@@ -53,6 +54,14 @@ Revision 2 committed and pushed; CI not yet read on the final head.
     "granted": "2026-11-27T18:05:00Z",
     "expires": "task-end"
   }
+]
+```
+
+## Artifacts
+```json
+[
+  {"type": "commit", "id": "0123456789abcdef0123456789abcdef01234567"},
+  {"type": "pr", "id": "https://github.com/example/repo/pull/3"}
 ]
 ```
 
