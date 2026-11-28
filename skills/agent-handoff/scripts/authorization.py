@@ -205,6 +205,9 @@ def evaluate(reference, operation, facts: dict, policy: dict | None, now: dateti
         problem = scope_problem(limits, operation, holder, label) if limits is not None else None
         if problem:
             return problem
+    if aspect == "spend":
+        return "verified", (f"entry {entry_id} covers the spending of '{operation['action']}' only (cost-only "
+                            f"or spend aspect): the execution itself needs its own authorization")
     return "verified", (f"entry {entry_id} granted by {by}, recorded by the host as a {kind} in {entry['approved_in']}, "
                         f"unchanged at the approved revision and on the default branch, covers '{operation['action']}' "
                         f"until {entry['expires']}")

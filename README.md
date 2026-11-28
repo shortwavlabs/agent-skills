@@ -545,7 +545,7 @@ skill ([RFC 0001](rfcs/0001-agent-operations/README.md), Phase 1c).
 - **The record:** a local, self-ignoring `.agent-state/handoffs/<branch>.md` with objective and scope, repository
   state, done and pending work with evidence labels, artifacts with digests, decisions and rejected approaches, tests,
   defects, running jobs (PID and start time), the claim and its transfer token, authorization references, budget and
-  resume steps; a public-safe PR summary.
+  resume steps; a redacted PR summary draft for review.
 - **Verified resumption:** the record is evidence, not authority. `handoff.py check` compares it with the repository
   (branch, HEAD, upstream, working tree, artifact digests, jobs, claim) and reports every difference; jobs are never
   restarted, duplicated or stopped, and expensive work with unchanged inputs is not repeated.

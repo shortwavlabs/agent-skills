@@ -38,7 +38,13 @@ import sys
 import tempfile
 import time
 import urllib.parse
+from contextlib import contextmanager
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:                                   # Windows: no advisory lock; the compare-and-replace check remains
+    fcntl = None
 
 sys.dont_write_bytecode = True
 HERE = Path(__file__).resolve().parent
@@ -184,6 +190,7 @@ def repo_state(root: Path, fresh: bool = False) -> dict:
             fetched = (fetched if fetched.is_absolute() else root / fetched) / "FETCH_HEAD"
             basis = "cached; last fetched " + (stamp(datetime.datetime.fromtimestamp(
                 fetched.stat().st_mtime, datetime.timezone.utc).replace(microsecond=0)) if fetched.exists() else "never")
+    upstream_sha = git(root, "rev-parse", "--verify", "-q", "@{upstream}").stdout.strip() or None
     remote_head = None
     if fresh and remote and branch != "(detached)":
         ls = git(root, "ls-remote", "--heads", remote, f"refs/heads/{branch}")
@@ -202,7 +209,8 @@ def repo_state(root: Path, fresh: bool = False) -> dict:
         if total > MAX_DIRTY:
             unknown.append(f"{total - MAX_DIRTY} uncommitted paths beyond the first {MAX_DIRTY} are not recorded")
     return {"identity": identity, "remote": remote, "checkout": f"{socket.gethostname()}:{root}", "branch": branch,
-            "head": head, "upstream": upstream, "basis": basis, "remote_head": remote_head, "worktree": worktree,
+            "head": head, "upstream": upstream, "basis": basis, "remote_head": remote_head,
+            "upstream_sha": upstream_sha, "worktree": worktree,
             "dirty": dirty, "dirty_total": total, "unknown": unknown}
 
 
@@ -371,13 +379,43 @@ Supersedes: {supersedes}
 """
 
 
-def new(root: Path, title: str, author: str, claim: str, transfer: str, supersede: bool, pr: str | None = None) -> Path:
+@contextmanager
+def locked(folder: Path, timeout: float = 10.0):
+    """An exclusive advisory lock on the handoffs directory itself, held for check, archive and publish. Where
+    fcntl is unavailable the compare-and-replace check below still refuses most races."""
+    if fcntl is None:
+        yield
+        return
+    fd = os.open(folder, os.O_RDONLY)
+    try:
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise SystemExit("error: another session is writing a handoff record here: try again shortly")
+                time.sleep(0.05)
+        yield
+    finally:
+        os.close(fd)
+
+
+def new(root: Path, title: str, author: str, claim: str, transfer: str, supersede: bool, pr: str | None = None,
+        lock_timeout: float = 10.0) -> Path:
+    folder = ensure_state_dir(root)
+    with locked(folder, lock_timeout):
+        return _new(root, folder, title, author, claim, transfer, supersede, pr)
+
+
+def _new(root: Path, folder: Path, title: str, author: str, claim: str, transfer: str, supersede: bool,
+         pr: str | None) -> Path:
     state = repo_state(root)
     if state["head"] is None:
         raise SystemExit("error: HEAD cannot be read: a record must name a commit")
     if claim and not CLAIM_ID.match(claim):
         raise SystemExit(f"error: {claim!r} is not a claim id")
-    folder = ensure_state_dir(root)
     target = folder / record_name(state["branch"])
     if target.is_symlink() or (target.exists() and not target.is_file()):
         raise SystemExit(f"error: {target.relative_to(root)} is a symlink or not a regular file: refusing it")
@@ -462,10 +500,11 @@ def check(path: Path, root: Path, fresh: bool = False) -> tuple[str, list[str]]:
     if now["upstream"] is not None and recorded_upstream != now["upstream"]:
         drift(f"upstream was '{recorded_upstream}', now '{now['upstream']}' ({now['basis']})")
     if now["remote_head"] is not None:
-        if now["remote_head"] == now["head"]:
-            out.append(f"ok: freshly verified: {now['remote']} has this branch at HEAD")
+        if now["remote_head"] == now["upstream_sha"]:
+            out.append(f"ok: freshly verified: {now['remote']} still has this branch where the cached upstream says")
         else:
-            drift(f"freshly verified: {now['remote']} has this branch at {now['remote_head'][:12]}, not at HEAD")
+            drift(f"freshly verified: {now['remote']} has this branch at {now['remote_head'][:12]}, but the cached "
+                  f"upstream says {str(now['upstream_sha'])[:12]}: the cached upstream state is stale (fetch)")
     if now["dirty"] is not None:
         if headers["Working tree"] != now["worktree"]:
             drift(f"working tree was '{headers['Working tree']}', now '{now['worktree']}'")
@@ -588,7 +627,8 @@ def describe_facts(facts: dict) -> str:
     if not facts.get("host_reachable"):
         return f"host not reached: {facts.get('why', 'unknown')}"
     a = facts.get("approval") or {}
-    return (f"repository {facts.get('repository')} pinned at {str(facts.get('default_revision'))[:12]}; commit exists: "
+    return (f"repository {facts.get('repository')} pinned at {facts.get('default_revision')} (pass it to --pin to "
+            f"revalidate); commit exists: "
             f"{facts.get('commit_exists')}; entry found: {facts.get('entry_at_reference') is not None}; approval: "
             f"{a.get('kind')} by {a.get('by')} ({a.get('state')}, content {a.get('entry_at_approved_revision')}, "
             f"merged into the default branch: {a.get('merged_into_default_branch')}, introduced by the PR: "
@@ -892,6 +932,22 @@ def self_test() -> list[str]:
         if not drifted(check(dirty, root)[1], "readable by other users"):
             fail("a record readable by others was not reported")
         dirty.chmod(0o600)
+        # Fresh verification: the remote compared with the cached upstream ref.
+        bare = base / "remote.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True, capture_output=True)
+        run(root, "remote", "add", "fresh", str(bare))
+        run(root, "push", "-q", "-u", "fresh", "feature/parser")
+        if not any("still has this branch where the cached upstream says" in l for l in check(dirty, root, True)[1]):
+            fail("fresh verification of an up-to-date cache did not say so")
+        run(root, "commit", "-q", "--allow-empty", "-m", "elsewhere")
+        run(root, "push", "-q", "fresh", "HEAD:refs/heads/other-place")
+        moved = git(root, "rev-parse", "HEAD").stdout.strip()
+        run(root, "reset", "-q", "--soft", "HEAD~1")
+        subprocess.run(["git", "--git-dir", str(bare), "update-ref", "refs/heads/feature/parser", moved], check=True)
+        if not drifted(check(dirty, root, True)[1], "the cached upstream state is stale"):
+            fail("fresh verification did not notice a remote that moved since the last fetch")
+        run(root, "branch", "-q", "--unset-upstream")
+        run(root, "remote", "remove", "fresh")
         # Branch names that collided under the old scheme map to distinct records.
         names = {record_name(b) for b in ("a/b", "a--b", "A/b", "a%2Fb")}
         if len(names) != 4 or any("/" in n for n in names):
@@ -940,11 +996,11 @@ def self_test() -> list[str]:
             fail(f"supersession with an unsafe Created value: {names}")
         if parse(again.read_text(encoding="utf-8"))[0]["Supersedes"] != "unknown":
             fail("an unsafe Created value was carried into Supersedes")
-        saved_publish = globals()["publish"]
+        saved_replace = os.replace
 
-        def interrupted(target, data):
+        def interrupted(src, dst):
             raise KeyboardInterrupt("simulated interruption")
-        globals()["publish"] = interrupted
+        os.replace = interrupted
         before_bytes = again.read_bytes()
         try:
             new(root, "Interrupted", "codex", "", "", True, pr="none")
@@ -952,12 +1008,25 @@ def self_test() -> list[str]:
         except KeyboardInterrupt:
             pass
         finally:
-            globals()["publish"] = saved_publish
+            os.replace = saved_replace
         if again.read_bytes() != before_bytes or list(again.parent.glob(".tmp-*")):
             fail("an interrupted supersession lost or damaged the current record")
         if not any(p.read_bytes() == before_bytes for p in history.glob("*.md")):
             fail("an interrupted supersession did not keep the previous record")
         new(root, "Retry", "codex", "", "", True, pr="none")  # the retry finds the record already archived
+        if fcntl is not None:
+            holder = subprocess.Popen([sys.executable, "-c", "import fcntl, os, sys, time; fd = os.open(sys.argv[1], "
+                                       "os.O_RDONLY); fcntl.flock(fd, fcntl.LOCK_EX); print('locked', flush=True); "
+                                       "time.sleep(30)", str(root / STATE / "handoffs")], stdout=subprocess.PIPE, text=True)
+            holder.stdout.readline()
+            try:
+                new(root, "Blocked", "codex", "", "", True, pr="none", lock_timeout=0.5)
+                fail("a record was written while another session held the handoff lock")
+            except SystemExit:
+                pass
+            finally:
+                holder.kill()
+                holder.wait()
         real_archive = globals()["archive"]
 
         def racing_archive(folder, stem, data):

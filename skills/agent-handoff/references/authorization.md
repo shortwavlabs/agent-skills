@@ -143,6 +143,10 @@ instead: a trust root the agent could write is not one.
   the owner's credentials (a `gh` login, a token) approves or merges as the owner, and nothing here can tell the
   difference. Approvals of authorization PRs therefore mean something only if agents do not approve or merge them
   with the owner's credentials. That is a rule for the owner's setup, not something this tool can enforce.
+- Scope binds what the operation states and what the entry limits. An operation that leaves out a dimension the
+  entry does not limit still verifies, so describe operations completely; an entry that should constrain a
+  dimension must say so in its `scope`.
+- A verified `spend` operation covers the spending only; its execution needs its own authorization.
 - Bounded inspection: 100 first-parent commits and 100 reviews; beyond that, unknown.
 - Spending limits are per operation. Cumulative budgets belong to `resource-budgeting` (Phase 2).
 - `gh` must be installed and authenticated for live facts; otherwise every standing reference is unknown.

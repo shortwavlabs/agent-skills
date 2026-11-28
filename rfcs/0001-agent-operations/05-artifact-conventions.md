@@ -49,7 +49,7 @@ Every record carries `kind` and `version` (JSON) or a `Version:` header line (Ma
 | **`ops/`**, committed (or the project's declared override) | Standing authorizations, budget, debt register, release decisions, amendments | Normal git history |
 | **Next to the results they describe** | Run manifests | The project's research layout decides |
 | **Private storage** (`workspace-housekeeping`) | Anything that must outlive the machine but must not be published, including important handoffs | Verified backup |
-| **PR description** | A public-safe status summary taken from a handoff | Public: nothing private |
+| **PR description** | A redacted status draft taken from a handoff, reviewed before posting | Public: nothing private |
 
 ### `.agent-state/` layout and exclusion
 
@@ -72,7 +72,7 @@ Every record carries `kind` and `version` (JSON) or a `Version:` header line (Ma
 - **Claims are ephemeral.** A released claim is deleted by its holder. Stale claims are moved to `claims/stale/`, not
   deleted, until reviewed. Any other entry in `claims/` makes the registry uninspectable (unknown), except a regular
   `.DS_Store` file, which is reported, ignored and never deleted.
-- **Handoffs are valuable.** They are never deleted automatically. The preservation path: a public-safe summary in
+- **Handoffs are valuable.** They are never deleted automatically. The preservation path: a reviewed, redacted summary in
   the PR description; a copy in the owner's private backup (`workspace-housekeeping`); or, in a **private**
   repository whose owner chooses it, a committed `ops/handoffs/` directory that is not ignored. Never force-add an
   ignored file, use index plumbing or rename files to get them committed.
@@ -201,10 +201,12 @@ Committed in `ops/authorizations.json` (or the file the canonical policy names),
   sentence covers an operation is not decided mechanically. Every dimension the operation states must be limited, and
   every limited dimension must be stated. A reference may carry narrower `limits`, never wider. An entry without
   `actions` or `scope` stays structurally valid and verifies as unknown.
-- **Bound to its PR.** The `approved_in` PR must have introduced or changed the entry, compared with the merge
-  commit's first parent (a merge) or with the merge base of the reviewed commit (a review), never with the PR's
-  recorded base, which can predate an entry pushed to the branch later: an owner merging an unrelated PR approves
-  nothing already on the branch. Standing references must name the designated file.
+- **Bound to its PR.** The `approved_in` PR must have been merged into the default branch (its merge on the
+  first-parent chain from a pinned revision) and must itself have introduced or changed the entry: compared with the
+  merge commit's first parent, or, for a squash or rebase merge, with the first commit the host does not associate
+  with the PR; never with the PR's recorded base, which can predate an entry pushed to the branch later. An owner
+  merging an unrelated PR approves nothing already on the branch. Since that merge, the entry must never have been
+  removed or changed (even if restored). Standing references must name the designated file.
 - Existing authorized workflows that cost money (D9) are entries here; the budget file only holds thresholds.
 - **No owner list here.** Owner identities and trusted repositories are declared only in the canonical policy (D14);
   a repository cannot establish its own owner identity.
@@ -349,8 +351,8 @@ non-fast-forward pushes, and that refusal is investigated, never forced.
 
 ## Handoff record
 
-Owner: `agent-handoff` (Phase 1c). Location: `.agent-state/handoffs/<branch>.md` (`/` in a branch name becomes
-`--`). Refreshed at milestones and at the end of a session with unfinished work. Phase 1a defines its required header
+Owner: `agent-handoff` (Phase 1c). Location: `.agent-state/handoffs/<percent-encoded branch>.<digest of the branch name>.md`
+(collision-resistant, also on case-insensitive filesystems), private (0600), published atomically. Refreshed at milestones and at the end of a session with unfinished work. Phase 1a defines its required header
 lines and headings; Phase 1c adds optional parts, still version 1: a `Transfer:` header (the one-time claim transfer
 token), `## Artifacts` (a JSON list of artifacts), a JSON list of jobs under `## Running processes and jobs`,
 `## Budget` and `## Lessons and proposals`. See `skills/agent-handoff/references/record.md`.

@@ -112,9 +112,11 @@ class Host:
             if len(parents) != len(data["parents"]) or not all(SHA.match(str(p)) for p in parents):
                 raise HostError(f"malformed parents for {ref[:12]}")
             files = data.get("files")
+            # A renamed file is listed under its new name, with the old one in previous_filename: both count.
             data = {"sha": data["sha"], "parents": parents,
                     "files": None if not isinstance(files, list) or len(files) >= FILES_PAGE
-                    else [f.get("filename") for f in files if isinstance(f, dict)]}
+                    else [n for f in files if isinstance(f, dict) for n in (f.get("filename"),
+                                                                             f.get("previous_filename")) if n]}
             self.commit_cache[ref] = self.commit_cache[data["sha"]] = data
         return self.commit_cache[ref]
 
@@ -316,8 +318,8 @@ class FakeGitHub:
         self.down = False
         self.calls: list[str] = []
 
-    def add(self, sha, parents, doc, prs=(), date="2026-11-27T00:00:00Z"):
-        self.commits[sha] = {"parents": list(parents), "doc": doc, "prs": list(prs), "date": date}
+    def add(self, sha, parents, doc, prs=(), date="2026-11-27T00:00:00Z", files=None):
+        self.commits[sha] = {"parents": list(parents), "doc": doc, "prs": list(prs), "date": date, "files": files}
         self.head = sha
         return sha
 
@@ -349,8 +351,9 @@ class FakeGitHub:
             if sha in self.commits:
                 c = self.commits[sha]
                 parent_doc = self.commits[c["parents"][0]]["doc"] if c["parents"] else None
-                files = [{"filename": "ops/authorizations.json"}] if len(c["parents"]) == 1 and c["doc"] != parent_doc \
-                    else ([] if len(c["parents"]) == 1 else [{"filename": "other"}])
+                files = c["files"] if c["files"] is not None else (
+                    [{"filename": "ops/authorizations.json"}] if len(c["parents"]) == 1 and c["doc"] != parent_doc
+                    else ([] if len(c["parents"]) == 1 else [{"filename": "other"}]))
                 return {"sha": sha, "parents": [{"sha": p} for p in c["parents"]], "files": files,
                         "commit": {"committer": {"date": c["date"]}}}
             if sha in self.docs:
@@ -458,6 +461,17 @@ def self_test() -> list[str]:
         gh.pr = {**merged, "merge_commit_sha": sha("1")}
         if outcome(gh, sha("1"))[0] != "verified":
             failures.append(f"side-branch states were counted as default-branch history: {outcome(gh, sha('1'))}")
+        # Renaming the file away and back: the host lists the old name only as previous_filename.
+        gh = FakeGitHub()
+        gh.add(sha("0"), [], doc())
+        gh.add(sha("1"), [sha("0")], doc(entry), prs=(1,))
+        gh.add(sha("2"), [sha("1")], None, prs=(6,), files=[{"filename": "ops/moved.json",
+                                                              "previous_filename": "ops/authorizations.json"}])
+        gh.add(sha("3"), [sha("2")], doc(entry), prs=(7,), files=[{"filename": "ops/authorizations.json",
+                                                                    "previous_filename": "ops/moved.json"}])
+        gh.pr = {**merged, "merge_commit_sha": sha("1")}
+        if outcome(gh, sha("1"))[0] != "inapplicable":
+            failures.append(f"a rename away and back hid the removal: {outcome(gh, sha('1'))}")
         # A side branch that removed the entry, merged into the default branch: that removal did reach it.
         gh = FakeGitHub()
         gh.add(sha("0"), [], doc())

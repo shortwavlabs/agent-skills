@@ -498,11 +498,11 @@ These are implementation details within the approved design, to be settled in th
   whether any cross-machine signal is worth adding without publishing private state.
 - **Handoff refresh before compaction (1c).** Some harnesses offer a pre-compaction hook; others give no warning.
 - **Proposed in Phase 1c** (revision 6, see `skills/agent-handoff/references/`): runtime verification reads, through
-  `gh api` only, the repository, the referenced commit (HTTP 422 means it does not exist), the authorizations file at
-  the referenced commit, the PR's base, each approved revision and the default branch, the PR's merge and reviews, and
-  the file's history on the default branch since the approval; offline or unreadable is unknown. The `approved_in` PR
-  must have introduced or changed the entry. Standing entries list `actions` (exact slugs) that an operation must
-  match; an entry without them is unknown. Handoffs are refreshed at milestones; Claude Code and Codex document
+  `gh api` only, the repository and a pinned default-branch revision, the referenced commit (HTTP 422 means it does
+  not exist), the PR's merge, reviews and associated commits, and the authorizations file along the first-parent
+  chain from the pin back to the merge (never by timestamp; at most 100 commits); offline, ambiguous or unreadable is
+  unknown. The `approved_in` PR must have introduced or changed the entry. Standing entries list `actions` (exact
+  slugs) and a structured `scope` that a structured operation must match; an entry without them is unknown. Handoffs are refreshed at milestones; Claude Code and Codex document
   `PreCompact` hooks the owner may configure, and this family installs none. Owner identities still come only from
   the canonical policy, so until Phase 1d standing references are unknown.
 - **Related operations (Phase 2).** How a task is identified for cumulative budget accounting (a PR, a run series, a
