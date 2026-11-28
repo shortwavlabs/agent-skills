@@ -184,8 +184,9 @@ Nothing in a domain skill changes before Phase 4.
 ## Rules for references between skills
 
 1. **Reference siblings by name, never by relative path.** The Agent Skills specification keeps file references
-   relative to the skill root and one level deep. The existing skills contain 107 links of the form
-   `../../<other-skill>/...`, which break whenever the sibling is not installed next to the linking skill. Phase 1a
+   relative to the skill root and one level deep. The existing skills contain 116 relative links into other skills
+   (88 distinct source-and-target pairs, most of the form `../../<other-skill>/...`), which break whenever the sibling
+   is not installed next to the linking skill. Phase 1a
    freezes them in a baseline and rejects new ones repository-wide.
 2. **State a minimum fallback.** For example: "If `workspace-housekeeping` is installed, follow it before deleting.
    Otherwise, delete nothing that is not a disposable, task-owned file without the owner's approval."

@@ -91,8 +91,8 @@ Each item touches existing content and needs explicit owner approval:
 - **PR #18 (merged 2026-11-27, independently of this RFC)** corrected `workspace-housekeeping`: a tested in-use check
   (`path_in_use.py`: working directories and open files of every process, explicit visibility, UNKNOWN never treated
   as idle), revalidation chained with removal, and no forced worktree removal. The family builds on it.
-- **Existing cross-skill links.** Phase 1a freezes the 107 existing `../../<other-skill>/` links in a baseline so no
-  new ones appear. Removing the existing ones is a separate repository-wide change.
+- **Existing cross-skill links.** Phase 1a freezes the 116 existing cross-skill links (88 distinct source-and-target
+  pairs) in a baseline so no new ones appear. Removing the existing ones is a separate repository-wide change.
 - **Clean-machine reproducibility without persistent checkouts (D12).** To investigate: a disposable CI job that
   checks out a commit; a container with the repository mounted read-only; a `git archive` export into a scratch
   directory, removed after use. None creates a persistent duplicate development checkout, and none weakens the
