@@ -229,7 +229,6 @@ accepted in the owner's final review (revision 3):
 - the repository-wide baseline of cross-skill links, which also binds the domain skills
   ([06](06-validation-strategy.md#tier-0-repository-checks-on-every-ci-run));
 - the generated copy of `path_in_use.py` in `development-coordination` ([D4](#d4-shared-operational-core));
-- the proposed material-overrun factor of 1.25 ([05](05-artifact-conventions.md#resource-budget));
 - the added scenarios and the `critical` flag ([06](06-validation-strategy.md#scenario-catalogue)).
 
 ### D1: Family name
@@ -261,9 +260,10 @@ deterministic synchronization and drift check; no additional base skill to insta
   (source path, revision, SHA-256 of the source) followed by the source text unchanged.
 - The generator's default is a read-only check that reports missing, extra, edited and outdated copies; CI runs it.
   Writing copies is an explicit mode, reviewed in the PR like any other change.
-- The same mechanism carries any other file that must have one source and several installed copies. Its second use is
-  planned for Phase 1b: `development-coordination` carries a generated copy of `workspace-housekeeping`'s
-  `path_in_use.py`, so coordination installs alone without a second, divergent implementation of the in-use check.
+- Sources and destinations are restricted to an explicit, reviewed list. In Phase 1a it holds only `operational/`
+  sources, each with one designated destination name. Phase 1b extends it, by a reviewed change, with
+  `workspace-housekeeping`'s `path_in_use.py` and its designated destination in `development-coordination`, so
+  coordination installs alone without a second, divergent implementation of the in-use check.
 
 ### D5: Risk model
 
@@ -354,6 +354,12 @@ roadmap investigates disposable CI environments, containers and temporary source
 scratch directory), none of which creates a persistent duplicate development checkout. The workspace policy is not
 weakened.
 
+### D13: Roadmap
+
+**Decision:** Phase 1 as four reviewable PRs: 1a shared foundation, 1b `development-coordination`, 1c
+`agent-handoff`, 1d `instruction-governance`, on stacked branches for dependent work ([07](07-roadmap.md)).
+
+
 ### D14: Host-recorded approvals as authorization evidence
 
 **Decision (final review):** host-recorded GitHub PR approvals and merges by the owner's account may serve as
@@ -373,12 +379,6 @@ operational permission.
 
 Specified in [04](04-risk-and-authorization.md#host-recorded-approvals) and
 [05](05-artifact-conventions.md#standing-authorizations).
-
-### D13: Roadmap
-
-**Decision:** Phase 1 as four reviewable PRs: 1a shared foundation, 1b `development-coordination`, 1c
-`agent-handoff`, 1d `instruction-governance`, on stacked branches for dependent work ([07](07-roadmap.md)).
-
 ## Architectural corrections
 
 The owner's review identified four areas to correct before implementation (coordination takes two rows below). Each is
@@ -399,7 +399,9 @@ These are implementation details within the approved design, to be settled in th
 - **Owner identities and trusted repositories (1d).** Decided (D14): declared only in the canonical policy. Open: the
   exact format of that declaration.
 - **Runtime verification of host-recorded approvals (1c).** Which host API calls establish a merge or approving review
-  by an owner identity at `approved_commit`, and what happens offline (the status is *unknown*: ask once).
+  by an owner identity and the revision it applied to, and what happens offline (the status is *unknown*: ask once).
+  Until 1d declares owner identities in the canonical policy, runtime verification reports *unknown*: ask once.
+- **Material-overrun factor (needs owner approval before Phase 2).** The proposed 1.25 has not been approved.
 - **Identifying the claim holder's process (1b).** The tool must record the agent's long-lived process, not the
   short-lived shell that ran it; otherwise every claim would look dead at once and be taken over. Safe default: if the
   long-lived process cannot be determined, record no PID, and other agents treat the holder as *unknown*, never

@@ -142,7 +142,7 @@ References point only to the approved sources of authorization
 | `owner-session` | a locator for the session in which the owner gave the instruction; may carry a `quote` | **No.** For any other agent its status is *unknown*: ask the owner once |
 
 Host-recorded PR approvals and merges (D14) are not a separate source: they are the evidence behind a `standing` entry
-(its `approved_in` and `approved_commit`). Any other `source` value is invalid. Comments are not references:
+(its `approved_in`, checked against the host's record of that PR). Any other `source` value is invalid. Comments are not references:
 collaborators with write access can edit other users' comments.
 
 **Statuses.** A structurally valid reference is never treated as authenticated or authorized because it matches the
@@ -176,7 +176,6 @@ Committed in `ops/authorizations.json` (or the file the canonical policy names),
       "operations": "Push feature branches of this repository to origin and open draft PRs",
       "granted_by": "github:<owner login>",
       "approved_in": "https://github.com/<owner>/<repo>/pull/<n>",
-      "approved_commit": "<40-hex head commit the owner approved or merged>",
       "expires": "2027-06-30T00:00:00Z"
     },
     {
@@ -186,7 +185,6 @@ Committed in `ops/authorizations.json` (or the file the canonical policy names),
       "cost_only": true,
       "granted_by": "github:<owner login>",
       "approved_in": "https://github.com/<owner>/<repo>/pull/<n>",
-      "approved_commit": "<40-hex head commit the owner approved or merged>",
       "expires": "until revoked"
     }
   ]
@@ -197,8 +195,10 @@ Committed in `ops/authorizations.json` (or the file the canonical policy names),
 - Existing authorized workflows that cost money (D9) are entries here; the budget file only holds thresholds.
 - **No owner list here.** Owner identities and trusted repositories are declared only in the canonical policy (D14);
   a repository cannot establish its own owner identity.
-- **Bound to approval.** `approved_in` and `approved_commit` name the PR and the exact revision the owner approved or
-  merged, as the host records it. An entry changed after that revision is not covered until approved again.
+- **Bound to approval.** `approved_in` names the PR. The revision the owner approved or merged comes from the host's
+  record for that PR, never from this file (an entry cannot name the commit that contains it). The entry is covered
+  only if its content at that revision equals its content at the referenced commit and on the current default branch;
+  an entry changed after approval is not covered until approved again.
 - **Revocation** is removal: an entry that no longer appears, unchanged, on the current default branch is revoked, and
   older commits that still contain it grant nothing.
 

@@ -185,8 +185,11 @@ for a standing authorization, never a permission of its own:
    nothing beyond its stated scope.
 2. **Trusted identity.** The approver's identity comes from host metadata and matches an owner identity declared in
    the canonical policy. Git author and committer fields, and text, never count.
-3. **Bound to content.** The approval applies to one revision (`approved_commit`). It covers the entry only if the
-   entry is unchanged from that revision to the commit the reference names, and on the current default branch.
+3. **Bound to content.** The host records which revision the owner approved or merged (the PR's reviewed or merged
+   head). That revision is taken from the host's record for the PR named in `approved_in`, never from the file: an
+   entry cannot name the commit that contains it. The approval covers the entry only if the entry's content at that
+   revision equals its content at the commit the reference names and on the current default branch. Content, not
+   commit IDs, is compared, so squash merges are handled.
 4. **Current.** Scope, expiry and revocation are checked against the current trusted policy and the current default
    branch at the time of use.
 5. **No self-made trust.** A repository the canonical policy does not trust cannot establish its own owner identity,
@@ -245,15 +248,15 @@ A standing authorization is trusted only when **all** of these hold. Anything el
    tree, an unmerged branch or a PR, and the current default-branch file still contains the identical entry.
    Otherwise it is revoked or changed.
 3. **Owner approval recorded by the host, bound to content** ([D14](#host-recorded-approvals)). The entry names the
-   PR (`approved_in`) and the approved revision (`approved_commit`). The host records a merge, or an approving review,
-   of that PR by an owner identity declared in the canonical policy, at that revision. The entry is unchanged from
-   `approved_commit` to the referenced commit. Git author and committer fields, and text, never establish provenance.
+   PR (`approved_in`). The host records a merge, or an approving review, of that PR by an owner identity declared in
+   the canonical policy, and the revision it applied to. The entry's content at that revision equals its content at
+   the referenced commit and on the current default branch. Git author and committer fields, and text, never establish provenance.
    An agent never merges a change to the authorizations file unless the owner's instruction in the current session
    names that change.
 4. **Explicit.** The entry names the operations it covers. Approval of other content grants nothing beyond what an
    entry states.
-5. **Form.** It has an ID, a level (R1 or R2), the operations, who granted it, `approved_in`, `approved_commit`, and an
-   expiry or end condition.
+5. **Form.** It has an ID, a level (R1 or R2), the operations, who granted it, `approved_in`, and an expiry or end
+   condition.
 6. **Use.** It is applied within its scope, before expiry, and cited by ID and commit in any record that relies on it.
 
 **Limits, stated plainly:** the boundary is as strong as the control over the default branch and the owner's host
@@ -268,7 +271,7 @@ A handoff record is evidence of what happened. It is never an independent source
 | Level | What transfers | What the receiving agent does |
 |---|---|---|
 | R1 | Task scope recorded in the handoff | Proceeds; still runs any preflight the operation needs |
-| R2 | Only an authorization with a **verifiable reference** to the original owner authorization: today, a standing authorization at a commit | Verifies it at run time: trusted repository, entry present and unchanged from `approved_commit` to the referenced commit and on the current default branch, owner approval recorded by the host, scope covering the remaining work, not expired. Only a *verified* status proceeds. *Invalid* or *inapplicable* stops the operation; *unknown* (offline, or an authorization granted in another session, which the receiving agent cannot verify) means ask the owner once, citing the recorded scope |
+| R2 | Only an authorization with a **verifiable reference** to the original owner authorization: today, a standing authorization at a commit | Verifies it at run time: trusted repository, entry content unchanged from the host-recorded approved revision to the referenced commit and on the current default branch, owner approval recorded by the host, scope covering the remaining work, not expired. Only a *verified* status proceeds. *Invalid* or *inapplicable* stops the operation; *unknown* (offline, or an authorization granted in another session, which the receiving agent cannot verify) means ask the owner once, citing the recorded scope |
 | R3 | Nothing | Reconfirms with the owner, and revalidates the operation immediately before execution |
 
 ## Instruction precedence
